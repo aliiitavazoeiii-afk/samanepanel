@@ -61,3 +61,9 @@ Darma `finance.py` has a **single-day special exception** with zero commission f
 - Current sale row uses one unit price per variant/day/source. If a single variant has multiple prices in one day, import rejects until a price-split line model is designed.
 - Real sale price must be confirmed (the product inventory export includes both list price and promotion price; neither guarantees settlement actual).
 - Inventory is local; future stock synchronization to Digikala requires an authenticated API integration and conflict policy, not currently implemented.
+
+## NEW REQUIRED UI: «تعریف» → «تعریف محصولات» (owner request, 2026-10-29)
+
+Read and implement **[`docs/PRODUCT_DEFINITIONS_SPEC.md`](PRODUCT_DEFINITIONS_SPEC.md)** before declaring the new panel's daily-sales feature complete. The user wants a clearly visible **«تعریف»** section (reuse existing section if available), containing **«تعریف محصولات»**. The 538 unique variants from the supplied inventory Excel must appear automatically there. The owner should enter **only each variant's بهای تمام‌شده (تومان)**; sale imports then automatically use that stored cost and the existing category-specific commission/processing/VAT formulas to calculate fees, receivable and profit. Do not require the owner to define products manually. Keep already entered costs and live stock intact, don't create duplicates, and never rewrite historical sale cost snapshots automatically.
+
+**Current code note:** `/daily-sales/inventory` already lists catalog variants and allows single/bulk COGS edits, but there is no independent `تعریف` navigation. Reuse this functionality and integrate an intuitive definitions page into the *existing* panel's UI rather than making a second disconnected catalog. The spec sets acceptance tests and safe catalog-import behavior. This is a **pending implementation requirement**, not a claim the new UI is already deployed.
