@@ -49,7 +49,7 @@ DIGITS=str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩','012345678901234
 class ImportErrorDetail(ValueError): pass
 
 def dbconnect(path):
- c=sqlite3.connect(str(path),timeout=30, isolation_level=None)
+ c=sqlite3.connect(str(path),timeout=30, isolation_level=None, check_same_thread=False)
  c.row_factory=sqlite3.Row
  c.execute('PRAGMA busy_timeout=30000')
  c.execute('PRAGMA foreign_keys=ON')
