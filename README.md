@@ -73,3 +73,9 @@ If the daily orders XLSX contains an explicit `قیمت واحد (تومان)` o
 - `https://github.com/aliiitavazoeiii-afk/darma-general/blob/v126-payment-history-filters/core/daily_order_views_v60.py`
 
 Further integration notes: `docs/NEW_CHAT_HANDOFF.md`.
+
+## Required panel navigation: «تعریف» → «تعریف محصولات»
+
+The next integration must expose an obvious **«تعریف»** menu and **«تعریف محصولات»** page (or reuse this menu if the main panel already has it). The 538 variants from `digikala kala.xlsx` are already auto-seeded on **initial empty database creation**; in the definitions page, the owner should only need to supply a **per-variant unit cost in toman**. The daily-sales import must read that cost automatically for its frozen COGS snapshot and calculate the correct Digikala charges and profit. Keep old costs and stock on redeploy/reimport. The existing `/daily-sales/inventory` page already supports manual and bulk cost edits; the dedicated definitions **navigation/UI and future-safe catalog sync remain integration work**.
+
+**Complete Persian product / UI / financial specification and acceptance criteria:** [`docs/PRODUCT_DEFINITIONS_SPEC.md`](docs/PRODUCT_DEFINITIONS_SPEC.md).
