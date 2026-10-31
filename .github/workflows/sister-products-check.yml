@@ -26,7 +26,8 @@ jobs:
         run: |
           python - <<'PY'
           from daily_sales_service.app import app
-          paths = {r.path for r in app.routes}
+          from daily_sales_service.master_v2_api import router
+          paths = {r.path for r in router.routes if hasattr(r,"path")}
           for suffix in ('/master', '/master/stock', '/master/stock/operations',
                          '/pricing', '/pricing/cost', '/pricing/sales', '/catalog',
                          '/import', '/preview', '/commit'):
