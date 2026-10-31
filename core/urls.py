@@ -127,7 +127,8 @@ urlpatterns = [
     path("inventory/materials/", inventory_center_v97.raw_materials, name="inventory_materials"),
     path("inventory/materials/action/", inventory_center_v97.raw_material_action, name="inventory_material_action"),
     path("inventory/color-model/add/", inventory_v20.add_color_model, name="inventory_add_color_model"),
-    path("inventory/operations/", inventory_operations_v16.inventory_operations, name="inventory_operations"),
+    path("inventory/operations/", sister_sales.digikala_proxy, {"tail": "master/stock/operations"}, name="inventory_operations"),
+    path("inventory/legacy-operations/", inventory_operations_v16.inventory_operations, name="legacy_inventory_operations"),
     path("inventory/operations/transfer-direction/", inventory_transfer_v123.inventory_transfer_direction, name="inventory_transfer_direction_v123"),
     path(
         "inventory/operations/transfers/<int:transfer_id>/update/",
@@ -151,6 +152,7 @@ urlpatterns = [
     path("settings/products/", sister_master.products, name="settings_products"),
     path("settings/products/new/", sister_sales.digikala_proxy, {"tail": "master"}, name="settings_product_new"),
     path("settings/products/digikala/", sister_sales.digikala_proxy, {"tail": "catalog"}, name="sister_product_digikala"),
+    path("settings/products/pricing/", sister_sales.digikala_proxy, {"tail": "pricing"}, name="sister_product_pricing"),
     path("settings/products/legacy/", product_center_v93.settings_products, name="legacy_settings_products"),
     path("settings/products/legacy/new/", settings_product_v60.settings_product_form, name="legacy_settings_product_new"),
     path("settings/products/<int:product_id>/", settings_product_v60.settings_product_form, name="settings_product_edit"),
