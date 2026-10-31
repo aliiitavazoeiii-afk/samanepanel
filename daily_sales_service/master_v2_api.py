@@ -256,7 +256,7 @@ async def post_adjust(request:Request,category:str=Form(...),model_id:str=Form("
         values=_posted_targets(conn,category,mid,size,post,"target_",subtype)
         count=batch_adjust(conn,category,mid,size,location,values,reason)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
-    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&subtype={quote(subtype)}&location={location}",status_code=303)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+(f"&model_id={model_id}" if model_id else "")+f"&size={quote(size)}&subtype={quote(subtype)}&location={location}",status_code=303)
 
 @router.post(ROOT+"/master/stock/transfer")
 async def post_transfer(request:Request,category:str=Form(...),model_id:str=Form(""),subtype:str=Form(""),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
@@ -266,7 +266,7 @@ async def post_transfer(request:Request,category:str=Form(...),model_id:str=Form
         values=_posted_targets(conn,category,mid,size,post,"qty_",subtype)
         batch_transfer(conn,category,mid,size,location,values,reason)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
-    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&subtype={quote(subtype)}",status_code=303)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+(f"&model_id={model_id}" if model_id else "")+f"&size={quote(size)}&subtype={quote(subtype)}",status_code=303)
 
 @router.post(ROOT+"/master/stock/undo")
 def undo_stock(event_id:int=Form(...),category:str=Form(""),conn=Depends(conn_dep)):
