@@ -7,7 +7,7 @@ test "$(id -u)" -eq 0 || { echo "Run as root" >&2; exit 1; }
 test -f "$APP/.env" && test -f "$APP/compose.fresh.yml" || { echo "Fresh panel not found" >&2; exit 1; }
 cd "$APP"
 test "$(git branch --show-current)" = "dia-darma-fresh" || { echo "Wrong branch" >&2; exit 1; }
-test -z "$(git status --porcelain)" || { echo "Uncommitted changes detected; stop" >&2; exit 1; }
+git diff --quiet && git diff --cached --quiet || { echo "Tracked source changes detected; stop" >&2; exit 1; }
 
 git fetch origin dia-darma-fresh
 git pull --ff-only origin dia-darma-fresh
