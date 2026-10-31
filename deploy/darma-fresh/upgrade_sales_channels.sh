@@ -48,7 +48,7 @@ echo "Legacy, fresh-stock and unified SKU master tests"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint env sister-digikala -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
 
 echo "Verify new product, pricing and stock routes"
-docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
+docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.app import app; from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
 
 echo "Start the sister sales service and isolated Django web"
 docker compose -f compose.fresh.yml up -d --no-deps sister-digikala web
