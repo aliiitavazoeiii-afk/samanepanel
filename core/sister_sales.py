@@ -52,12 +52,14 @@ _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/uploa
             "master/stock/operations", "master/stock/bulk-adjust", "master/stock/transfer",
             "master/stock/undo", "master/stock/transfer/revise",
             "pricing", "pricing/cost", "pricing/sales", "pricing/cost/save", "pricing/sales/save",
-            "catalog", "catalog/map"}
+            "catalog", "catalog/map", "platforms", "capital-report", "api/sister-capital.json",
+            "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add"}
 _POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
-         "pricing/cost/save", "pricing/sales/save", "catalog/map"}
+         "pricing/cost/save", "pricing/sales/save", "catalog/map",
+         "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
 _API = "/daily-sales"
@@ -68,7 +70,9 @@ _API = "/daily-sales"
 _CANONICAL_PAGES = {
     "master": "/settings/products/new/",
     "master/stock": "/inventory/stock/",
-    "catalog": "/settings/products/digikala/",
+    "catalog": "/settings/products/platforms/digikala/",
+    "platforms": "/settings/products/platforms/",
+    "capital-report": "/report/sister-capital/",
 }
 
 
@@ -120,7 +124,7 @@ def embedded_response(request, upstream_html, tail, status=200):
     title = unescape(re.sub(r"<[^>]*>", "", title_match.group(1))).strip() if title_match else "مدیریت محصولات و فروش"
     section = (
         "stock" if tail.startswith("master/stock")
-        else "catalog" if tail.startswith("catalog")
+        else "catalog" if tail.startswith(("catalog","platforms"))
         else "pricing" if tail.startswith("pricing")
         else "master" if tail.startswith("master")
         else "sales"
