@@ -45,8 +45,11 @@ def ghaleb(request):
 
 
 _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/upload",
-            "stock/adjust", "settings", "setting", "api/report.json", "api/report.csv"}
-_POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting"}
+            "stock/adjust", "settings", "setting", "api/report.json", "api/report.csv",
+            "master", "master/add", "master/edit", "master/stock", "master/stock/adjust",
+            "catalog", "catalog/map"}
+_POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
+         "master/add", "master/edit", "master/stock/adjust", "catalog/map"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
 _API = "/daily-sales"
