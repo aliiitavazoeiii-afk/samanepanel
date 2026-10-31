@@ -37,6 +37,57 @@ jobs:
           print('SISTER_PRODUCT_MASTER_ROUTES_OK')
           PY
 
+      - name: Live HTTP smoke for platform, pricing and inventory
+        run: |
+          pip install httpx
+          python - <<'PY'
+          import os,tempfile
+          from datetime import date,timedelta
+          from pathlib import Path
+          from httpx import BasicAuth
+          os.environ["SALES_ADMIN_PASSWORD"]="x"*32
+          os.environ["SALES_ADMIN_USER"]="bridge"
+          with tempfile.TemporaryDirectory() as temp:
+              os.environ["SALES_DB_PATH"]=str(Path(temp)/"sister.sqlite3")
+              from daily_sales_service.app import app
+              from fastapi.testclient import TestClient
+              from daily_sales_service.engine import dbconnect
+              from daily_sales_service.master_v2_logic import add_model,sku_rows,batch_adjust,set_channel_prices
+              auth=BasicAuth("bridge","x"*32)
+              with TestClient(app) as client:
+                  for url in ("/daily-sales/platforms","/daily-sales/platforms/site",
+                              "/daily-sales/platforms/basalam","/daily-sales/platforms/mold",
+                              "/daily-sales/pricing/cost","/daily-sales/capital-report",
+                              "/daily-sales/api/sister-capital.json"):
+                      response=client.get(url,auth=auth,follow_redirects=False)
+                      assert response.status_code==200,(url,response.status_code,response.text[:200])
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      add_model(conn,"شورت زنانه دارما","مدل تست","","مشکی","M")
+                      sku=sku_rows(conn,"شورت زنانه دارما")[0]
+                      set_channel_prices(conn,"site","شورت زنانه دارما","","M",150000)
+                      batch_adjust(conn,sku["category"],sku["id"],"M","home",{sku["id"]:9},"شمارش تست")
+                  created=client.post("/daily-sales/platforms/site/add",auth=auth,
+                      data={"master_id":sku["id"],"pack_qty":3,"title":"سه عددی تست",
+                            "category":"شورت زنانه دارما"},follow_redirects=False)
+                  assert created.status_code==303,created.text
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      listing_id=conn.execute("SELECT id FROM platform_listings WHERE channel='site'").fetchone()[0]
+                  sale=client.post("/daily-sales/platforms/site/sales/add",auth=auth,
+                      data={"listing_id":listing_id,"packs":2,"warehouse":"home",
+                            "sale_date":date.today().isoformat(),"order_ref":"test-1"},
+                      follow_redirects=False)
+                  assert sale.status_code==303,sale.text
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      assert conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(sku["id"],)).fetchone()[0]==3
+                  tomorrow=(date.today()+timedelta(days=1)).isoformat()
+                  cost=client.post("/daily-sales/pricing/cost/save",auth=auth,
+                      data={"category":"شورت زنانه دارما","subtype":"","size":"*",
+                            "cost":"80000","effective_date":tomorrow},
+                      follow_redirects=False)
+                  assert cost.status_code==303,cost.text
+          print("SISTER_HTTP_PLATFORM_PRICING_SALES_OK")
+          PY
+
   sister-django-shell:
     runs-on: ubuntu-latest
     steps:
