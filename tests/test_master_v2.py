@@ -26,6 +26,31 @@ class MasterV2Test(unittest.TestCase):
   count=add_model(self.conn,category,title,subtype,colors,sizes)
   return count
 
+ def test_clean_ui_and_all_new_routes(self):
+  from daily_sales_service.app import app
+  from daily_sales_service.master_v2_api import master, stock, pricing, cost_prices, sales_prices
+  paths={route.path for route in app.routes}
+  for suffix in ("/master","/master/add","/master/stock",
+                 "/master/stock/operations","/pricing","/pricing/cost",
+                 "/pricing/sales","/catalog"):
+   self.assertIn("/daily-sales"+suffix,paths)
+  response=master(category="بادیگارد",conn=self.conn)
+  html=response.body.decode("utf-8")
+  self.assertIn("تعریف محصولات",html)
+  self.assertIn("اسلیپ",html)
+  self.assertNotIn("کد کالا",html)
+  self.assertNotIn("بهای تمام‌شده (تومان)",html)
+  self.assertIn("</style>",html)
+  self.make()
+  stock_html=stock(category="شورت زنانه دیا",conn=self.conn).body.decode("utf-8")
+  for label in ("موجودی کل","موجودی خانه","موجودی انبار خورشید"):
+   self.assertIn(label,stock_html)
+  prices=pricing(conn=self.conn).body.decode("utf-8")
+  self.assertIn("بهای تمام‌شده",prices)
+  self.assertIn("قیمت فروش",prices)
+  self.assertIn("اسلیپ",cost_prices(conn=self.conn).body.decode("utf-8"))
+  self.assertIn("فروش باسلام",sales_prices(conn=self.conn).body.decode("utf-8"))
+
  def test_auto_hidden_code_idempotent_and_two_warehouses(self):
   self.assertEqual(self.make(),4)
   self.assertEqual(self.make(),0)
