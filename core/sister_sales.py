@@ -94,19 +94,42 @@ def embedded_response(request, upstream_html, tail, status=200):
     match = re.search(r"<main(?:\s[^>]*)?>(.*?)</main>", upstream_html, flags=re.I | re.S)
     if match is None:
         return HttpResponse("قالب محتوای سرویس فروش معتبر نیست.", status=502)
-    body = canonical_page_links(add_csrf(request, match.group(1)))
+    # Preserve ONLY the isolated sister product stylesheet from the upstream
+    # <head>. The Django proxy previously copied only <main> and silently
+    # dropped all .m2-* layout rules, breaking filters, cards and stock tables.
+    embedded_page_css = ""
+    head = re.search(r"<head\b[^>]*>(.*?)</head>", upstream_html, flags=re.I | re.S)
+    if head:
+        for css in re.findall(r"<style\b[^>]*>(.*?)</style>", head.group(1), flags=re.I | re.S):
+            if css.lstrip().startswith(".m2-shell") and len(css) <= 30000:
+                embedded_page_css = css
+                break
+    page_body = match.group(1)
+    if embedded_page_css:
+        # app.page adds a generic hero in addition to the master view title.
+        # Remove that redundant wrapper only on the new styled pages.
+        page_body = re.sub(
+            r'^\s*<div class="hero">\s*<div>.*?</div>\s*</div>',
+            "",
+            page_body,
+            count=1,
+            flags=re.I | re.S,
+        )
+    body = canonical_page_links(add_csrf(request, page_body))
     title_match = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.I | re.S)
     title = unescape(re.sub(r"<[^>]*>", "", title_match.group(1))).strip() if title_match else "مدیریت محصولات و فروش"
     section = (
         "stock" if tail.startswith("master/stock")
         else "catalog" if tail.startswith("catalog")
+        else "pricing" if tail.startswith("pricing")
         else "master" if tail.startswith("master")
         else "sales"
     )
     return render(
         request,
         "core/sister_sales_embedded.html",
-        {"embedded_html": body, "embedded_title": title, "section": section},
+        {"embedded_html": body, "embedded_title": title,
+         "embedded_page_css": embedded_page_css, "section": section},
         status=status,
     )
 
