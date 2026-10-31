@@ -9,6 +9,8 @@ import re
 import secrets
 from urllib import error, parse, request as http_request
 
+from html import unescape
+
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
@@ -53,6 +55,65 @@ _POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
 _API = "/daily-sales"
+
+# The FastAPI service is a private data/form backend. Django owns the layout.
+# Only public GET page links are canonicalized; POST operations keep their
+# authenticated /sales/digikala/* proxy endpoints.
+_CANONICAL_PAGES = {
+    "master": "/settings/products/new/",
+    "master/stock": "/inventory/stock/",
+    "catalog": "/settings/products/digikala/",
+}
+
+
+def canonical_page_links(body):
+    """Keep internal navigation inside the original Django sidebar/layout."""
+    for tail, target in sorted(_CANONICAL_PAGES.items(), key=lambda pair: -len(pair[0])):
+        original = _ROOT + "/" + tail
+        body = re.sub(
+            r'(?P<attribute>\\b(?:href|action)=")' + re.escape(original) + r'(?=[?"])',
+            lambda match: match.group("attribute") + target,
+            body,
+        )
+    return body
+
+
+def embedded_response(request, upstream_html, tail, status=200):
+    """Extract only backend <main> so its standalone html/head/header never render.
+
+    The same original base.html controls the top bar, sidebar, brand, fonts,
+    spacing, glass cards and mobile menu. Keep the upstream business forms
+    and CSRF protection intact.
+    """
+    match = re.search(r"<main(?:\\s[^>]*)?>(.*?)</main>", upstream_html, flags=re.I | re.S)
+    if match is None:
+        return HttpResponse("قالب محتوای سرویس فروش معتبر نیست.", status=502)
+    body = canonical_page_links(add_csrf(request, match.group(1)))
+    title_match = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.I | re.S)
+    title = unescape(re.sub(r"<[^>]*>", "", title_match.group(1))).strip() if title_match else "مدیریت محصولات و فروش"
+    section = (
+        "stock" if tail.startswith("master/stock")
+        else "catalog" if tail.startswith("catalog")
+        else "master" if tail.startswith("master")
+        else "sales"
+    )
+    return render(
+        request,
+        "core/sister_sales_embedded.html",
+        {"embedded_html": body, "embedded_title": title, "section": section},
+        status=status,
+    )
+
+
+def public_redirect_location(location):
+    """Map trusted internal 303 pages to their proper original-panel URLs."""
+    if not location.startswith(_API + "/"):
+        return None
+    pieces = parse.urlsplit(location)
+    tail = pieces.path[len(_API) + 1:]
+    target = _CANONICAL_PAGES.get(tail, _ROOT + "/" + tail)
+    return target + ("?" + pieces.query if pieces.query else "")
+
 
 
 class NoRedirect(http_request.HTTPRedirectHandler):
@@ -171,17 +232,15 @@ def digikala_proxy(request, tail=""):
     if len(raw) > _LIMIT:
         return HttpResponse("پاسخ بیش از حد بزرگ است.", status=502)
     if 300 <= status < 400:
-        if not location.startswith(_API + "/"):
+        safe_location = public_redirect_location(location)
+        if safe_location is None:
             return HttpResponse("مسیر انتقال نامعتبر است.", status=502)
         res = HttpResponse(status=status)
-        res["Location"] = _ROOT + location[len(_API):]
+        res["Location"] = safe_location
         return res
     if "text/html" in mime:
         html = raw.decode("utf-8", errors="replace").replace(_API, _ROOT)
-        html = add_csrf(request, html)
-        html = html.replace("<header>", '<header><a style="padding:8px 13px;text-decoration:none;border-radius:10px;background:#233f5a;color:#fff" href="/sales/">بازگشت به کانال‌ها</a>', 1)
-        html = html.replace("</style></head>", _DARK_CSS, 1)
-        res = HttpResponse(html, status=status, content_type="text/html; charset=utf-8")
+        res = embedded_response(request, html, tail, status=status)
     else:
         res = HttpResponse(raw, status=status, content_type=mime)
         if disposition and "\n" not in disposition and "\r" not in disposition:
