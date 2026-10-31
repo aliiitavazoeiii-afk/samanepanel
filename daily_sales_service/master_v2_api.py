@@ -16,6 +16,7 @@ from .master_v2_ui import (
     page_with_style, category_tabs, category_option, group_options, inventory_grid,
 )
 from .master_api import catalog as digikala_catalog, catalog_map as digikala_map
+from .master_v2_corrections import undo_adjustment, revise_transfer
 
 router=APIRouter()
 
@@ -174,16 +175,32 @@ def operations(category:str="",model_id:int|None=None,subtype:str="",size:str=""
         for s in selected:
             body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}</strong><div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])}</div><input type="number" name="qty_{s["id"]}" min="0" placeholder="تعداد انتقال"></div>'
         body+='</div><div class="m2-fields" style="margin-top:15px"><div><label>شرح انتقال</label><input name="reason" value="انتقال بین دو انبار" required></div><div><button type="submit" class="m2-btn">ثبت انتقال</button></div></div></form></div>'
-    recent=conn.execute("""SELECT ev.occurred_at,ev.source,ev.delta,ev.balance_after,ev.reference,
+    recent=conn.execute("""SELECT ev.id,ev.master_id,ev.occurred_at,ev.source,ev.delta,ev.balance_after,ev.reference,
        m.title,m.color,m.size FROM master_stock_events ev
        JOIN master_products m ON m.id=ev.master_id
        WHERE m.category=? ORDER BY ev.id DESC LIMIT 40""",(category,)).fetchall()
     body+='<div class="m2-section"><h3>آخرین گردش‌ها و اصلاحات</h3><div class="m2-history"><table>'
-    body+='<thead><tr><th>زمان</th><th>مدل</th><th>رنگ / سایز</th><th>انبار</th><th>تغییر</th><th>موجودی پس از ثبت</th><th>شرح</th></tr></thead><tbody>'
+    body+='<thead><tr><th>زمان</th><th>مدل</th><th>رنگ / سایز</th><th>انبار</th><th>تغییر</th><th>موجودی پس از ثبت</th><th>شرح</th><th>اصلاح سند</th></tr></thead><tbody>'
+    seen_latest=set()
     for ev in recent:
         loc={"home":"خانه","seller":"خانه","khorshid":"خورشید","digikala":"دیجی‌کالا (سابق)"}.get(ev["source"],ev["source"])
-        body+=f'<tr><td>{e(ev["occurred_at"][:19])}</td><td>{e(ev["title"])}</td><td>{e(ev["color"])} / {e(ev["size"])}</td><td>{e(loc)}</td><td>{fmt(ev["delta"])}</td><td>{fmt(ev["balance_after"])}</td><td>{e(ev["reference"])}</td></tr>'
+        key=(ev["master_id"],ev["source"])
+        eligible=key not in seen_latest and str(ev["reference"]).startswith("adjust:") and ev["source"] in ("home","khorshid")
+        seen_latest.add(key)
+        undo_button=(f'<form method="post" action="{ROOT}/master/stock/undo" onsubmit="return confirm(\'این اصلاح برگردانده شود؟\')"><input type="hidden" name="event_id" value="{ev["id"]}"><input type="hidden" name="category" value="{e(category)}"><button type="submit">برگرداندن اصلاح</button></form>') if eligible else "—"
+        body+=f'<tr><td>{e(ev["occurred_at"][:19])}</td><td>{e(ev["title"])}</td><td>{e(ev["color"])} / {e(ev["size"])}</td><td>{e(loc)}</td><td>{fmt(ev["delta"])}</td><td>{fmt(ev["balance_after"])}</td><td>{e(ev["reference"])}</td><td>{undo_button}</td></tr>'
     body+='</tbody></table></div></div>'
+    transfers=conn.execute("""SELECT t.*,m.title,m.size,m.color FROM master_transfers t
+        JOIN master_products m ON m.id=t.master_id
+        WHERE m.category=? ORDER BY t.id DESC LIMIT 30""",(category,)).fetchall()
+    if transfers:
+        body+='<div class="m2-section"><h3>سوابق انتقال و ویرایش تعداد</h3><div class="m2-history"><table><thead><tr><th>زمان</th><th>محصول</th><th>مسیر</th><th>تعداد قبلی</th><th>ویرایش تعداد</th></tr></thead><tbody>'
+        for t in transfers:
+            src="خانه" if t["from_location"]=="home" else "خورشید"
+            dst="خانه" if t["to_location"]=="home" else "خورشید"
+            edit=(f'<form action="{ROOT}/master/stock/transfer/revise" method="post" class="m2-fields"><input type="hidden" name="transfer_id" value="{t["id"]}"><input type="hidden" name="category" value="{e(category)}"><input type="number" name="target_qty" value="{t["quantity"]}" min="0" style="width:100px"><button type="submit">اصلاح</button></form>')
+            body+=f'<tr><td>{e(t["occurred_at"][:19])}</td><td>{e(t["title"])} / {e(t["color"])} / {e(t["size"])}</td><td>{e(src)} ← {e(dst)}</td><td>{fmt(t["quantity"])}</td><td>{edit}</td></tr>'
+        body+='</tbody></table></div><p class="m2-hint">ویرایش انتقال فقط وقتی مجاز است که بعد از آن هیچ گردش دیگری روی همان کالا و دو انبار ثبت نشده باشد؛ برای جلوگیری از برهم‌خوردن موجودی.</p></div>'
     body+=f'<a class="m2-btn" href="{ROOT}/master/stock?category={quote(category)}'+(f'&model_id={model_id}' if model_id else '')+'">بازگشت به موجودی کالا</a>'
     return page_with_style("انتقال / اصلاح موجودی",body)
 
@@ -208,6 +225,18 @@ async def post_transfer(request:Request,category:str=Form(...),model_id:int=Form
         batch_transfer(conn,category,model_id,size,location,values,reason)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
     return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}",status_code=303)
+
+@router.post(ROOT+"/master/stock/undo")
+def undo_stock(event_id:int=Form(...),category:str=Form(""),conn=Depends(conn_dep)):
+    try:undo_adjustment(conn,event_id)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category),status_code=303)
+
+@router.post(ROOT+"/master/stock/transfer/revise")
+def revise_stock_transfer(transfer_id:int=Form(...),target_qty:str=Form(...),category:str=Form(""),conn=Depends(conn_dep)):
+    try:revise_transfer(conn,transfer_id,target_qty)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category),status_code=303)
 
 def _price_tiles():
     return (f'<div class="m2-cards">'
