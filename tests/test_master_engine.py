@@ -34,6 +34,8 @@ class UnifiedStockTest(unittest.TestCase):
   adjust_master_stock(self.conn,mid,'seller',6,'شمارش اولیه انبار')
   row=self.conn.execute('SELECT seller_stock, digikala_stock FROM master_products WHERE id=?',(mid,)).fetchone()
   self.assertEqual((row[0],row[1]),(6,0))
+  audit=self.conn.execute('SELECT delta,balance_after FROM master_stock_events WHERE master_id=?',(mid,)).fetchone()
+  self.assertEqual((audit['delta'],audit['balance_after']),(6,6))
   with self.assertRaises(ImportErrorDetail):
    add_master(self.conn,'زیرپوش دارما','U-001','تکراری',size='L',color='مشکی')
 
@@ -56,6 +58,8 @@ class UnifiedStockTest(unittest.TestCase):
   self.assertEqual(stock(),4)
   self.assertEqual(report(self.conn)['units'],2)
   self.assertEqual(self.conn.execute('SELECT SUM(delta) FROM master_stock_events WHERE reference LIKE "digikala:%"').fetchone()[0],-2)
+  audit=self.conn.execute('SELECT balance_after FROM master_stock_events WHERE reference LIKE "digikala:%" ORDER BY id DESC LIMIT 1').fetchone()
+  self.assertEqual(audit['balance_after'],4)
   with self.assertRaises(ImportErrorDetail):
    newmid=add_master(self.conn,'قالب','SH-1','قالب',color='سفید')
    map_variant(self.conn,self.a,newmid,100000)
