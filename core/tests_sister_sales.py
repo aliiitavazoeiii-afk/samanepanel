@@ -47,9 +47,16 @@ class SalesChannelRoutesTest(SimpleTestCase):
             self.assertIn(category, html)
         self.assertIn("محصولات دیجی‌کالا", html)
 
+    def test_sister_pricing_and_inventory_operations_routes(self):
+        self.assertEqual(reverse("sister_product_pricing"), "/settings/products/pricing/")
+        self.assertEqual(reverse("inventory_operations"), "/inventory/operations/")
+        self.assertEqual(resolve("/settings/products/pricing/").func, sister_sales.digikala_proxy)
+        self.assertEqual(resolve("/inventory/operations/").func, sister_sales.digikala_proxy)
+
     def test_master_proxy_requires_auth(self):
         for url in ("/settings/products/new/", "/settings/products/digikala/",
-                    "/inventory/stock/", "/sales/digikala/master/add"):
+                    "/settings/products/pricing/", "/inventory/stock/",
+                    "/inventory/operations/", "/sales/digikala/master/add"):
             self.assertEqual(self.client.get(url).status_code, 302)
 
     def test_proxy_requires_auth(self):
