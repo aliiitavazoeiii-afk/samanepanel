@@ -1,0 +1,30 @@
+{% extends 'core/report_excel_v97.html' %}
+{% load jalali %}
+{% block content %}
+{{ block.super }}
+<section class="card mt-4" aria-label="سرمایه مستقل پنل خواهر">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div><div class="text-secondary small">بهای تمام‌شده مؤثر به تاریخ امروز تهران</div>
+      <h3 class="card-title">ارزش سرمایه کالاهای پنل خواهر (مستقل)</h3></div>
+    <a class="btn btn-outline-light btn-sm" href="{% url 'sister_capital_report' %}">گزارش سرمایه پنل خواهر</a>
+  </div>
+  <div class="card-body">
+    {% if sister_capital %}
+      <div class="row g-3 align-items-center">
+        <div class="col-md-4"><div class="text-secondary small">ارزش موجودی خانه + خورشید</div>
+          {% if sister_capital.total_value != None %}
+          <strong class="h3">{{ sister_capital.total_value|groupnum }} تومان</strong>
+          {% else %}<strong>نامشخص؛ بهای برخی محصولات ثبت نشده</strong>{% endif %}
+        </div>
+        <div class="col-md-4"><div class="text-secondary small">کل موجودی فیزیکی</div>
+          <strong class="h3">{{ sister_capital.units|groupnum }} عدد</strong></div>
+        <div class="col-md-4"><div class="text-secondary small">تعداد فاقد قیمت تمام‌شده</div>
+          <strong class="h3">{{ sister_capital.unknown_units|groupnum }} عدد</strong></div>
+      </div>
+      <div class="text-secondary small mt-3">محاسبه مستقل است و به جمع سرمایه قدیمی این گزارش افزوده نمی‌شود؛ تا زمانی که تطبیق حسابداری دو کسب‌وکار تأیید نشده از دوباره‌شماری جلوگیری می‌شود. قیمت‌های زمان‌بندی‌شده به‌صورت خودکار در تاریخ اجرا فعال خواهند شد.</div>
+    {% else %}
+      <div class="text-secondary">گزارش سرمایه مستقل موقتاً از سرویس فروش قابل دریافت نیست. اطلاعات اصلی دست‌نخورده باقی مانده‌اند.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
