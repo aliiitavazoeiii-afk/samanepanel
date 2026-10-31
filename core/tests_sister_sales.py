@@ -28,6 +28,28 @@ class SalesChannelRoutesTest(SimpleTestCase):
             self.assertIn(word, text)
         self.assertEqual(response.status_code, 200)
 
+    def test_definitions_routes_and_five_categories(self):
+        self.assertEqual(reverse("settings_products"), "/settings/products/")
+        self.assertEqual(reverse("settings_product_new"), "/settings/products/new/")
+        self.assertEqual(reverse("sister_product_digikala"), "/settings/products/digikala/")
+        self.assertEqual(reverse("inventory_stock"), "/inventory/stock/")
+        self.assertEqual(resolve("/inventory/stock/").func, sister_sales.digikala_proxy)
+        from . import sister_master
+        request = RequestFactory().get("/settings/products/")
+        request.user = SimpleNamespace(is_authenticated=True)
+        response = sister_master.products(request)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        for category in ("زیرپوش دارما", "شورت زنانه دارما",
+                         "شورت زنانه دیا", "بادیگارد", "قالب"):
+            self.assertIn(category, html)
+        self.assertIn("محصولات دیجی‌کالا", html)
+
+    def test_master_proxy_requires_auth(self):
+        for url in ("/settings/products/new/", "/settings/products/digikala/",
+                    "/inventory/stock/", "/sales/digikala/master/add"):
+            self.assertEqual(self.client.get(url).status_code, 302)
+
     def test_proxy_requires_auth(self):
         response = self.client.get("/sales/digikala/")
         self.assertEqual(response.status_code,302)
