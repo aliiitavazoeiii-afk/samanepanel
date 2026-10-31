@@ -26,6 +26,29 @@ class MasterV2Test(unittest.TestCase):
   count=add_model(self.conn,category,title,subtype,colors,sizes)
   return count
 
+ def test_verified_catalog_filters_show_all_colors_and_correct_bodyguard_types(self):
+  from daily_sales_service.catalog_import import apply_catalog
+  from daily_sales_service.master_v2_api import stock, master, operations
+  from daily_sales_service.master_v2_logic import list_models
+  data=apply_catalog(self.conn,dry_run=False)
+  self.assertEqual(data["expected"],213)
+  self.assertEqual(data["new"],213)
+  self.assertEqual(len(list_models(self.conn,"بادیگارد","اسلیپ")),18)
+  self.assertEqual(len(list_models(self.conn,"بادیگارد","پادار")),22)
+  board=stock(category="بادیگارد",subtype="اسلیپ",conn=self.conn).body.decode("utf-8")
+  self.assertIn("موجودی کل",board)
+  self.assertIn("موجودی خانه",board)
+  self.assertIn("موجودی انبار خورشید",board)
+  self.assertIn("قرمز اسلیپ",board)
+  self.assertIn("طوسی ملانژ",board)
+  self.assertGreaterEqual(board.count('class="m2-table"'),3)
+  form=operations(category="بادیگارد",subtype="اسلیپ",size="L",conn=self.conn).body.decode("utf-8")
+  self.assertEqual(form.count('name="target_'),18)
+  definitions=master(category="بادیگارد",subtype="اسلیپ",conn=self.conn).body.decode("utf-8")
+  self.assertIn("18 رنگ",definitions)
+  self.assertIn("شورت مردانه اسلیپ",definitions)
+  self.assertNotIn("قیمت فروش (تومان)",definitions)
+
  def test_clean_ui_and_all_new_routes(self):
   from daily_sales_service.app import app
   from daily_sales_service.master_v2_api import router, master, stock, pricing, cost_prices, sales_prices
