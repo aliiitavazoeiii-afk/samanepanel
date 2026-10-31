@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file": "body.xlsx",
+    "sheet": "Sheet1",
+    "note": "Only product model/color lists and some size headers; no inventory, prices, or product IDs."
+  },
+  "categories": [
+    "زیرپوش دارما",
+    "شورت زنانه دارما",
+    "شورت زنانه دیا",
+    "بادیگارد",
+    "قالب"
+  ],
+  "groups": [
+    {
+      "key": "mens_slip",
+      "category": "بادیگارد",
+      "model": "اسلیپ",
+      "title_prefix": "شورت مردانه اسلیپ",
+      "code_prefix": "BG-SL",
+      "source_range": "E5:E22",
+      "size_header": "G4:J4",
+      "sizes": [
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "colors": [
+        "قرمز اسلیپ",
+        "سبز",
+        "قهوه ای",
+        "طوسی ملانژ",
+        "طوسی فیلی",
+        "زرشکی",
+        "نوک مدادی",
+        "طوسی ابی",
+        "مغزپسته",
+        "سدری",
+        "مشکی",
+        "بنفش",
+        "سرمه ای",
+        "فیروزه ای",
+        "کله غازی",
+        "خط دار مشکی",
+        "نوشته سرمه ای",
+        "ابی نفتی"
+      ]
+    },
+    {
+      "key": "mens_padar",
+      "category": "بادیگارد",
+      "model": "پادار",
+      "title_prefix": "شورت مردانه پادار",
+      "code_prefix": "BG-PA",
+      "source_range": "N5:N26",
+      "size_header": "O4:R4",
+      "sizes": [
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "colors": [
+        "طوسی ملانژ",
+        "قرمز",
+        "زرشکی",
+        "سرمه ای",
+        "بنفش",
+        "سدری",
+        "ابی نفتی",
+        "یشمی",
+        "فیروزه ای",
+        "سفید",
+        "طوسی فیلی",
+        "قهوه ای",
+        "مشکی",
+        "مغز پسته ای",
+        "خط دار آبی",
+        "لیفه یشمی",
+        "لیفه سرمه ای",
+        "ck سرمه ای",
+        "سدری ck",
+        "کله غازی ck",
+        "کله غازی",
+        "نوک مدادی"
+      ]
+    },
+    {
+      "key": "undershirt",
+      "category": "زیرپوش دارما",
+      "model": "زیرپوش",
+      "title_prefix": "زیرپوش",
+      "code_prefix": "DA-UP",
+      "source_range": "E30:E32",
+      "size_header": "F28:H28",
+      "sizes": [
+        "M",
+        "L",
+        "XL"
+      ],
+      "colors": [
+        "طوسی",
+        "سفید",
+        "سرمه ای"
+      ]
+    },
+    {
+      "key": "women_dia",
+      "category": "شورت زنانه دیا",
+      "model": "شورت زنانه دیا",
+      "title_prefix": "شورت زنانه دیا",
+      "code_prefix": "DI-W",
+      "source_range": "E37:E40",
+      "size_header": "F36:I36",
+      "sizes": [
+        "M",
+        "L",
+        "XL",
+        "XXL"
+      ],
+      "colors": [
+        "راه راه مشکی",
+        "سرمه ای",
+        "سفید",
+        "مشکی"
+      ]
+    },
+    {
+      "key": "women_darma",
+      "category": "شورت زنانه دارما",
+      "model": "شورت زنانه دارما",
+      "title_prefix": "شورت زنانه دارما",
+      "code_prefix": "DA-W",
+      "source_range": "E43:E47",
+      "size_header": null,
+      "sizes": [
+        "M",
+        "L",
+        "XL",
+        "XXL",
+        "3XL"
+      ],
+      "size_note": "Sizes inferred from owner's previously-established Darma size range because body.xlsx has no size header for this section.",
+      "colors": [
+        "سفید",
+        "مشکی",
+        "سرمه ای",
+        "کرم",
+        "صورتی"
+      ]
+    },
+    {
+      "key": "molds",
+      "category": "قالب",
+      "model": "قالب",
+      "title_prefix": "قالب",
+      "code_prefix": "GH",
+      "source_range": null,
+      "size_header": null,
+      "size_note": "Three sizes explicitly supplied by owner in conversation; absent from body.xlsx.",
+      "sizes": [
+        "کوچک",
+        "متوسط",
+        "بزرگ"
+      ],
+      "colors": [
+        "-"
+      ]
+    }
+  ]
+}
