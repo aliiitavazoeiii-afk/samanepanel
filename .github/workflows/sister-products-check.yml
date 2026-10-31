@@ -36,3 +36,32 @@ jobs:
               assert '/daily-sales' + suffix in app_paths, suffix
           print('SISTER_PRODUCT_MASTER_ROUTES_OK')
           PY
+
+  sister-django-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Django shell requirements
+        run: pip install -r requirements.txt
+      - name: Check sister Django routes and CSRF proxy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings
+          DIA_DARMA_SSH_ONLY: '1'
+        run: python manage.py test core.tests_sister_sales -v 2
+      - name: Validate comprehensive sister capital template
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings
+        run: |
+          python - <<'PY'
+          import django
+          django.setup()
+          from django.template.loader import get_template
+          from django.urls import reverse
+          get_template("core/report_excel_sister_v1.html")
+          for name in ("sister_product_platforms","sister_capital_report","sister_sales_site","sister_sales_basalam","sister_sales_ghaleb"):
+              print(name,reverse(name))
+          print("SISTER_DJANGO_SHELL_OK")
+          PY
