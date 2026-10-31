@@ -114,7 +114,7 @@ def adjust_master_stock(conn, master_id, source, new_stock, reason):
         delta = stock-int(old[0])
         conn.execute(f"UPDATE master_products SET {column}=?,updated_at=? WHERE id=?",(stock,now(),master_id))
         conn.execute("""INSERT INTO master_stock_events(occurred_at,master_id,source,delta,balance_after,reference)
-                         VALUES (?,?,?,?,?,?)""", (now(),master_id,source,delta,"manual:"+reason[:200]))
+                         VALUES (?,?,?,?,?,?)""", (now(),master_id,source,delta,stock,"manual:"+reason[:200]))
         conn.execute("COMMIT")
     except Exception:
         conn.execute("ROLLBACK");raise
@@ -252,7 +252,7 @@ def strict_commit(conn,token):
             conn.execute(f"UPDATE master_products SET {col}=?,updated_at=? WHERE id=?",
                          (balance,now(),mid))
             conn.execute("""INSERT INTO master_stock_events(occurred_at,master_id,source,delta,balance_after,reference)
-                VALUES (?,?,?,?,?,?)""", (now(),mid,source,delta,f"digikala:{day}:{source}:{token}"))
+                VALUES (?,?,?,?,?,?)""", (now(),mid,source,delta,balance,f"digikala:{day}:{source}:{token}"))
         conn.execute("DELETE FROM sales WHERE sale_date=? AND source=?",(day,source))
         for x in p["rows"]:
             conn.execute("""INSERT INTO sales(sale_date,source,variant_id,qty,price_toman,commission_toman,processing_toman,vat_toman,fee_toman,cost_toman)
