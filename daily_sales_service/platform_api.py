@@ -1,5 +1,7 @@
 """Minimal 4-card platform navigation and SKU-linked selling item catalogue."""
 from urllib.parse import quote
+import json
+from .master_v2_ui import family_title
 from fastapi import APIRouter,Depends,Form
 from fastapi.responses import RedirectResponse
 from .app import ROOT,conn_dep,e,fmt
@@ -42,15 +44,61 @@ def channel_page(channel:str,category:str="",q:str="",conn=Depends(conn_dep)):
         body+='</select><button class="m2-btn" type="submit">انتخاب دسته</button></form>'
     body+=f'<form method="post" action="{ROOT}/platforms/{channel}/add" class="m2-fields">'
     body+=f'<input type="hidden" name="category" value="{e(category)}">'
-    body+='<div><label>محصول پایه، رنگ و سایز</label><select name="master_id" required>'
+    # Progressive enhancement: working combined picker without JS, then
+    # separate Model / Color / Size selectors sourced from the exact same SKUs.
+    body+='<div id="p-fallback"><label>محصول پایه، رنگ و سایز</label><select id="p-sku" name="master_id" required>'
     if master_skus:
-        body+=''.join(f'<option value="{s["id"]}">{e(s["title"])} · {e(s["subtype"] or s["category"])} · {e(s["color"])} · {e(s["size"])}</option>' for s in master_skus)
+        body+=''.join(f'<option value="{s["id"]}">{e(family_title(s))} · {e(s["subtype"] or s["category"])} · {e(s["color"])} · {e(s["size"])}</option>' for s in master_skus)
     else:body+='<option value="">برای این دسته هنوز کالایی تعریف نشده</option>'
     body+='</select></div>'
+    body+='<div class="m2-picker-extra" id="p-model-wrap" hidden><label>مدل محصول</label><select id="p-model"></select></div>'
+    body+='<div class="m2-picker-extra" id="p-color-wrap" hidden><label>رنگ محصول</label><select id="p-color"></select></div>'
+    body+='<div class="m2-picker-extra" id="p-size-wrap" hidden><label>سایزبندی</label><select id="p-size"></select></div>'
     body+='<div><label>تعداد در هر بسته</label><select name="pack_qty">'+''.join(f'<option value="{n}">{n} عددی</option>' for n in range(1,13))+'</select></div>'
     body+='<div><label>عنوان فروش در پلتفرم (اختیاری)</label><input name="title" placeholder="مثلاً پک سه‌عددی شورت زنانه"></div>'
     body+='<div><button class="m2-btn" type="submit"'+(' disabled' if not master_skus else '')+'>ثبت محصول</button></div></form>'
     body+=f'<p class="m2-hint" style="margin-top:12px">قیمت این بسته از قیمت واحد همان محصول در <a href="{ROOT}/pricing/sales?channel={channel}&category={quote(category)}">قیمت‌گذاری {e(PLATFORMS[channel])}</a> × تعداد بسته محاسبه می‌شود؛ موجودی تکراری ایجاد نمی‌شود.</p></div>'
+    sku_payload=json.dumps([
+        {"id":sku["id"],"model":family_title(sku)+(" · "+sku["subtype"] if sku["subtype"] else ""),
+         "color":sku["color"],"size":sku["size"]} for sku in master_skus
+    ],ensure_ascii=False).replace("<","\\u003c").replace("&","\\u0026")
+    body+='<script type="application/json" id="p-master-json">'+sku_payload+'</script>'
+    body+="""<script>
+(function(){
+  const node=document.getElementById('p-master-json');
+  if(!node)return;
+  let list=[];
+  try{list=JSON.parse(node.textContent);}catch(e){return;}
+  if(!list.length)return;
+  const model=document.getElementById('p-model'),color=document.getElementById('p-color'),
+        size=document.getElementById('p-size'),fallback=document.getElementById('p-sku');
+  function unique(values){return [...new Set(values)];}
+  function fill(select, values){
+    let prior=select.value;
+    select.replaceChildren(...values.map(v=>{let o=document.createElement('option');o.value=v;o.textContent=v;return o;}));
+    if(values.includes(prior))select.value=prior;
+  }
+  function syncSKU(){
+    const chosen=list.find(x=>x.model===model.value&&x.color===color.value&&x.size===size.value);
+    fallback.value=chosen?String(chosen.id):'';
+  }
+  function syncColor(){
+    const matching=list.filter(x=>x.model===model.value&&x.color===color.value);
+    fill(size,unique(matching.map(x=>x.size)));syncSKU();
+  }
+  function syncModel(){
+    const matching=list.filter(x=>x.model===model.value);
+    fill(color,unique(matching.map(x=>x.color)));syncColor();
+  }
+  fill(model,unique(list.map(x=>x.model)));
+  model.addEventListener('change',syncModel);
+  color.addEventListener('change',syncColor);
+  size.addEventListener('change',syncSKU);
+  syncModel();
+  document.getElementById('p-fallback').hidden=true;
+  for(const id of ['p-model-wrap','p-color-wrap','p-size-wrap'])document.getElementById(id).hidden=false;
+})();
+</script>"""
     body+=f'<div class="m2-search-block"><form action="{ROOT}/platforms/{channel}" method="get">'
     body+=f'<input type="hidden" name="category" value="{e(category)}"><input name="q" placeholder="جست‌وجوی نام یا شناسه محصول" value="{e(q)}"><button class="m2-btn">جستجو</button></form></div>'
     rows=list_listings(conn,channel,q)  # Entire platform catalogue, independent of create-form category.
