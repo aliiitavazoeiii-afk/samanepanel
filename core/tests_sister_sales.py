@@ -45,7 +45,7 @@ class SalesChannelRoutesTest(SimpleTestCase):
         for category in ("زیرپوش دارما", "شورت زنانه دارما",
                          "شورت زنانه دیا", "بادیگارد", "قالب"):
             self.assertIn(category, html)
-        self.assertIn("محصولات دیجی‌کالا", html)
+        self.assertIn("پلتفرم‌ها", html)
 
     def test_sister_pricing_and_inventory_operations_routes(self):
         self.assertEqual(reverse("sister_product_pricing"), "/settings/products/pricing/")
@@ -53,8 +53,26 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(resolve("/settings/products/pricing/").func, sister_sales.digikala_proxy)
         self.assertEqual(resolve("/inventory/operations/").func, sister_sales.digikala_proxy)
 
+    def test_platforms_and_capital_routes(self):
+        self.assertEqual(reverse("sister_product_platforms"), "/settings/products/platforms/")
+        self.assertEqual(reverse("sister_product_platforms_digikala"), "/settings/products/platforms/digikala/")
+        self.assertEqual(reverse("sister_capital_report"), "/report/sister-capital/")
+        for url in ("/settings/products/platforms/", "/settings/products/platforms/digikala/",
+                    "/report/sister-capital/", "/sales/digikala/platforms/site",
+                    "/sales/site/", "/sales/basalam/", "/sales/ghaleb/"):
+            self.assertEqual(resolve(url).func, sister_sales.digikala_proxy)
+        self.assertEqual(
+            sister_sales.public_redirect_location("/daily-sales/platforms"),
+            "/settings/products/platforms/",
+        )
+        self.assertEqual(
+            sister_sales.public_redirect_location("/daily-sales/capital-report"),
+            "/report/sister-capital/",
+        )
+
     def test_master_proxy_requires_auth(self):
         for url in ("/settings/products/new/", "/settings/products/digikala/",
+                    "/settings/products/platforms/", "/report/sister-capital/",
                     "/settings/products/pricing/", "/inventory/stock/",
                     "/inventory/operations/", "/sales/digikala/master/add"):
             self.assertEqual(self.client.get(url).status_code, 302)
@@ -88,7 +106,7 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertIn('تعریف محصولات اصلی', html)
         self.assertIn('action="/sales/digikala/master/add"', html)
         self.assertIn('action="/settings/products/new/"', html)
-        self.assertIn('href="/settings/products/digikala/"', html)
+        self.assertIn('href="/settings/products/platforms/digikala/"', html)
         self.assertIn('name="csrfmiddlewaretoken"', html)
         self.assertNotIn("OLD STANDALONE HEADER", html)
         self.assertNotIn("OLD FOOTER", html)
