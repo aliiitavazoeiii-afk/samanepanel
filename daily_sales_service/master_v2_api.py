@@ -13,7 +13,7 @@ from .master_v2_logic import (
     set_cost_rule, set_channel_prices, cost_for,
 )
 from .master_v2_ui import (
-    page_with_style, category_tabs, category_option, group_options, inventory_grid,
+    page_with_style, category_tabs, category_option, group_options, inventory_grid, family_title,
 )
 from .master_api import catalog as digikala_catalog, catalog_map as digikala_map
 from .master_v2_corrections import undo_adjustment, revise_transfer
@@ -72,21 +72,37 @@ def master(category:str="",subtype:str="",q:str="",conn=Depends(conn_dep)):
     if not models:
         intro+='<div class="m2-card"><h3>هنوز محصولی در این فیلتر تعریف نشده است.</h3></div>'
     else:
-        intro+='<h3>مدل‌های تعریف‌شده</h3><div class="m2-list">'
+        # Imported catalog codes are per color, NOT per product model.
+        # Present them as ONE family card with all colors and sizes; keep
+        # every physical SKU ID/stock/DigiKala mapping unchanged.
+        families={}
         for m in models:
-            skus=sku_rows(conn,category,m["representative"],active_only=False)
+            product_skus=sku_rows(conn,category,m["representative"],active_only=False)
+            if not product_skus:continue
+            key=(family_title(product_skus[0]),m["subtype"])
+            family=families.setdefault(key,{"models":[],"skus":[]})
+            family["models"].append(m)
+            family["skus"].extend(product_skus)
+        intro+='<h3>مدل‌های تعریف‌شده</h3><div class="m2-list">'
+        for (family_name,group_type),family in families.items():
+            skus=family["skus"]
             colors=sorted({s["color"] for s in skus})
             sizes=sorted({s["size"] for s in skus})
-            intro+=f'''<div class="m2-card"><h3>{e(m["title"])}</h3>'''
-            if m["subtype"]: intro+=f'<p class="m2-hint">نوع: {e(m["subtype"])}</p>'
-            intro+=f'<p class="m2-hint">{len(skus)} ترکیب رنگ و سایز</p>'
-            intro+='<div class="m2-tags">'+''.join(f'<span class="m2-tag">{e(c)}</span>' for c in colors)+'</div>'
+            intro+=f'<div class="m2-card"><h3>{e(family_name)}</h3>'
+            if group_type:intro+=f'<p class="m2-hint">نوع: {e(group_type)}</p>'
+            intro+=f'<p class="m2-hint">{len(colors)} رنگ · {len(sizes)} سایز · {len(skus)} تنوع فیزیکی</p>'
+            intro+='<div class="m2-tags">'+''.join(f'<span class="m2-tag">{e(col)}</span>' for col in colors)+'</div>'
             intro+='<p class="m2-hint">سایزها: '+e(" · ".join(sizes))+'</p>'
-            intro+=f'''<form method="post" action="{ROOT}/master/rename" class="m2-fields">
+            if len(family["models"])==1:
+                m=family["models"][0]
+                intro+=f'''<form method="post" action="{ROOT}/master/rename" class="m2-fields">
 <input type="hidden" name="master_id" value="{m["representative"]}">
 <div><label>ویرایش عنوان</label><input name="title" value="{e(m["title"])}" required></div>
 <div><label><input type="checkbox" name="active" value="1" {"checked" if m["active"] else ""}> فعال</label><button class="m2-btn" type="submit">ذخیره</button></div>
-</form><p style="margin-top:12px"><a href="{ROOT}/master/stock?category={quote(category)}&model_id={m["representative"]}">موجودی این مدل</a></p></div>'''
+</form>'''
+            else:
+                intro+='<p class="m2-hint">رنگ‌ها به‌صورت یک مدل نمایش داده می‌شوند و شناسه‌های قبلیِ کالا بدون تغییر باقی مانده‌اند.</p>'
+            intro+=f'<p><a class="m2-btn" href="{ROOT}/master/stock?category={quote(category)}'+(f'&subtype={quote(group_type)}' if group_type else '')+'">مشاهده موجودی</a></p></div>'
         intro+='</div>'
     intro+=f'<p style="margin-top:24px"><a href="{ROOT}/catalog">محصولات دیجی‌کالا</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
     return page_with_style("تعریف محصولات",intro)
@@ -113,24 +129,38 @@ def _model_scope(conn,category,subtype="",q="",model_id=None):
 def stock(category:str="",subtype:str="",q:str="",model_id:int|None=None,conn=Depends(conn_dep)):
     category=category if category in CATEGORIES else CATEGORIES[0]
     subtype=subtype if category=="بادیگارد" and subtype in BODY_TYPES else ""
-    models,model_id=_model_scope(conn,category,subtype,q,model_id)
-    body='<h1>موجودی کالا</h1><p class="m2-hint">نمایش بر اساس رنگ و سایز، همان ساختار موجودی پنل دارما</p>'
-    # Old DigiKala-warehouse balances must not be silently mapped to KhorShid.
+    models=list_models(conn,category,subtype,q)
+    # All models/colors are shown by default, like Darma's stock board.
+    # Optional model selection narrows to a specific SKU group.
+    if model_id and not any(m["representative"]==model_id for m in models):
+        model_id=None
+    body='<h1>موجودی کالا</h1><p class="m2-hint">ابتدا دسته و نوع را انتخاب کن؛ رنگ‌ها در سطر و سایزها در ستون نمایش داده می‌شوند.</p>'
     legacy=conn.execute("SELECT COALESCE(SUM(digikala_stock),0) FROM master_products").fetchone()[0]
     if legacy:
-        body+=f'<div class="m2-msg">{fmt(legacy)} عدد موجودی قدیمیِ «نزد دیجی‌کالا» جداگانه محفوظ است. این تعداد بدون تأیید تو به انبار خورشید منتقل نمی‌شود.</div>'
+        body+=f'<div class="m2-msg">{fmt(legacy)} عدد موجودی قدیمیِ «نزد دیجی‌کالا» جداگانه محفوظ است؛ بدون تأیید تو به خورشید منتقل نمی‌شود.</div>'
     body+=category_tabs("/master/stock",category)
     body+=_filter_form("/master/stock",category,subtype,q,models,model_id,with_model=True)
-    body+=f'<div class="m2-hero"><h2>{e(next((m["title"] for m in models if m["representative"]==model_id),category))}</h2>'
-    body+=f'<a class="m2-btn" href="{ROOT}/master/stock/operations?category={quote(category)}'+(f'&model_id={model_id}' if model_id else '')+'">انتقال / اصلاح موجودی</a></div>'
-    if not models:
-        body+='<div class="m2-card"><p>ابتدا این دسته را در «تعریف محصولات» اضافه کن.</p></div>'
+    body+=f'<div class="m2-hero"><h2>{e(category)}'+(f' — {e(subtype)}' if subtype else '')+'</h2>'
+    ops_link=f'{ROOT}/master/stock/operations?category={quote(category)}'
+    if subtype:ops_link+='&subtype='+quote(subtype)
+    if model_id:ops_link+='&model_id='+str(model_id)
+    body+=f'<a class="m2-btn" href="{ops_link}">انتقال / اصلاح موجودی</a></div>'
+    skus=sku_rows(conn,category,model_id,subtype=subtype)
+    if q:
+        skus=[s for s in skus if q in s["title"] or q in s["color"] or q in s["size"]]
+    if not skus:
+        body+='<div class="m2-card"><p>برای فیلتر انتخاب‌شده کالایی تعریف نشده است.</p></div>'
     else:
-        skus=sku_rows(conn,category,model_id)
-        for location,label in (("total","موجودی کل"),("home","موجودی خانه"),("khorshid","موجودی انبار خورشید")):
-            body+=inventory_grid(conn,skus,location,label)
-        body+='<p class="m2-hint">قرمز پررنگ: موجودی صفر؛ قرمز ملایم: موجودی کمتر از ۱۰ عدد. ارزش سرمایه از بخش «بهای تمام‌شده» قیمت‌گذاری محاسبه می‌شود.</p>'
-    body+=f'<p><a href="{ROOT}/master?category={quote(category)}">تعریف محصولات همین دسته</a></p>'
+        families={}
+        for sku in skus:
+            families.setdefault(family_title(sku),[]).append(sku)
+        for family_name,rows in sorted(families.items(),key=lambda item:(0 if "اسلیپ" in item[0] else 1,item[0])):
+            if len(families)>1:
+                body+=f'<h3 class="m2-family-title">{e(family_name)}</h3>'
+            for location,label in (("total","موجودی کل"),("home","موجودی خانه"),("khorshid","موجودی انبار خورشید")):
+                body+=inventory_grid(conn,rows,location,label)
+        body+='<p class="m2-hint">قرمز پررنگ: صفر؛ قرمز ملایم: کمتر از ۱۰ عدد. ارزش سرمایه از بهای تمام‌شده محاسبه می‌شود.</p>'
+    body+=f'<p><a href="{ROOT}/master?category={quote(category)}">بازگشت به تعریف محصولات</a></p>'
     return page_with_style("موجودی کالا",body)
 
 def _operations_filter(conn,category,model_id,subtype,size,location):
