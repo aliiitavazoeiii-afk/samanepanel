@@ -79,6 +79,30 @@ class MasterV2Test(unittest.TestCase):
    batch_adjust(self.conn,"شورت زنانه دیا",model_id,"M","home",{mids[0]:5,mids[1]:"-3"},"شمارش موجودی")
   self.assertEqual(self.conn.execute("SELECT SUM(seller_stock) FROM master_products").fetchone()[0],0)
 
+ def test_undo_latest_adjustment_and_transfer_revision(self):
+  from daily_sales_service.master_v2_corrections import undo_adjustment, revise_transfer
+  self.make()
+  sku=sku_rows(self.conn,"شورت زنانه دیا")[0]
+  mid=sku["id"];size=sku["size"]
+  batch_adjust(self.conn,"شورت زنانه دیا",mid,size,"home",{mid:12},"شمارش اول")
+  batch_adjust(self.conn,"شورت زنانه دیا",mid,size,"home",{mid:9},"اشتباه در شمارش")
+  event=self.conn.execute("SELECT id FROM master_stock_events WHERE master_id=? ORDER BY id DESC LIMIT 1",(mid,)).fetchone()[0]
+  undo_adjustment(self.conn,event)
+  self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()[0],12)
+  with self.assertRaises(ImportErrorDetail):
+   undo_adjustment(self.conn,event)
+  batch_transfer(self.conn,"شورت زنانه دیا",mid,size,"home",{mid:4},"ارسال به خورشید")
+  transfer_id=self.conn.execute("SELECT id FROM master_transfers WHERE master_id=?",(mid,)).fetchone()[0]
+  revise_transfer(self.conn,transfer_id,2)
+  actual=self.conn.execute("SELECT seller_stock,khorshid_stock FROM master_products WHERE id=?",(mid,)).fetchone()
+  self.assertEqual(tuple(actual),(10,2))
+  revise_transfer(self.conn,transfer_id,0)
+  actual=self.conn.execute("SELECT seller_stock,khorshid_stock FROM master_products WHERE id=?",(mid,)).fetchone()
+  self.assertEqual(tuple(actual),(12,0))
+  batch_adjust(self.conn,"شورت زنانه دیا",mid,size,"home",{mid:11},"شمارش پس از انتقال")
+  with self.assertRaises(ImportErrorDetail):
+   revise_transfer(self.conn,transfer_id,3)
+
  def test_cost_rules_by_bodyguard_type_and_mold_size(self):
   add_model(self.conn,"بادیگارد","اسلیپ زنانه","اسلیپ","مشکی","M")
   add_model(self.conn,"بادیگارد","پادار زنانه","پادار","مشکی","M")
