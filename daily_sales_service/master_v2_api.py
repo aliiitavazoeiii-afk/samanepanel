@@ -164,23 +164,33 @@ def stock(category:str="",subtype:str="",q:str="",model_id:int|None=None,conn=De
     return page_with_style("موجودی کالا",body)
 
 def _operations_filter(conn,category,model_id,subtype,size,location):
-    models,model_id=_model_scope(conn,category,subtype,model_id=model_id)
-    skus=sku_rows(conn,category,model_id) if model_id else []
-    sizes=sorted({s["size"] for s in skus})
+    models=list_models(conn,category,subtype)
+    if model_id and not any(m["representative"]==model_id for m in models):
+        model_id=None
+    # Preserve "all colors" as the default, rather than silently narrowing
+    # the correction screen to one color-coded imported model.
+    skus=sku_rows(conn,category,model_id,subtype=subtype)
+    order=("XS","S","M","L","XL","2XL","XXL","3XL","4XL","کوچک","متوسط","بزرگ")
+    sizes=sorted({s["size"] for s in skus},key=lambda x:(order.index(x) if x in order else 999,x))
     if size not in sizes:size=sizes[0] if sizes else ""
-    filtered=[s for s in skus if s["size"]==size]
+    selected=[s for s in skus if s["size"]==size]
     current_model=next((m for m in models if m["representative"]==model_id),None)
-    return models,model_id,skus,sizes,size,filtered,current_model
+    return models,model_id,skus,sizes,size,selected,current_model
 
 @router.get(ROOT+"/master/stock/operations")
 def operations(category:str="",model_id:int|None=None,subtype:str="",size:str="",location:str="home",conn=Depends(conn_dep)):
     category=category if category in CATEGORIES else CATEGORIES[0]
     if location not in WAREHOUSES:location="home"
+    subtype=subtype if category=="بادیگارد" and subtype in BODY_TYPES else ""
     models,model_id,skus,sizes,size,selected,model=_operations_filter(conn,category,model_id,subtype,size,location)
     body='<h1>انتقال / اصلاح موجودی</h1><p class="m2-hint">اصلاح تعداد نهایی و انتقال بین خانه و خورشید، با ثبت سند گردش برای هر رنگ و سایز.</p>'
     body+=category_tabs("/master/stock/operations",category)
     body+=f'<div class="m2-filters"><form action="{ROOT}/master/stock/operations" method="get">'
     body+=f'<input type="hidden" name="category" value="{e(category)}">'
+    if category=="بادیگارد":
+        opts='<option value="">همه نوع‌ها</option>'+''.join(
+            f'<option value="{e(x)}"'+(' selected' if subtype==x else '')+f'>{e(x)}</option>' for x in BODY_TYPES)
+        body+='<div><label>نوع بادیگارد</label><select name="subtype">'+opts+'</select></div>'
     body+='<div><label>مدل محصول</label><select name="model_id">'+group_options(models,model_id)+'</select></div>'
     body+='<div><label>سایز</label><select name="size">'+''.join(f'<option value="{e(s)}"'+(' selected' if s==size else '')+'>'+e(s)+'</option>' for s in sizes)+'</select></div>'
     body+='<div><label>محل اصلاح</label><select name="location"><option value="home"'+(' selected' if location=="home" else '')+'>خانه</option><option value="khorshid"'+(' selected' if location=="khorshid" else '')+'>خورشید</option></select></div>'
@@ -190,20 +200,20 @@ def operations(category:str="",model_id:int|None=None,subtype:str="",size:str=""
     else:
         body+=f'<div class="m2-card"><h3>اصلاح موجودی {e(model["title"] if model else category)} — سایز {e(size)}</h3>'
         body+='<p class="m2-hint">فقط رنگ‌هایی که باید اصلاح شوند را پر کن؛ عدد واردشده جایگزین موجودی فعلی همان انبار می‌شود.</p>'
-        body+=f'<form method="post" action="{ROOT}/master/stock/bulk-adjust"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id}"><input type="hidden" name="size" value="{e(size)}"><input type="hidden" name="location" value="{e(location)}">'
+        body+=f'<form method="post" action="{ROOT}/master/stock/bulk-adjust"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id or ''}"><input type="hidden" name="subtype" value="{e(subtype)}"><input type="hidden" name="size" value="{e(size)}"><input type="hidden" name="location" value="{e(location)}">'
         body+='<div class="m2-operation-grid">'
         for s in selected:
-            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}</strong>'
+            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}'+(f' · {e(family_title(s))}' if not subtype and category=="بادیگارد" else '')+'</strong>'
             body+=f'<div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])} · کل: {fmt(s["seller_stock"]+s["khorshid_stock"])}</div>'
             body+=f'<label>موجودی جدید {("خانه" if location=="home" else "خورشید")}</label><input type="number" min="0" name="target_{s["id"]}" placeholder="بدون تغییر" /></div>'
         body+='</div><div class="m2-fields" style="margin-top:16px"><div><label>دلیل اصلاح</label><input name="reason" required placeholder="شمارش موجودی / مغایرت"></div><div><button type="submit" class="m2-btn">ثبت اصلاح موجودی</button></div></div></form></div>'
         body+=f'<div class="m2-card" style="margin-top:20px"><h3>انتقال بین انبار خورشید و خانه</h3>'
-        body+=f'<form method="post" action="{ROOT}/master/stock/transfer"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id}"><input type="hidden" name="size" value="{e(size)}">'
+        body+=f'<form method="post" action="{ROOT}/master/stock/transfer"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id or ''}"><input type="hidden" name="subtype" value="{e(subtype)}"><input type="hidden" name="size" value="{e(size)}">'
         body+='<div class="m2-fields"><div><label>جهت انتقال</label><select name="location">'
         body+='<option value="khorshid">خورشید ← خانه</option><option value="home">خانه ← خورشید</option></select></div></div>'
         body+='<div class="m2-operation-grid" style="margin-top:14px">'
         for s in selected:
-            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}</strong><div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])}</div><input type="number" name="qty_{s["id"]}" min="0" placeholder="تعداد انتقال"></div>'
+            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}'+(f' · {e(family_title(s))}' if not subtype and category=="بادیگارد" else '')+f'</strong><div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])}</div><input type="number" name="qty_{s["id"]}" min="0" placeholder="تعداد انتقال"></div>'
         body+='</div><div class="m2-fields" style="margin-top:15px"><div><label>شرح انتقال</label><input name="reason" value="انتقال بین دو انبار" required></div><div><button type="submit" class="m2-btn">ثبت انتقال</button></div></div></form></div>'
     recent=conn.execute("""SELECT ev.id,ev.master_id,ev.occurred_at,ev.source,ev.delta,ev.balance_after,ev.reference,
        m.title,m.color,m.size FROM master_stock_events ev
@@ -234,27 +244,29 @@ def operations(category:str="",model_id:int|None=None,subtype:str="",size:str=""
     body+=f'<a class="m2-btn" href="{ROOT}/master/stock?category={quote(category)}'+(f'&model_id={model_id}' if model_id else '')+'">بازگشت به موجودی کالا</a>'
     return page_with_style("انتقال / اصلاح موجودی",body)
 
-def _posted_targets(conn,category,model_id,size,post,prefix):
-    valid=sku_rows(conn,category,model_id)
+def _posted_targets(conn,category,model_id,size,post,prefix,subtype=""):
+    valid=sku_rows(conn,category,model_id,subtype=subtype)
     return {s["id"]:post.get(f"{prefix}{s['id']}") for s in valid if s["size"]==size and post.get(f"{prefix}{s['id']}") not in (None,"")}
 
 @router.post(ROOT+"/master/stock/bulk-adjust")
-async def post_adjust(request:Request,category:str=Form(...),model_id:int=Form(...),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
+async def post_adjust(request:Request,category:str=Form(...),model_id:str=Form(""),subtype:str=Form(""),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
     try:
         post=await request.form()
-        values=_posted_targets(conn,category,model_id,size,post,"target_")
-        count=batch_adjust(conn,category,model_id,size,location,values,reason)
+        mid=int(model_id) if model_id else None
+        values=_posted_targets(conn,category,mid,size,post,"target_",subtype)
+        count=batch_adjust(conn,category,mid,size,location,values,reason)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
-    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&location={location}",status_code=303)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&subtype={quote(subtype)}&location={location}",status_code=303)
 
 @router.post(ROOT+"/master/stock/transfer")
-async def post_transfer(request:Request,category:str=Form(...),model_id:int=Form(...),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
+async def post_transfer(request:Request,category:str=Form(...),model_id:str=Form(""),subtype:str=Form(""),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
     try:
         post=await request.form()
-        values=_posted_targets(conn,category,model_id,size,post,"qty_")
-        batch_transfer(conn,category,model_id,size,location,values,reason)
+        mid=int(model_id) if model_id else None
+        values=_posted_targets(conn,category,mid,size,post,"qty_",subtype)
+        batch_transfer(conn,category,mid,size,location,values,reason)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
-    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}",status_code=303)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&subtype={quote(subtype)}",status_code=303)
 
 @router.post(ROOT+"/master/stock/undo")
 def undo_stock(event_id:int=Form(...),category:str=Form(""),conn=Depends(conn_dep)):
