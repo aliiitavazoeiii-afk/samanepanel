@@ -114,6 +114,10 @@ def stock(category:str="",subtype:str="",q:str="",model_id:int|None=None,conn=De
     subtype=subtype if category=="بادیگارد" and subtype in BODY_TYPES else ""
     models,model_id=_model_scope(conn,category,subtype,q,model_id)
     body='<h1>موجودی کالا</h1><p class="m2-hint">نمایش بر اساس رنگ و سایز، همان ساختار موجودی پنل دارما</p>'
+    # Old DigiKala-warehouse balances must not be silently mapped to KhorShid.
+    legacy=conn.execute("SELECT COALESCE(SUM(digikala_stock),0) FROM master_products").fetchone()[0]
+    if legacy:
+        body+=f'<div class="m2-msg">{fmt(legacy)} عدد موجودی قدیمیِ «نزد دیجی‌کالا» جداگانه محفوظ است. این تعداد بدون تأیید تو به انبار خورشید منتقل نمی‌شود.</div>'
     body+=category_tabs("/master/stock",category)
     body+=_filter_form("/master/stock",category,subtype,q,models,model_id,with_model=True)
     body+=f'<div class="m2-hero"><h2>{e(next((m["title"] for m in models if m["representative"]==model_id),category))}</h2>'
@@ -250,8 +254,11 @@ def sales_prices(channel:str="site",category:str="",conn=Depends(conn_dep)):
     body+='<div class="m2-tabs">'+''.join(f'<a href="{ROOT}/pricing/sales?channel={name}" class="{("current" if name==channel else "")}">{e(title)}</a>' for name,title in CHANNELS.items())+'</div>'
     body+=f'<div class="m2-card"><h3>ثبت گروهی قیمت — {e(CHANNELS[channel])}</h3><form method="post" action="{ROOT}/pricing/sales/save" class="m2-fields">'
     body+=f'<input type="hidden" name="channel" value="{e(channel)}">'
-    body+='<div><label>دسته</label><select name="category" id="m2-cat" onchange="window.location.href=\''+ROOT+'/pricing/sales?channel='+quote(channel)+'&category=\'+encodeURIComponent(this.value)">'
-    body+=category_option(category)+'</select></div>'
+    if channel=="mold":
+        body+='<input type="hidden" name="category" value="قالب"><div><label>دسته</label><strong>قالب</strong></div>'
+    else:
+        body+='<div><label>دسته</label><select name="category" id="m2-cat" onchange="window.location.href=\''+ROOT+'/pricing/sales?channel='+quote(channel)+'&category=\'+encodeURIComponent(this.value)">'
+        body+=category_option(category)+'</select></div>'
     if category=="بادیگارد":
         body+='<div><label>نوع بادیگارد</label><select name="subtype">'+''.join(f'<option value="{e(t)}">{e(t)}</option>' for t in BODY_TYPES)+'</select></div>'
     else:body+='<input type="hidden" name="subtype" value="">'
