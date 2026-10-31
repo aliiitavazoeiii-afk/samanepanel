@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}{{ embedded_title }} | پنل فروش{% endblock %}
+{% block content %}
+<style>
+/* DigiKala is a native page inside the EXISTING panel shell.
+   Scope every rule; never alter the dashboard, sidebar, or other modules. */
+.sister-suite{direction:rtl;color:#f7f9fc;font-family:inherit;min-width:0}
+.sister-suite .hero{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+.sister-suite .hero h1{font-size:1.65rem;font-weight:850;color:#f8fafc;letter-spacing:-.01em;margin:0 0 8px}
+.sister-suite .hero p{color:#aebdcd;margin:0;font-size:.9rem}
+.sister-suite .panel,.sister-suite .card{border:1px solid rgba(255,255,255,.15);border-radius:16px;background:linear-gradient(135deg,rgba(18,43,72,.40),rgba(5,19,34,.24));box-shadow:0 20px 52px rgba(0,7,18,.26),inset 0 1px 0 rgba(255,255,255,.10);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);color:#f7f9fc}
+.sister-suite .panel{padding:21px;margin-top:18px;max-width:100%}
+.sister-suite .panel h3{font-size:1.1rem;font-weight:800;color:#fff;margin:0 0 18px}
+.sister-suite .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.sister-suite .grid>.card{padding:20px}
+.sister-suite .card small{display:block;color:#aebdcd}
+.sister-suite .card strong{display:block;font-size:1.55rem;font-weight:850;direction:ltr;text-align:right;color:#fff}
+.sister-suite .card.warn{border-color:rgba(245,158,11,.44)}
+.sister-suite .forms{display:flex;gap:13px;align-items:flex-end;flex-wrap:wrap}
+.sister-suite .forms>div{flex:1 1 170px;min-width:0}
+.sister-suite .forms>button{flex:0 0 auto}
+.sister-suite label{font-size:.78rem;display:block;margin-bottom:7px;color:#b7c4d2;font-weight:550}
+.sister-suite input:not([type=checkbox]):not([type=radio]),.sister-suite select{color:#f8fafc;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.18);border-radius:9px;min-height:41px;padding:9px 12px;font:inherit;max-width:100%;width:100%;outline:none}
+.sister-suite input::placeholder{color:#879bb2}
+.sister-suite select option{background:#0b1c33;color:#fff}
+.sister-suite input:focus,.sister-suite select:focus{border-color:#f79009;background:rgba(255,255,255,.12);box-shadow:0 0 0 .2rem rgba(251,101,20,.14)}
+.sister-suite input[type=checkbox]{accent-color:#fb6514}
+.sister-suite button,.sister-suite a.button{border:1px solid #fb6514;border-radius:9px;background:#fb6514;color:white;font:inherit;font-size:.86rem;font-weight:750;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:9px 15px;min-height:41px;cursor:pointer;max-width:100%}
+.sister-suite button:hover,.sister-suite a.button:hover{background:#e9540a;border-color:#e9540a;color:white}
+.sister-suite .scroll{max-width:100%;overflow-x:auto;border:1px solid rgba(255,255,255,.10);border-radius:12px}
+.sister-suite table{border-collapse:collapse;width:100%;font-size:.83rem}
+.sister-suite th,.sister-suite td{border-bottom:1px solid rgba(255,255,255,.08);padding:11px 13px;text-align:right;vertical-align:middle;background:transparent;color:#eef4fa}
+.sister-suite th{background:rgba(255,255,255,.065);color:#dce7f1;font-weight:750;white-space:nowrap}
+.sister-suite tbody tr:hover td{background:rgba(255,255,255,.035)}
+.sister-suite td.num{text-align:left;direction:ltr;white-space:nowrap}
+.sister-suite td.title{min-width:220px;max-width:500px}
+.sister-suite td .forms{min-width:400px}
+.sister-suite td .forms input:not([type=checkbox]){width:auto;min-width:95px}
+.sister-suite td a:not(.button){color:#ffd08a}
+.sister-suite .notice{background:rgba(255,168,58,.08);border:1px solid rgba(251,167,57,.45);color:#f6e4c7;border-radius:12px;padding:14px 17px;margin:15px 0;font-size:.88rem}
+.sister-suite .notice.error{border-color:rgba(240,68,56,.47);background:rgba(240,68,56,.09);color:#ffcdca}
+.sister-suite .notice.ok{border-color:rgba(18,183,106,.40);background:rgba(18,183,106,.09);color:#b4f1d2}
+.sister-suite .faint{color:#aebdcd}
+.sister-suite p{color:#aebdcd}
+.sister-suite .section-nav{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 20px}
+.sister-suite .section-nav a{display:inline-flex;padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:10px;text-decoration:none;color:#d9e6f2;background:rgba(255,255,255,.045);font-size:.83rem}
+.sister-suite .section-nav a:hover{color:white;border-color:rgba(251,101,20,.5)}
+.sister-suite .section-nav a.active{background:rgba(251,101,20,.16);border-color:rgba(251,101,20,.45);color:#ffbf91}
+.sister-suite footer{margin:25px 0;color:#8ba1b5;font-size:.76rem;text-align:right}
+@media(max-width:767px){.sister-suite .grid{grid-template-columns:1fr 1fr}.sister-suite .panel{padding:15px}.sister-suite .hero h1{font-size:1.3rem}}
+@media(max-width:460px){.sister-suite .grid{grid-template-columns:1fr}.sister-suite .forms>div{flex:1 1 100%}}
+</style>
+<div class="sister-suite">
+  <div class="page-kicker">تعاریف و فروش / مدیریت محصولات</div>
+  <nav class="section-nav" aria-label="بخش‌های محصولات و فروش">
+    <a href="{% url 'settings_products' %}">محصولات و کدها</a>
+    <a href="{% url 'settings_product_new' %}" {% if section == 'master' %}class="active"{% endif %}>تعریف محصولات</a>
+    <a href="{% url 'sister_product_digikala' %}" {% if section == 'catalog' %}class="active"{% endif %}>محصولات دیجی‌کالا</a>
+    <a href="{% url 'inventory_stock' %}" {% if section == 'stock' %}class="active"{% endif %}>موجودی کالا</a>
+    <a href="{% url 'sale_start' %}">فروش روزانه</a>
+  </nav>
+  {{ embedded_html|safe }}
+  <footer>مبالغ به تومان هستند. فروش تأییدشده و اصلاح موجودی با سابقه ثبت می‌شوند.</footer>
+</div>
+{% endblock %}
