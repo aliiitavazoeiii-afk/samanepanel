@@ -19,6 +19,8 @@ if ! grep -q '^SALES_ADMIN_PASSWORD=' .env; then
   printf 'SALES_ADMIN_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
 fi
 
+# Ensure the declared external edge network exists before any Compose command.
+docker network inspect forosh_edge >/dev/null 2>&1 || docker network create --driver bridge forosh_edge >/dev/null
 mkdir -p backups
 STAMP="$(date +%Y%m%d-%H%M%S)"
 echo "Backing up only the isolated Django PostgreSQL database..."
@@ -33,8 +35,6 @@ if docker compose -f compose.fresh.yml ps --status running --services | grep -qx
   test -s "backups/sister-sales-$STAMP.sqlite3"
 fi
 
-# Create only the public edge network; new web remains on its isolated DB network.
-docker network inspect forosh_edge >/dev/null 2>&1 || docker network create --driver bridge forosh_edge >/dev/null
 docker compose -f compose.fresh.yml config --quiet
 docker compose -f compose.fresh.yml build web sister-digikala
 echo "Django system checks — no changes to DB"
