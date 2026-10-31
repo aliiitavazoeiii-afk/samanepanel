@@ -43,6 +43,7 @@ services:
       SALES_ADMIN_USER: bridge
       SALES_ADMIN_PASSWORD: ${SALES_ADMIN_PASSWORD:?Set the unique sister sales password}
       SALES_START_EMPTY_STOCK: "1"
+      SALES_MASTER_STRICT: "1"
     volumes:
       - sister_sales_data:/data
     healthcheck:
