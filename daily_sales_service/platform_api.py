@@ -53,7 +53,7 @@ def channel_page(channel:str,category:str="",q:str="",conn=Depends(conn_dep)):
     body+=f'<p class="m2-hint" style="margin-top:12px">قیمت این بسته از قیمت واحد همان محصول در <a href="{ROOT}/pricing/sales?channel={channel}&category={quote(category)}">قیمت‌گذاری {e(PLATFORMS[channel])}</a> × تعداد بسته محاسبه می‌شود؛ موجودی تکراری ایجاد نمی‌شود.</p></div>'
     body+=f'<div class="m2-search-block"><form action="{ROOT}/platforms/{channel}" method="get">'
     body+=f'<input type="hidden" name="category" value="{e(category)}"><input name="q" placeholder="جست‌وجوی نام یا شناسه محصول" value="{e(q)}"><button class="m2-btn">جستجو</button></form></div>'
-    rows=list_listings(conn,channel,q,category)
+    rows=list_listings(conn,channel,q)  # Entire platform catalogue, independent of create-form category.
     body+='<div class="m2-card"><h3>فهرست محصولات ثبت‌شده</h3>'
     if rows:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>عنوان محصول</th><th>شناسه پلتفرم</th><th>رنگ / سایز</th><th>بسته</th><th>قیمت</th><th>موجودی کل (عدد)</th><th>وضعیت</th></tr></thead><tbody>'
