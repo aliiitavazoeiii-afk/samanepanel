@@ -234,14 +234,14 @@ def cost_for(conn,sku):
         if r is not None:return int(r[0])
     return sku.get("cost_toman")
 
-def set_channel_prices(conn,channel,category,subtype,size,price):
+def set_channel_prices(conn,channel,category,subtype,size,price,model_id=None):
     if channel not in CHANNELS:raise ImportErrorDetail("درگاه فروش نامعتبر است.")
     if category not in CATEGORIES:raise ImportErrorDetail("دسته‌بندی نامعتبر است.")
     if channel=="mold" and category!="قالب":raise ImportErrorDetail("فروش قالب فقط برای دسته قالب است.")
     subtype=_normalize_subtype(category,subtype)
     size=str(size or "*").strip()
     value=money(price)
-    qs=sku_rows(conn,category,subtype=subtype)
+    qs=sku_rows(conn,category,model_id=model_id,subtype=subtype)
     if size!="*":qs=[r for r in qs if r["size"]==size]
     if not qs:raise ImportErrorDetail("برای دسته و سایز انتخاب‌شده محصولی تعریف نشده است.")
     conn.execute("BEGIN IMMEDIATE")
@@ -261,3 +261,42 @@ def channel_price_for(conn,master_id,channel):
     r=conn.execute("SELECT price_toman FROM master_channel_prices WHERE master_id=? AND channel=?",
                    (master_id,channel)).fetchone()
     return int(r[0]) if r is not None else None
+
+def batch_transfer(conn,category,model_id,size,source,quantities,reason):
+    from_col=_warehouse_col(source)
+    to_location="khorshid" if source=="home" else "home"
+    to_col=_warehouse_col(to_location)
+    reason=_clean(reason,200)
+    rows={r["id"]:r for r in sku_rows(conn,category,model_id)}
+    pending=[]
+    for master_id,raw_qty in quantities.items():
+        if master_id not in rows or rows[master_id]["size"]!=size:
+            raise ImportErrorDetail("کالای انتقالی خارج از فیلتر انتخاب‌شده است.")
+        qty=money(raw_qty)
+        if qty>0:pending.append((master_id,qty))
+    if not pending:raise ImportErrorDetail("حداقل یک تعداد برای انتقال وارد کن.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for mid,qty in pending:
+            original=conn.execute(f"SELECT {from_col},{to_col} FROM master_products WHERE id=? AND active=1",(mid,)).fetchone()
+            if original is None or int(original[0])<qty:
+                raise ImportErrorDetail("موجودی مبدأ برای یکی از رنگ‌ها کافی نیست؛ هیچ انتقالی ثبت نشد.")
+        reference="bulk-transfer:"+uuid.uuid4().hex
+        total=0
+        for mid,qty in pending:
+            original=conn.execute(f"SELECT {from_col},{to_col} FROM master_products WHERE id=?",(mid,)).fetchone()
+            old_src,old_dst=map(int,original)
+            conn.execute(f"UPDATE master_products SET {from_col}=?,{to_col}=?,updated_at=? WHERE id=?",
+                         (old_src-qty,old_dst+qty,now(),mid))
+            for loc,delta,balance in ((source,-qty,old_src-qty),(to_location,qty,old_dst+qty)):
+                conn.execute("""INSERT INTO master_stock_events
+                     (occurred_at,master_id,source,delta,balance_after,reference)
+                     VALUES (?,?,?,?,?,?)""",(now(),mid,loc,delta,balance,reference+" "+reason))
+            conn.execute("""INSERT INTO master_transfers
+              (occurred_at,master_id,from_location,to_location,quantity,reference)
+              VALUES (?,?,?,?,?,?)""",(now(),mid,source,to_location,qty,reference))
+            total+=qty
+        conn.execute("COMMIT")
+        return total
+    except Exception:
+        conn.execute("ROLLBACK");raise
