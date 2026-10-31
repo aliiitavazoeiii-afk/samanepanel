@@ -96,7 +96,10 @@ class PlatformV3Test(unittest.TestCase):
     from daily_sales_service.master_v2_api import router
     from daily_sales_service.platform_api import channel_page,platforms
     from daily_sales_service.capital_api import capital_report,capital_data
-    paths={r.path for r in router.routes if hasattr(r,"path")}
+    from daily_sales_service.platform_api import router as platform_router
+    from daily_sales_service.capital_api import router as capital_router
+    paths={r.path for rr in (router,platform_router,capital_router)
+           for r in rr.routes if hasattr(r,"path")}
     for suffix in ("/platforms","/platforms/{channel}","/platforms/{channel}/add",
                    "/platforms/{channel}/sales","/platforms/{channel}/sales/add",
                    "/capital-report","/api/sister-capital.json"):
