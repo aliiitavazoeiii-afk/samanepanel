@@ -1,0 +1,282 @@
+"""Route family for sister catalogue, centralized pricing, and dual-warehouse stock."""
+from collections import defaultdict
+from urllib.parse import quote
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import RedirectResponse
+
+from .app import ROOT, conn_dep, e, fmt
+from .engine import ImportErrorDetail
+from .master_engine import CATEGORIES
+from .master_v2_logic import (
+    BODY_TYPES, CHANNELS, SIZES, WAREHOUSES, add_model, rename_model,
+    list_models, sku_rows, batch_adjust, batch_transfer,
+    set_cost_rule, set_channel_prices, cost_for,
+)
+from .master_v2_ui import (
+    page_with_style, category_tabs, category_option, group_options, inventory_grid,
+)
+from .master_api import catalog as digikala_catalog, catalog_map as digikala_map
+
+router=APIRouter()
+
+def alert_error(exc):
+    return page_with_style("خطا در ثبت",f'<div class="m2-msg">{e(str(exc))}</div>'
+       +f'<p><a class="m2-btn" href="{ROOT}/master">بازگشت به تعاریف</a> · '
+       +f'<a href="{ROOT}/master/stock">موجودی کالا</a> · '
+       +f'<a href="{ROOT}/pricing">قیمت‌گذاری</a></p>')
+
+def tabs(category):
+    return category_tabs("/master",category)
+
+def _subtypes(category):
+    if category=="بادیگارد":
+        return '<option value="">همه</option>'+''.join(f'<option value="{e(t)}">{e(t)}</option>' for t in BODY_TYPES)
+    return '<option value="">بدون زیرگروه</option>'
+
+def _filter_form(endpoint,category,subtype,q,models,model_id="",with_model=False):
+    model_input=('''<div><label>مدل محصول</label><select name="model_id">'''
+                 +group_options(models,model_id)+'</select></div>') if with_model else ''
+    opt='<option value="">همه زیرگروه‌ها</option>'
+    if category=="بادیگارد":
+        opt+=''.join(f'<option value="{e(t)}"'+(' selected' if t==subtype else '')+'>'+e(t)+'</option>' for t in BODY_TYPES)
+    return (f'<div class="m2-filters"><form action="{ROOT}{endpoint}" method="get">'
+        f'<input type="hidden" name="category" value="{e(category)}">'
+        f'<div><label>جست‌وجوی نام مدل یا رنگ</label><input name="q" value="{e(q)}" placeholder="نام محصول یا رنگ"></div>'
+        f'<div><label>نوع محصول</label><select name="subtype">{opt}</select></div>'
+        +model_input+
+        '<div><button type="submit">اعمال فیلتر</button></div></form></div>')
+
+@router.get(ROOT+"/master")
+def master(category:str="",subtype:str="",q:str="",conn=Depends(conn_dep)):
+    category=category if category in CATEGORIES else CATEGORIES[0]
+    subtype=subtype if category=="بادیگارد" and subtype in BODY_TYPES else ""
+    models=list_models(conn,category,subtype,q)
+    intro=(f'<div class="m2-hero"><div><h1>تعریف محصولات</h1>'
+      '<p class="m2-hint">فقط هویت کالا: دسته، نام، نوع، رنگ و سایزبندی. قیمت و موجودی در بخش‌های جداگانه‌اند.</p></div>'
+      f'<a class="m2-btn" href="{ROOT}/pricing">قیمت‌گذاری</a></div>')
+    intro+=tabs(category)
+    intro+=_filter_form("/master",category,subtype,q,models)
+    subtype_select=(f'<div><label>نوع بادیگارد</label><select name="subtype">'
+          +''.join(f'<option value="{e(t)}">{e(t)}</option>' for t in BODY_TYPES)
+          +'</select></div>') if category=="بادیگارد" else '<input type="hidden" name="subtype" value="">'
+    intro+=f'''<div class="m2-card" style="margin-bottom:22px"><h3>افزودن محصول / مدل</h3>
+<form method="post" action="{ROOT}/master/add" class="m2-fields">
+<input type="hidden" name="category" value="{e(category)}">
+<div><label>عنوان محصول</label><input name="title" placeholder="نام مدل" required maxlength="220"></div>
+{subtype_select}
+<div><label>رنگ‌بندی (با ویرگول جدا کن)</label><input name="colors" placeholder="مشکی، سفید، سرمه‌ای"></div>
+<div><label>سایزبندی (با ویرگول جدا کن)</label><input name="sizes" placeholder="{e('، '.join(SIZES[category]))}"></div>
+<div><button type="submit" class="m2-btn">ثبت محصول</button></div>
+</form><p class="m2-hint" style="margin-top:12px">اگر همین مدل قبلاً ثبت شده باشد، فقط ترکیب رنگ/سایزهای جدید اضافه می‌شوند و موجودی‌های قبلی حفظ می‌شوند. شناسه داخلی به‌صورت خودکار ساخته می‌شود.</p></div>'''
+    if not models:
+        intro+='<div class="m2-card"><h3>هنوز محصولی در این فیلتر تعریف نشده است.</h3></div>'
+    else:
+        intro+='<h3>مدل‌های تعریف‌شده</h3><div class="m2-list">'
+        for m in models:
+            skus=sku_rows(conn,category,m["representative"],active_only=False)
+            colors=sorted({s["color"] for s in skus})
+            sizes=sorted({s["size"] for s in skus})
+            intro+=f'''<div class="m2-card"><h3>{e(m["title"])}</h3>'''
+            if m["subtype"]: intro+=f'<p class="m2-hint">نوع: {e(m["subtype"])}</p>'
+            intro+=f'<p class="m2-hint">{len(skus)} ترکیب رنگ و سایز</p>'
+            intro+='<div class="m2-tags">'+''.join(f'<span class="m2-tag">{e(c)}</span>' for c in colors)+'</div>'
+            intro+='<p class="m2-hint">سایزها: '+e(" · ".join(sizes))+'</p>'
+            intro+=f'''<form method="post" action="{ROOT}/master/rename" class="m2-fields">
+<input type="hidden" name="master_id" value="{m["representative"]}">
+<div><label>ویرایش عنوان</label><input name="title" value="{e(m["title"])}" required></div>
+<div><label><input type="checkbox" name="active" value="1" {"checked" if m["active"] else ""}> فعال</label><button class="m2-btn" type="submit">ذخیره</button></div>
+</form><p style="margin-top:12px"><a href="{ROOT}/master/stock?category={quote(category)}&model_id={m["representative"]}">موجودی این مدل</a></p></div>'''
+        intro+='</div>'
+    intro+=f'<p style="margin-top:24px"><a href="{ROOT}/catalog">محصولات دیجی‌کالا</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
+    return page_with_style("تعریف محصولات",intro)
+
+@router.post(ROOT+"/master/add")
+def add(category:str=Form(...),title:str=Form(...),subtype:str=Form(""),colors:str=Form(""),sizes:str=Form(""),conn=Depends(conn_dep)):
+    try:add_model(conn,category,title,subtype,colors,sizes)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master?category="+quote(category),status_code=303)
+
+@router.post(ROOT+"/master/rename")
+def rename(master_id:int=Form(...),title:str=Form(...),active:str=Form(""),conn=Depends(conn_dep)):
+    try:rename_model(conn,master_id,title,bool(active))
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master",status_code=303)
+
+def _model_scope(conn,category,subtype="",q="",model_id=None):
+    models=list_models(conn,category,subtype,q)
+    if model_id and not any(m["representative"]==model_id for m in models):model_id=None
+    if not model_id and models:model_id=models[0]["representative"]
+    return models,model_id
+
+@router.get(ROOT+"/master/stock")
+def stock(category:str="",subtype:str="",q:str="",model_id:int|None=None,conn=Depends(conn_dep)):
+    category=category if category in CATEGORIES else CATEGORIES[0]
+    subtype=subtype if category=="بادیگارد" and subtype in BODY_TYPES else ""
+    models,model_id=_model_scope(conn,category,subtype,q,model_id)
+    body='<h1>موجودی کالا</h1><p class="m2-hint">نمایش بر اساس رنگ و سایز، همان ساختار موجودی پنل دارما</p>'
+    body+=category_tabs("/master/stock",category)
+    body+=_filter_form("/master/stock",category,subtype,q,models,model_id,with_model=True)
+    body+=f'<div class="m2-hero"><h2>{e(next((m["title"] for m in models if m["representative"]==model_id),category))}</h2>'
+    body+=f'<a class="m2-btn" href="{ROOT}/master/stock/operations?category={quote(category)}'+(f'&model_id={model_id}' if model_id else '')+'">انتقال / اصلاح موجودی</a></div>'
+    if not models:
+        body+='<div class="m2-card"><p>ابتدا این دسته را در «تعریف محصولات» اضافه کن.</p></div>'
+    else:
+        skus=sku_rows(conn,category,model_id)
+        for location,label in (("total","موجودی کل"),("home","موجودی خانه"),("khorshid","موجودی انبار خورشید")):
+            body+=inventory_grid(conn,skus,location,label)
+        body+='<p class="m2-hint">قرمز پررنگ: موجودی صفر؛ قرمز ملایم: موجودی کمتر از ۱۰ عدد. ارزش سرمایه از بخش «بهای تمام‌شده» قیمت‌گذاری محاسبه می‌شود.</p>'
+    body+=f'<p><a href="{ROOT}/master?category={quote(category)}">تعریف محصولات همین دسته</a></p>'
+    return page_with_style("موجودی کالا",body)
+
+def _operations_filter(conn,category,model_id,subtype,size,location):
+    models,model_id=_model_scope(conn,category,subtype,model_id=model_id)
+    skus=sku_rows(conn,category,model_id) if model_id else []
+    sizes=sorted({s["size"] for s in skus})
+    if size not in sizes:size=sizes[0] if sizes else ""
+    filtered=[s for s in skus if s["size"]==size]
+    current_model=next((m for m in models if m["representative"]==model_id),None)
+    return models,model_id,skus,sizes,size,filtered,current_model
+
+@router.get(ROOT+"/master/stock/operations")
+def operations(category:str="",model_id:int|None=None,subtype:str="",size:str="",location:str="home",conn=Depends(conn_dep)):
+    category=category if category in CATEGORIES else CATEGORIES[0]
+    if location not in WAREHOUSES:location="home"
+    models,model_id,skus,sizes,size,selected,model=_operations_filter(conn,category,model_id,subtype,size,location)
+    body='<h1>انتقال / اصلاح موجودی</h1><p class="m2-hint">اصلاح تعداد نهایی و انتقال بین خانه و خورشید، با ثبت سند گردش برای هر رنگ و سایز.</p>'
+    body+=category_tabs("/master/stock/operations",category)
+    body+=f'<div class="m2-filters"><form action="{ROOT}/master/stock/operations" method="get">'
+    body+=f'<input type="hidden" name="category" value="{e(category)}">'
+    body+='<div><label>مدل محصول</label><select name="model_id">'+group_options(models,model_id)+'</select></div>'
+    body+='<div><label>سایز</label><select name="size">'+''.join(f'<option value="{e(s)}"'+(' selected' if s==size else '')+'>'+e(s)+'</option>' for s in sizes)+'</select></div>'
+    body+='<div><label>محل اصلاح</label><select name="location"><option value="home"'+(' selected' if location=="home" else '')+'>خانه</option><option value="khorshid"'+(' selected' if location=="khorshid" else '')+'>خورشید</option></select></div>'
+    body+='<div><button type="submit">نمایش موجودی</button></div></form></div>'
+    if not selected:
+        body+='<div class="m2-card">برای این فیلتر کالایی پیدا نشد.</div>'
+    else:
+        body+=f'<div class="m2-card"><h3>اصلاح موجودی {e(model["title"] if model else category)} — سایز {e(size)}</h3>'
+        body+='<p class="m2-hint">فقط رنگ‌هایی که باید اصلاح شوند را پر کن؛ عدد واردشده جایگزین موجودی فعلی همان انبار می‌شود.</p>'
+        body+=f'<form method="post" action="{ROOT}/master/stock/bulk-adjust"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id}"><input type="hidden" name="size" value="{e(size)}"><input type="hidden" name="location" value="{e(location)}">'
+        body+='<div class="m2-operation-grid">'
+        for s in selected:
+            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}</strong>'
+            body+=f'<div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])} · کل: {fmt(s["seller_stock"]+s["khorshid_stock"])}</div>'
+            body+=f'<label>موجودی جدید {("خانه" if location=="home" else "خورشید")}</label><input type="number" min="0" name="target_{s["id"]}" placeholder="بدون تغییر" /></div>'
+        body+='</div><div class="m2-fields" style="margin-top:16px"><div><label>دلیل اصلاح</label><input name="reason" required placeholder="شمارش موجودی / مغایرت"></div><div><button type="submit" class="m2-btn">ثبت اصلاح موجودی</button></div></div></form></div>'
+        body+=f'<div class="m2-card" style="margin-top:20px"><h3>انتقال بین انبار خورشید و خانه</h3>'
+        body+=f'<form method="post" action="{ROOT}/master/stock/transfer"><input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="model_id" value="{model_id}"><input type="hidden" name="size" value="{e(size)}">'
+        body+='<div class="m2-fields"><div><label>جهت انتقال</label><select name="location">'
+        body+='<option value="khorshid">خورشید ← خانه</option><option value="home">خانه ← خورشید</option></select></div></div>'
+        body+='<div class="m2-operation-grid" style="margin-top:14px">'
+        for s in selected:
+            body+=f'<div class="m2-operation-color"><strong>{e(s["color"])}</strong><div class="m2-hint">خانه: {fmt(s["seller_stock"])} · خورشید: {fmt(s["khorshid_stock"])}</div><input type="number" name="qty_{s["id"]}" min="0" placeholder="تعداد انتقال"></div>'
+        body+='</div><div class="m2-fields" style="margin-top:15px"><div><label>شرح انتقال</label><input name="reason" value="انتقال بین دو انبار" required></div><div><button type="submit" class="m2-btn">ثبت انتقال</button></div></div></form></div>'
+    recent=conn.execute("""SELECT ev.occurred_at,ev.source,ev.delta,ev.balance_after,ev.reference,
+       m.title,m.color,m.size FROM master_stock_events ev
+       JOIN master_products m ON m.id=ev.master_id
+       WHERE m.category=? ORDER BY ev.id DESC LIMIT 40""",(category,)).fetchall()
+    body+='<div class="m2-section"><h3>آخرین گردش‌ها و اصلاحات</h3><div class="m2-history"><table>'
+    body+='<thead><tr><th>زمان</th><th>مدل</th><th>رنگ / سایز</th><th>انبار</th><th>تغییر</th><th>موجودی پس از ثبت</th><th>شرح</th></tr></thead><tbody>'
+    for ev in recent:
+        loc={"home":"خانه","seller":"خانه","khorshid":"خورشید","digikala":"دیجی‌کالا (سابق)"}.get(ev["source"],ev["source"])
+        body+=f'<tr><td>{e(ev["occurred_at"][:19])}</td><td>{e(ev["title"])}</td><td>{e(ev["color"])} / {e(ev["size"])}</td><td>{e(loc)}</td><td>{fmt(ev["delta"])}</td><td>{fmt(ev["balance_after"])}</td><td>{e(ev["reference"])}</td></tr>'
+    body+='</tbody></table></div></div>'
+    body+=f'<a class="m2-btn" href="{ROOT}/master/stock?category={quote(category)}'+(f'&model_id={model_id}' if model_id else '')+'">بازگشت به موجودی کالا</a>'
+    return page_with_style("انتقال / اصلاح موجودی",body)
+
+def _posted_targets(conn,category,model_id,size,post,prefix):
+    valid=sku_rows(conn,category,model_id)
+    return {s["id"]:post.get(f"{prefix}{s['id']}") for s in valid if s["size"]==size and post.get(f"{prefix}{s['id']}") not in (None,"")}
+
+@router.post(ROOT+"/master/stock/bulk-adjust")
+async def post_adjust(request:Request,category:str=Form(...),model_id:int=Form(...),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
+    try:
+        post=await request.form()
+        values=_posted_targets(conn,category,model_id,size,post,"target_")
+        count=batch_adjust(conn,category,model_id,size,location,values,reason)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}&location={location}",status_code=303)
+
+@router.post(ROOT+"/master/stock/transfer")
+async def post_transfer(request:Request,category:str=Form(...),model_id:int=Form(...),size:str=Form(...),location:str=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
+    try:
+        post=await request.form()
+        values=_posted_targets(conn,category,model_id,size,post,"qty_")
+        batch_transfer(conn,category,model_id,size,location,values,reason)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/master/stock/operations?category="+quote(category)+f"&model_id={model_id}&size={quote(size)}",status_code=303)
+
+def _price_tiles():
+    return (f'<div class="m2-cards">'
+      f'<a class="m2-card" href="{ROOT}/pricing/cost" style="text-decoration:none"><h3>بهای تمام‌شده</h3><p class="m2-hint">تعریف هزینه تولید بر اساس نوع کالا؛ بادیگارد اسلیپ/پادار و قالب کوچک/متوسط/بزرگ.</p></a>'
+      f'<a class="m2-card" href="{ROOT}/pricing/sales" style="text-decoration:none"><h3>قیمت فروش</h3><p class="m2-hint">قیمت‌گذاری گروهی فروش سایت، باسلام و قالب؛ مستقل از دیجی‌کالا.</p></a></div>')
+
+@router.get(ROOT+"/pricing")
+def pricing(conn=Depends(conn_dep)):
+    return page_with_style("قیمت‌گذاری",'<h1>قیمت‌گذاری</h1><p class="m2-hint">قیمت از تعریف محصول جدا شده است.</p>'+_price_tiles())
+
+@router.get(ROOT+"/pricing/cost")
+def cost_prices(conn=Depends(conn_dep)):
+    cost_rows={ (r["category"],r["subtype"],r["size"]):r["cost_toman"] for r in conn.execute("SELECT * FROM master_cost_rules")}
+    body='<h1>بهای تمام‌شده</h1><p class="m2-hint">هزینه تولید مرکزی هر گروه؛ بدون وابستگی به رنگ. تغییر هزینه، فروش‌های تاریخی را بازنویسی نمی‌کند.</p>'
+    body+=_price_tiles()+'<div class="m2-cards" style="margin-top:20px">'
+    for category in CATEGORIES:
+        variants=[("اسلیپ","*"),("پادار","*")] if category=="بادیگارد" else ([("",s) for s in SIZES["قالب"]] if category=="قالب" else [("","*")])
+        body+=f'<div class="m2-card"><h3>{e(category)}</h3>'
+        for subtype,size in variants:
+            current=cost_rows.get((category,subtype,size))
+            name=subtype or (size if size!="*" else "همه محصولات این دسته")
+            body+=f'<form method="post" action="{ROOT}/pricing/cost/save" class="m2-fields" style="margin-bottom:14px">'
+            body+=f'<input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="subtype" value="{e(subtype)}"><input type="hidden" name="size" value="{e(size)}">'
+            body+=f'<div><label>{e(name)} — بهای تمام‌شده هر عدد (تومان)</label><input name="cost" type="number" min="0" value="{e(current if current is not None else "")}" placeholder="هنوز مشخص نشده" required></div>'
+            body+='<div><button class="m2-btn" type="submit">ذخیره</button></div></form>'
+        body+='</div>'
+    body+='</div>'
+    return page_with_style("بهای تمام‌شده",body)
+
+@router.post(ROOT+"/pricing/cost/save")
+def save_cost(category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),cost:str=Form(...),conn=Depends(conn_dep)):
+    try:set_cost_rule(conn,category,subtype,size,cost)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/pricing/cost",status_code=303)
+
+@router.get(ROOT+"/pricing/sales")
+def sales_prices(channel:str="site",category:str="",conn=Depends(conn_dep)):
+    if channel not in CHANNELS:channel="site"
+    category=category if category in CATEGORIES else ("قالب" if channel=="mold" else CATEGORIES[0])
+    if channel=="mold":category="قالب"
+    models=list_models(conn,category)
+    body='<h1>قیمت فروش</h1><p class="m2-hint">قیمت مستقل برای هر درگاه، قابل اعمال گروهی به مدل یا دسته و سایز. دیجی‌کالا فقط در «محصولات دیجی‌کالا» مدیریت می‌شود.</p>'
+    body+=_price_tiles()
+    body+='<div class="m2-tabs">'+''.join(f'<a href="{ROOT}/pricing/sales?channel={name}" class="{("current" if name==channel else "")}">{e(title)}</a>' for name,title in CHANNELS.items())+'</div>'
+    body+=f'<div class="m2-card"><h3>ثبت گروهی قیمت — {e(CHANNELS[channel])}</h3><form method="post" action="{ROOT}/pricing/sales/save" class="m2-fields">'
+    body+=f'<input type="hidden" name="channel" value="{e(channel)}">'
+    body+='<div><label>دسته</label><select name="category" id="m2-cat" onchange="window.location.href=\''+ROOT+'/pricing/sales?channel='+quote(channel)+'&category=\'+encodeURIComponent(this.value)">'
+    body+=category_option(category)+'</select></div>'
+    if category=="بادیگارد":
+        body+='<div><label>نوع بادیگارد</label><select name="subtype">'+''.join(f'<option value="{e(t)}">{e(t)}</option>' for t in BODY_TYPES)+'</select></div>'
+    else:body+='<input type="hidden" name="subtype" value="">'
+    body+='<div><label>مدل موردنظر</label><select name="model_id">'+group_options(models)+'</select></div>'
+    body+='<div><label>سایز</label><select name="size"><option value="*">همه سایزها</option>'+''.join(f'<option value="{e(s)}">{e(s)}</option>' for s in SIZES[category])+'</select></div>'
+    body+='<div><label>قیمت فروش واحد (تومان)</label><input type="number" min="0" name="price" required></div>'
+    body+='<div><button class="m2-btn" type="submit">ثبت قیمت گروهی</button></div></form></div>'
+    rows=conn.execute("""SELECT m.title,m.size,m.color,m.subtype,cp.price_toman FROM master_channel_prices cp
+        JOIN master_products m ON m.id=cp.master_id
+        WHERE cp.channel=? AND m.category=?
+        ORDER BY m.title,m.size,m.color LIMIT 150""",(channel,category)).fetchall()
+    body+=f'<div class="m2-section"><h3>قیمت‌های ثبت‌شده — {e(category)}</h3><div class="m2-history"><table><thead><tr><th>محصول</th><th>نوع</th><th>رنگ</th><th>سایز</th><th>قیمت (تومان)</th></tr></thead><tbody>'
+    for row in rows:
+        body+=f'<tr><td>{e(row["title"])}</td><td>{e(row["subtype"] or "—")}</td><td>{e(row["color"])}</td><td>{e(row["size"])}</td><td>{fmt(row["price_toman"])}</td></tr>'
+    body+='</tbody></table></div></div>'
+    return page_with_style("قیمت فروش",body)
+
+@router.post(ROOT+"/pricing/sales/save")
+def save_sale_price(channel:str=Form(...),category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),model_id:str=Form(""),price:str=Form(...),conn=Depends(conn_dep)):
+    try:
+        group_id=int(model_id) if model_id else None
+        set_channel_prices(conn,channel,category,subtype,size,price,group_id)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/pricing/sales?channel="+quote(channel)+"&category="+quote(category),status_code=303)
+
+# The existing 538 DigiKala external variants and their mapping remain intact.
+router.add_api_route(ROOT+"/catalog",digikala_catalog,methods=["GET"])
+router.add_api_route(ROOT+"/catalog/map",digikala_map,methods=["POST"])
