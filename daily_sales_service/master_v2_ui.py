@@ -76,7 +76,7 @@ def inventory_grid(conn,skus,location,label):
     keyed={(s["color"],s["size"]):s for s in skus}
     sums=[0]*len(sizes)
     worth=[0]*len(sizes)
-    grand=0;capital=0
+    grand=0;capital=0;unknown=set()
     col={"total":None,"home":"seller_stock","khorshid":"khorshid_stock"}[location]
     rows=[]
     for color in colors:
@@ -88,6 +88,7 @@ def inventory_grid(conn,skus,location,label):
             qty=int(x["seller_stock"])+int(x["khorshid_stock"]) if col is None else int(x[col])
             cs=cost_for(conn,x)
             value=(cs or 0)*qty
+            if cs is None and qty>0:unknown.add(idx)
             row_total+=qty;sums[idx]+=qty;worth[idx]+=value;capital+=value
             css="m2-zero" if qty==0 else ("m2-low" if qty<10 else "")
             cells.append(f'<td class="{css}" title="بهای تمام‌شده هر عدد: {fmt(cs) if cs is not None else "نامشخص"}">{fmt(qty)}</td>')
@@ -95,7 +96,8 @@ def inventory_grid(conn,skus,location,label):
         rows.append(f'<tr><th>{e(color)}</th>'+''.join(cells)+f'<td><b>{fmt(row_total)}</b></td></tr>')
     foot='<tr class="m2-subtotal"><th>مجموع</th>'+''.join(f'<td>{fmt(n)}</td>' for n in sums)+f'<td>{fmt(grand)}</td></tr>'
     if location=="total":
-        foot+='<tr class="m2-capital"><th>ارزش سرمایه</th>'+''.join(f'<td>{fmt(n)}</td>' for n in worth)+f'<td>{fmt(capital)} <small>تومان</small></td></tr>'
+        capital_label='نامشخص' if unknown else fmt(capital)+' <small>تومان</small>'
+        foot+='<tr class="m2-capital"><th>ارزش سرمایه</th>'+''.join(f'<td>{fmt(n) if idx not in unknown else "نامشخص"}</td>' for idx,n in enumerate(worth))+f'<td>{capital_label}</td></tr>'
     html=f'<div class="m2-section"><h3>{e(label)}</h3><div class="m2-unit">جدول را به چپ و راست بکش</div>'
     html+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>رنگ / مدل</th>'+''.join(f'<th>{e(s)}</th>' for s in sizes)+'<th>کل</th></tr></thead><tbody>'+''.join(rows)+'</tbody><tfoot>'+foot+'</tfoot></table></div></div>'
     return html
