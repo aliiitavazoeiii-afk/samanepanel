@@ -1,4 +1,4 @@
-import io, tempfile, unittest, zipfile
+import io, os, tempfile, unittest, zipfile
 from decimal import Decimal
 from pathlib import Path
 from daily_sales_service.engine import init_db, fee_unit, settings_for, create_preview,commit_preview,report,ImportErrorDetail
@@ -24,6 +24,9 @@ def make_xlsx(rows):
 
 class DailySalesTest(unittest.TestCase):
  def setUp(self):
+  previous=os.environ.get('SALES_MASTER_STRICT')
+  os.environ['SALES_MASTER_STRICT']='0'  # Legacy-mode regression tests only.
+  self.addCleanup(lambda: os.environ.pop('SALES_MASTER_STRICT',None) if previous is None else os.environ.__setitem__('SALES_MASTER_STRICT',previous))
   self.folder=tempfile.TemporaryDirectory();self.addCleanup(self.folder.cleanup)
   self.conn=init_db(Path(self.folder.name)/'test.sqlite3')
   self.addCleanup(self.conn.close)
