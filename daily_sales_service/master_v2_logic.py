@@ -59,6 +59,14 @@ def ensure_v2(conn):
         conn.execute("ALTER TABLE master_products ADD COLUMN subtype TEXT NOT NULL DEFAULT ''")
     if "khorshid_stock" not in fields:
         conn.execute("ALTER TABLE master_products ADD COLUMN khorshid_stock INTEGER NOT NULL DEFAULT 0 CHECK(khorshid_stock>=0)")
+    # Historical 2026 body.xlsx imports carried slip/padar in the product
+    # title/code but no subtype. Backfill only this classification, not balances.
+    conn.execute("""UPDATE master_products SET subtype='اسلیپ'
+                    WHERE category='بادیگارد' AND subtype=''
+                      AND (code LIKE 'BG-SL-%' OR title LIKE '%اسلیپ%')""")
+    conn.execute("""UPDATE master_products SET subtype='پادار'
+                    WHERE category='بادیگارد' AND subtype=''
+                      AND (code LIKE 'BG-PA-%' OR title LIKE '%پادار%')""")
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
