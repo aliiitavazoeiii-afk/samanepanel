@@ -382,3 +382,8 @@ def save_sale_price(channel:str=Form(...),category:str=Form(...),subtype:str=For
 # The existing 538 DigiKala external variants and their mapping remain intact.
 router.add_api_route(ROOT+"/catalog",digikala_catalog,methods=["GET"])
 router.add_api_route(ROOT+"/catalog/map",digikala_map,methods=["POST"])
+
+from .platform_api import router as platform_router
+from .capital_api import router as capital_router
+router.include_router(platform_router)
+router.include_router(capital_router)
