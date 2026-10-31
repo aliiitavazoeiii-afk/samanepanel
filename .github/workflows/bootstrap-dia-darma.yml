@@ -1,0 +1,56 @@
+name: Bootstrap full Darma copy into dia-darma-fresh branch
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-dia-darma.yml"
+      - "deploy/darma-fresh/**"
+permissions:
+  contents: write
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Import pinned Darma source without history and add safe fresh-instance overlay
+        shell: bash
+        env:
+          SOURCE_SHA: 90a79e993adced1689c70d5b0777ce2ea7f2789f
+          SOURCE_REF: v126-payment-history-filters
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin dia-darma-fresh >/dev/null 2>&1; then
+            echo 'Branch dia-darma-fresh already exists; refusing to overwrite.'
+            exit 0
+          fi
+
+          mkdir -p "$RUNNER_TEMP/dia-fresh-overlay"
+          cp -a deploy/darma-fresh "$RUNNER_TEMP/dia-fresh-overlay/"
+          cp docs/DARMA_FRESH_BOOTSTRAP.md "$RUNNER_TEMP/dia-fresh-overlay/"
+
+          git fetch --no-tags --depth=1 https://github.com/aliiitavazoeiii-afk/darma-general.git "refs/heads/$SOURCE_REF"
+          FETCHED_SHA="$(git rev-parse FETCH_HEAD)"
+          test "$FETCHED_SHA" = "$SOURCE_SHA" || {
+            echo "Upstream branch changed; expected $SOURCE_SHA got $FETCHED_SHA. Review before importing." >&2
+            exit 1
+          }
+
+          git checkout --detach FETCH_HEAD
+          git checkout --orphan dia-darma-fresh
+
+          mkdir -p deploy docs
+          cp -a "$RUNNER_TEMP/dia-fresh-overlay/darma-fresh" deploy/
+          cp "$RUNNER_TEMP/dia-fresh-overlay/DARMA_FRESH_BOOTSTRAP.md" docs/
+          cp deploy/darma-fresh/compose.fresh.yml compose.fresh.yml
+          python3 deploy/darma-fresh/patch_darma.py
+          python3 -m compileall -q config core
+          git config user.name "Samanepanel Bootstrap"
+          git config user.email "samanepanel-bootstrap@users.noreply.github.com"
+          git add -A
+          git commit -m "Import complete Darma source as isolated empty-data Dia starter"
+          git push origin HEAD:refs/heads/dia-darma-fresh
+          echo 'DIA_DARMA_FRESH_BRANCH_CREATED'
