@@ -1,3 +1,38 @@
+# Host Caddy deployment discovered on 2026-10-31
+
+Live server diagnostics show **Caddy is a host process** listening on TCP
+80/443 (not a Docker container). The Dia Gallery Django web container is
+published on host loopback 8001; the new standalone Samanepanel web is
+published on loopback 18081.
+
+**Use deploy/darma-fresh/enable_forosh_host_caddy.sh instead of
+enable_forosh_domain.sh.** The old script is intended for a Docker Caddy
+installation and will deliberately refuse to run against this server.
+
+Download from the **Git branch** to avoid stale raw.githubusercontent.com
+responses:
+
+```bash
+cd /opt/dia-darma-fresh
+git fetch origin dia-darma-fresh
+git show FETCH_HEAD:deploy/darma-fresh/enable_forosh_host_caddy.sh > /root/enable_forosh_host_caddy.sh
+grep -q HOST_CADDY_CONFIG_LOADED /root/enable_forosh_host_caddy.sh && bash /root/enable_forosh_host_caddy.sh
+```
+
+The new script identifies the ACTIVE Caddy configuration from the running
+host Caddy process command line. It validates the existing Caddyfile,
+confirms it serves samaneh.filmjadiid.ir, backs up the Caddyfile and
+the isolated Samanepanel .env, adjusts only the Samanepanel host/HTTPS
+settings and web container, then appends a separate domain block targeting
+127.0.0.1:18081 and reloads host Caddy without restarting it. On config
+validation or reload failure it restores the original Caddyfile.
+
+If its active Caddy configuration cannot be proven, it stops before any
+modification. The installer does not automatically change DNS. A DNS
+A record `forosh` should point to the correct public server address.
+
+---
+
 # Serve independent Samanepanel on https://forosh.filmjadiid.ir
 
 The Dia Gallery repository documents a Caddy-based deployment, but the live server may use a different checkout path. The installer discovers the **actual running Caddyfile host bind mount** via `docker inspect` and checks the existing `samaneh.filmjadiid.ir` site block; it never assumes `/opt/dia-gallery/Caddyfile` exists. If no unambiguous match exists, it prints running containers/listening ports and stops without modifying the reverse proxy.
