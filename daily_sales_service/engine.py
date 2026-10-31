@@ -277,7 +277,7 @@ def commit_preview(conn,token):
   conn.execute('ROLLBACK');raise
 
 def report(conn,start=None,end=None):
- sql='SELECT s.*,p.category,p.title FROM sales s JOIN products p ON p.variant_id=s.variant_id WHERE 1=1';args=[]
+ sql='SELECT s.*,COALESCE(m.category,p.category) AS category,COALESCE(m.title,p.title) AS title FROM sales s JOIN products p ON p.variant_id=s.variant_id LEFT JOIN master_products m ON m.id=p.master_id WHERE 1=1';args=[]
  if start:sql+=' AND sale_date>=?';args.append(start)
  if end:sql+=' AND sale_date<=?';args.append(end)
  sql+=' ORDER BY sale_date DESC,p.category,p.title'
