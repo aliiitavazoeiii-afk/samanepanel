@@ -1,0 +1,105 @@
+{% extends 'base.html' %}{% load jalali %}{% block title %}پایش قیمت‌گذاری دارما | DARMA{% endblock %}
+{% block content %}{% include 'core/_mobile_shell.html' %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <div class="page-kicker">V88 · گزارش فقط‌خواندنی</div>
+    <h1 class="page-title mb-1">پایش قیمت‌گذاری و عملکرد محصولات</h1>
+    <div class="page-muted">{{ as_of_j }} در مقایسه با {{ previous_day_j }}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{% url 'settings_products' %}">قیمت‌های محصولات</a>
+    <a class="btn btn-primary" href="{% url 'pricing_monitor_xlsx' %}?date={{ date_filter|urlencode }}&code={{ code_filter|urlencode }}&size={{ size_filter|urlencode }}">دریافت اکسل</a>
+  </div>
+</div>
+
+{% if date_warning %}<div class="alert alert-warning mb-3">{{ date_warning }}</div>{% endif %}
+<div class="alert {% if is_partial_day %}alert-warning{% else %}alert-success{% endif %} mb-4">
+  {% if is_partial_day %}
+  امروز هنوز کامل نشده است. عدد واقعی امروز و روز مشابه ماه قبل نمایش داده می‌شود، اما درصد تغییر روزانه تا پایان روز عمداً محاسبه نمی‌شود.
+  {% else %}روز انتخاب‌شده کامل است و درصدهای روزانه قابل مقایسه‌اند.{% endif %}
+</div>
+
+<form method="get" class="card glass-card mb-4"><div class="card-body"><div class="row g-2 align-items-end">
+  <div class="col-md-3"><label class="form-label">تاریخ گزارش</label><input class="form-control" name="date" value="{{ date_filter }}" placeholder="1405/07/03"></div>
+  <div class="col-md-3"><label class="form-label">کد محصول</label><select name="code" class="form-select"><option value="">همه کدهای پرفروش</option>{% for code in filter_codes %}<option value="{{ code }}" {% if code_filter == code %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label">سایز</label><select name="size" class="form-select"><option value="">همه سایزها</option>{% for size in filter_sizes %}<option value="{{ size }}" {% if size_filter == size %}selected{% endif %}>{{ size }}</option>{% endfor %}</select></div>
+  <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill" type="submit">اعمال فیلتر</button><a class="btn btn-outline-secondary" href="{% url 'pricing_monitor' %}">امروز</a></div>
+</div></div></form>
+
+<div class="row g-2 g-md-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">فروش امروز</div><div class="h2 money mt-2">{{ day_current.total.gross|groupnum }}</div><div class="text-secondary">روز قبل: {{ day_previous.total.gross|groupnum }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">پک امروز</div><div class="h2 mt-2">{{ day_current.total.packs|groupnum }}</div><div class="text-secondary">روز قبل: {{ day_previous.total.packs|groupnum }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">سود امروز</div><div class="h2 money mt-2">{{ day_current.total.profit|groupnum }}</div><div class="text-secondary">روز قبل: {{ day_previous.total.profit|groupnum }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">بهای فعلی هر شورت</div><div class="h2 money mt-2">{{ current_cost|groupnum }}</div><div class="text-secondary">برای سود تعدیل‌شده دوره قبل</div></div></div></div>
+</div>
+
+<div class="card glass-card mb-4">
+  <div class="card-header"><div><h3 class="card-title mb-1">امروز در برابر همان روز ماه قبل</h3><div class="text-secondary small">هر ردیف = یک کد + یک سایز؛ 06 و pack6 در گزارش یک گروه محسوب می‌شوند.</div></div></div>
+  <div class="table-responsive"><table class="table table-vcenter table-nowrap">
+    <thead><tr><th>کد</th><th>سایز</th><th>پک</th><th>تعداد فعلی</th><th>ماه قبل</th><th>فروش فعلی</th><th>فروش قبل</th><th>تغییر فروش</th><th>سود فعلی</th><th>سود قبل</th><th>تغییر سود</th><th>میانگین فی پک</th><th>فی هر شورت</th><th>حاشیه سود</th></tr></thead>
+    <tbody>{% for row in day_rows %}<tr>
+      <td><strong>{{ row.code }}</strong></td><td>{{ row.size }}</td><td>{{ row.pack_qty }}</td>
+      <td>{{ row.current.packs|groupnum }}</td><td>{{ row.previous.packs|groupnum }}</td>
+      <td class="money">{{ row.current.gross|groupnum }}</td><td class="money">{{ row.previous.gross|groupnum }}</td>
+      <td>{% if row.gross_delta.pct == None %}<span class="text-secondary">موقت</span>{% else %}<span class="{% if row.gross_delta.pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.gross_delta.pct|pct1 }}٪</span>{% endif %}</td>
+      <td class="money {% if row.current.profit >= row.previous.profit %}text-success{% else %}text-danger{% endif %}">{{ row.current.profit|groupnum }}</td><td class="money">{{ row.previous.profit|groupnum }}</td>
+      <td>{% if row.profit_delta.pct == None %}<span class="text-secondary">موقت</span>{% else %}<span class="{% if row.profit_delta.pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.profit_delta.pct|pct1 }}٪</span>{% endif %}</td>
+      <td class="money">{{ row.current.avg_pack_price|groupnum }} <span class="text-secondary">/ {{ row.previous.avg_pack_price|groupnum }}</span></td>
+      <td class="money">{{ row.current.avg_short_price|groupnum }} <span class="text-secondary">/ {{ row.previous.avg_short_price|groupnum }}</span></td>
+      <td>{{ row.current.margin|pct1 }}٪ <span class="text-secondary">/ {{ row.previous.margin|pct1 }}٪</span></td>
+    </tr>{% empty %}<tr><td colspan="14" class="text-center text-secondary py-4">برای این فیلتر فروش پرفروشی پیدا نشد.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+
+<div class="card glass-card mb-4">
+  <div class="card-header"><div><h3 class="card-title mb-1">مقایسه تجمعی روزهای کامل</h3><div class="text-secondary small">{{ mtd_start_j }} تا {{ mtd_end_j }} در برابر {{ previous_mtd_start_j }} تا {{ previous_mtd_end_j }}</div></div></div>
+  <div class="table-responsive"><table class="table table-vcenter table-nowrap">
+    <thead><tr><th>کد</th><th>سایز</th><th>تعداد فعلی</th><th>قبل</th><th>تغییر تعداد</th><th>سود فعلی</th><th>سود قبل</th><th>تغییر سود</th><th>سود قبل با هزینه فعلی</th><th>تغییر سود تعدیل‌شده</th><th>حاشیه</th><th>سهم فروش</th><th>میانگین فی پک</th></tr></thead>
+    <tbody>{% for row in mtd_rows %}<tr>
+      <td><strong>{{ row.code }}</strong></td><td>{{ row.size }}</td>
+      <td>{{ row.current.packs|groupnum }}</td><td>{{ row.previous.packs|groupnum }}</td>
+      <td>{% if row.packs_delta.pct == None %}—{% else %}<span class="{% if row.packs_delta.pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.packs_delta.pct|pct1 }}٪</span>{% endif %}</td>
+      <td class="money">{{ row.current.profit|groupnum }}</td><td class="money">{{ row.previous.profit|groupnum }}</td>
+      <td>{% if row.profit_delta.pct == None %}—{% else %}<span class="{% if row.profit_delta.pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.profit_delta.pct|pct1 }}٪</span>{% endif %}</td>
+      <td class="money">{{ row.adjusted_previous_profit|groupnum }}</td>
+      <td>{% if row.adjusted_profit_delta.pct == None %}—{% else %}<span class="{% if row.adjusted_profit_delta.pct >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.adjusted_profit_delta.pct|pct1 }}٪</span>{% endif %}</td>
+      <td>{{ row.current.margin|pct1 }}٪ <span class="text-secondary">({% if row.margin_delta_pp >= 0 %}+{% endif %}{{ row.margin_delta_pp|pct1 }} واحد)</span></td>
+      <td>{{ row.current_share|pct1 }}٪ <span class="text-secondary">({% if row.share_delta_pp >= 0 %}+{% endif %}{{ row.share_delta_pp|pct1 }} واحد)</span></td>
+      <td class="money">{{ row.current.avg_pack_price|groupnum }} <span class="text-secondary">/ {{ row.previous.avg_pack_price|groupnum }}</span></td>
+    </tr>{% empty %}<tr><td colspan="13" class="text-center text-secondary py-4">هنوز روز کامل در این ماه وجود ندارد.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-6"><div class="card glass-card h-100"><div class="card-header"><h3 class="card-title">فروش تجمعی روزهای کامل</h3></div><div class="card-body"><div class="chart-wrap"><canvas id="pricingSalesChart" height="120"></canvas></div></div></div></div>
+  <div class="col-xl-6"><div class="card glass-card h-100"><div class="card-header"><h3 class="card-title">سود تجمعی روزهای کامل</h3></div><div class="card-body"><div class="chart-wrap"><canvas id="pricingProfitChart" height="120"></canvas></div></div></div></div>
+</div>
+
+<div class="card glass-card mb-4">
+ <div class="card-header"><div><h3 class="card-title mb-1">ارزیابی تغییر قیمت</h3><div class="text-secondary small">دوره‌های کمتر از ۱۰ روز کامل نتیجه قطعی نمی‌گیرند. نرخ تبدیل در داده داخلی فعلی موجود نیست.</div></div></div>
+ <div class="table-responsive"><table class="table table-vcenter"><thead><tr><th>کد</th><th>سایز</th><th>تاریخ قیمت</th><th>روز کامل</th><th>تعداد بعد/قبل</th><th>سود بعد</th><th>سود قبل با هزینه فعلی</th><th>وضعیت</th></tr></thead>
+ <tbody>{% for row in evaluations %}<tr><td>{{ row.code }}</td><td>{{ row.size }}</td><td>{{ row.effective_j }}</td><td>{{ row.complete_days }}</td><td>{{ row.current.packs|groupnum }} / {{ row.previous.packs|groupnum }}</td><td class="money">{{ row.current.profit|groupnum }}</td><td class="money">{{ row.adjusted_previous_profit|groupnum }}</td><td><span class="badge {% if row.status == 'نامزد بررسی افزایش' %}bg-green-lt{% elif row.status == 'نیازمند بررسی افت عملکرد' %}bg-red-lt{% else %}bg-yellow-lt{% endif %}">{{ row.status }}</span></td></tr>{% empty %}<tr><td colspan="8" class="text-center text-secondary py-4">هنوز تغییر قیمت تاریخ‌دار برای این فیلتر ثبت نشده.</td></tr>{% endfor %}</tbody>
+ </table></div>
+</div>
+
+<div class="alert alert-info">{{ credit_note }}</div>
+
+{{ chart_labels|json_script:"pricing-labels" }}
+{{ chart_sales_current|json_script:"pricing-sales-current" }}
+{{ chart_sales_previous|json_script:"pricing-sales-previous" }}
+{{ chart_profit_current|json_script:"pricing-profit-current" }}
+{{ chart_profit_previous|json_script:"pricing-profit-previous" }}
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script><script>
+(function(){
+ if(typeof Chart==='undefined') return;
+ const labels=JSON.parse(document.getElementById('pricing-labels').textContent);
+ const sc=JSON.parse(document.getElementById('pricing-sales-current').textContent);
+ const sp=JSON.parse(document.getElementById('pricing-sales-previous').textContent);
+ const pc=JSON.parse(document.getElementById('pricing-profit-current').textContent);
+ const pp=JSON.parse(document.getElementById('pricing-profit-previous').textContent);
+ const make=(id,a,b,l1,l2)=>{const el=document.getElementById(id);if(!el)return;new Chart(el,{type:'line',data:{labels,datasets:[{label:l1,data:a,borderWidth:2,tension:.25},{label:l2,data:b,borderWidth:2,tension:.25}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true}}}})};
+ make('pricingSalesChart',sc,sp,'ماه جاری','ماه قبل');
+ make('pricingProfitChart',pc,pp,'سود ماه جاری','سود ماه قبل');
+})();
+</script>{% endblock %}

@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block title %}تعاریف | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<style>.definition114-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;max-width:1040px}.definition114-card{display:flex;flex-direction:column;gap:18px;min-height:155px;padding:26px;text-decoration:none;color:#f7f9fc;border-radius:19px;border:1px solid rgba(255,255,255,.15);background:linear-gradient(140deg,rgba(28,65,98,.42),rgba(7,25,44,.30));transition:transform .18s,border-color .18s}.definition114-card:hover{transform:translateY(-3px);color:#fff;border-color:rgba(251,101,20,.55)}.definition114-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:15px;background:rgba(251,101,20,.14);color:#ffb47b;font-size:1.7rem}.definition114-card h2{font-size:1.45rem;margin:0}.definition114-card p{font-size:.86rem;color:#afc2d4;margin:0}@media(max-width:767.98px){.definition114-grid{grid-template-columns:1fr}.definition114-card{min-height:160px;padding:21px}}</style>
+<div class="mb-4"><h1 class="page-title">تعاریف</h1></div>
+<div class="definition114-grid">
+<a class="definition114-card" href="{% url 'settings_products' %}"><span class="definition114-icon" aria-hidden="true">▦</span><h2>محصولات و کدها</h2></a>
+<a class="definition114-card" href="{% url 'settings_initial' %}"><span class="definition114-icon" aria-hidden="true">⚙</span><h2>تنظیمات اولیه</h2></a>
+</div>{% endblock %}

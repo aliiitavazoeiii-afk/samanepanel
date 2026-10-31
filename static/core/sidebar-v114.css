@@ -1,0 +1,31 @@
+/* V114 desktop icon rail / clean direct navigation. Mobile remains drawer. */
+.erp-sidebar{width:246px!important;transition:width .22s ease,transform .22s ease!important;overflow-x:hidden!important}
+.erp-main{margin-right:246px;transition:margin-right .22s ease!important}
+.erp-nav{display:flex!important;flex-direction:column;gap:5px}
+.erp-nav .nav114-link{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 12px!important;margin:0!important;border:1px solid transparent;border-radius:13px;font-size:.88rem;font-weight:750;white-space:nowrap;color:#c7d8e8;transition:background .16s,border-color .16s}
+.erp-nav .nav114-link:hover{background:rgba(74,117,161,.17);border-color:rgba(186,215,238,.12)}
+.erp-nav .nav114-link.active{background:linear-gradient(110deg,rgba(251,101,20,.20),rgba(251,101,20,.045));border-color:rgba(251,101,20,.27)}
+.nav114-icon{width:34px;height:34px;min-width:34px;border-radius:10px;background:rgba(142,179,211,.10);border:1px solid rgba(184,215,240,.11);display:grid;place-items:center;color:#e2edf7;font-family:Vazirmatn,Tahoma,sans-serif;font-size:1.3rem;font-weight:900;line-height:1}
+.nav114-link.active .nav114-icon{background:rgba(251,101,20,.24);color:#ffc093}
+.nav114-label{overflow:hidden;text-overflow:ellipsis;opacity:1;transition:opacity .12s}
+.nav114-separator{height:1px;margin:10px 12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.17),transparent)}
+.nav114-head{font-weight:900!important}
+@media(min-width:992px){
+ body.sidebar-collapsed .erp-sidebar{transform:none!important;width:72px!important;box-shadow:none!important;padding-left:11px!important;padding-right:11px!important}
+ body.sidebar-collapsed .erp-main{margin-right:72px!important}
+ body.sidebar-collapsed .sidebar-edge-trigger{display:none!important}
+ body.sidebar-collapsed .erp-sidebar-head{margin:0 0 12px!important;min-height:48px}
+ body.sidebar-collapsed .darma-logo-wrap-v74{height:44px!important;min-height:44px!important}
+ body.sidebar-collapsed .darma-logo-wrap-v74 img{max-width:42px!important;max-height:42px!important;object-fit:contain}
+ body.sidebar-collapsed .erp-sidebar .sidebar-close{display:none!important}
+ body.sidebar-collapsed .erp-nav .nav114-link{justify-content:center;gap:0;padding:7px!important}
+ body.sidebar-collapsed .nav114-label{display:none!important;opacity:0}
+ body.sidebar-collapsed .nav114-separator{margin:7px 4px}
+ body.sidebar-collapsed.sidebar-peek .erp-sidebar{transform:none!important;box-shadow:none!important}
+}
+@media(max-width:991.98px){
+ .erp-sidebar{width:270px!important}
+ .erp-main{margin-right:0!important}
+ .erp-nav .nav114-link{min-height:50px}
+}
+@media(prefers-reduced-motion:reduce){.erp-sidebar,.erp-main,.nav114-label{transition:none!important}}

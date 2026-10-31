@@ -1,0 +1,236 @@
+{% extends 'core/material_report_v36.html' %}{% load jalali static %}
+
+{% block scripts %}
+{{ block.super }}
+<style>
+.material-v105-kpi-wrap{width:100%} .material-month-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.material-month-kpi{min-width:0;border:1px solid rgba(255,255,255,.11);border-radius:14px;background:rgba(255,255,255,.035);padding:13px 14px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between}.material-month-kpi .kpi-label{display:block;color:#9fb0c4;font-size:.72rem;line-height:1.45;font-weight:700}.material-month-kpi .kpi-value{direction:ltr;unicode-bidi:isolate;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;color:#fff;font-size:1.42rem;font-weight:950;line-height:1.15;margin-top:12px}.material-month-kpi .kpi-unit{display:block;color:#8fa2b7;font-size:.68rem;margin-top:5px;line-height:1.4}.material-month-kpi.highlight .kpi-value{color:#ffd08a}.material-month-archive{border:1px solid rgba(255,255,255,.12);border-radius:15px;background:linear-gradient(135deg,rgba(15,39,65,.34),rgba(6,22,39,.24));overflow:hidden}.material-month-archive>summary{cursor:pointer;list-style:none;padding:15px 17px;display:flex;justify-content:space-between;align-items:center;gap:12px}.material-month-archive>summary::-webkit-details-marker{display:none}.material-month-archive>summary:hover{background:rgba(255,255,255,.035)}.material-month-archive-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.material-month-archive-title strong{font-size:1rem}.material-month-count{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:.72rem;color:#b9cbe0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10)}.material-month-archive-toggle{font-size:.75rem;color:#95a7ba;white-space:nowrap}.material-month-archive-body{padding:0 12px 1px;border-top:1px solid rgba(255,255,255,.08)}.material-month-archive-body>.material-block{margin-top:12px!important}.material-color-progress{margin-top:10px}.material-color-progress-title{font-size:.72rem;color:#9fb0c4;margin:0 0 7px 2px}.material-color-progress-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.material-color-progress-card{min-width:0;border:1px solid rgba(255,255,255,.10);border-radius:13px;background:rgba(255,255,255,.025);padding:11px 12px}.material-color-progress-card h4{margin:0;font-size:.94rem}.material-color-progress-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.material-color-rolls{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:.72rem;color:#b9cbe0}.material-color-rolls b{font-size:.9rem;color:#ffd08a}.material-color-progress-row{display:flex;justify-content:space-between;gap:8px;font-size:.69rem;color:#9fb0c4;margin-top:4px}.material-color-progress-row b{color:#f7f9fc;font-size:.78rem}.material-color-progress-row.pending b{color:#ffd08a}.material-color-progress-card.is-done{opacity:.58}
+@media(max-width:1200px){.material-month-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.material-color-progress-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:767.98px){.material-month-kpis{grid-template-columns:1fr 1fr}.material-page-tools{align-items:stretch}.material-search{width:100%;min-width:0!important;max-width:none!important}.material-color-progress-grid{grid-template-columns:1fr 1fr}}@media(max-width:430px){.material-month-kpis{grid-template-columns:1fr}.material-month-kpi{min-height:84px}.material-month-kpi .kpi-value{font-size:1.3rem}.material-color-progress-grid{grid-template-columns:1fr}}
+
+.material-period-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px;border:1px solid rgba(251,160,61,.23);background:rgba(251,160,61,.045);border-radius:14px;padding:12px 16px}
+.material-period-bar strong{color:#fff;font-size:.98rem}
+.material-period-explainer{font-size:.72rem;color:#9fb0c4;margin-top:5px}
+.material-period-current{font-size:.75rem;color:#ffd08a}
+.material-month-archive[data-selected-report="true"]{border-color:rgba(251,160,61,.46)}
+.material-month-full-delivery{margin-top:14px;padding:14px;border:1px solid rgba(90,160,255,.22);border-radius:14px;background:rgba(60,110,180,.06)}
+.material-full-delivery-header{display:flex;gap:7px;flex-direction:column;margin-bottom:12px}
+.material-full-delivery-header strong{font-size:.95rem;color:#e7f2ff}
+.material-full-delivery-hint{font-size:.73rem;color:#9fb0c4}
+.material-full-delivery-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.material-full-delivery-totals>div{border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px;background:rgba(255,255,255,.03)}
+.material-full-delivery-totals span{display:block;font-size:.73rem;color:#9fb0c4}
+.material-full-delivery-totals b{display:block;font-size:1.1rem;margin-top:7px}
+.material-full-delivery-rows{margin-top:11px}
+.material-full-delivery-row{display:grid;grid-template-columns:minmax(90px,1.2fr) repeat(5,minmax(70px,1fr));gap:10px;align-items:center;padding:10px;border-top:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#c5d5e4}
+.material-full-delivery-row strong{color:#f3f8ff}
+.material-full-pending{color:#ffd08a;font-weight:800}
+.material-full-delivery-empty{font-size:.78rem;color:#9fb0c4}
+@media(max-width:991.98px){.material-full-delivery-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.material-full-delivery-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:540px){.material-full-delivery-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+<template id="materialV92Kpis" data-current-month="{{ material_current_month_key }}" data-selected-month="{{ material_selected_month_key }}">
+  <div class="material-period-bar" id="material-report-summary">
+    <div>
+      <strong>گزارش مواد اولیه — {{ material_selected_month_label }}</strong>
+      <div class="material-period-explainer">آمار مواد اعمال‌نشده و تحویل‌های ثبت‌شده فقط از صورت‌های همین ماه محاسبه می‌شود.</div>
+    </div>
+    {% if material_selected_is_archive %}
+      <a class="btn btn-outline-light btn-sm" href="{% url 'material_report' %}#material-report-summary" data-material-current-link>بازگشت به {{ material_current_month_label }} (ماه جاری)</a>
+    {% else %}
+      <span class="material-period-current">ماه جاری · {{ material_current_month_label }}</span>
+    {% endif %}
+  </div>
+  <div class="material-month-kpis" aria-label="خلاصه گزارش مواد اولیه" data-material-kpis="v105">
+    <div class="material-month-kpi"><span class="kpi-label">پارچه‌های اعمال‌نشده {{ material_selected_month_label }}</span><div class="kpi-value">{{ material_month_summary.roll_count|groupnum }}</div><span class="kpi-unit">طاقه · فقط صورت‌های {{ material_selected_month_label }}</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">وزن پارچه اعمال‌نشده {{ material_selected_month_label }}</span><div class="kpi-value">{{ material_month_summary.weight_display }}</div><span class="kpi-unit">کیلو · فقط رنگ‌های اعمال‌نشده {{ material_selected_month_label }}</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">برش‌های اعمال‌نشده {{ material_selected_month_label }}</span><div class="kpi-value">{{ material_month_summary.minimum_delivery|groupnum }}</div><span class="kpi-unit">عدد · برش با مواد اعمال‌نشده</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">تعداد تحویل‌شده</span><div class="kpi-value">{{ material_month_summary.delivered|groupnum }}</div><span class="kpi-unit">عدد · ثبت‌شده در صورت تحویل</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">مانده تحویل</span><div class="kpi-value">{{ material_month_summary.pending|groupnum }}</div><span class="kpi-unit">عدد · کسری خالص پس از تهاتر مازاد</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">مازاد خالص تحویل</span><div class="kpi-value">{{ material_month_summary.surplus|groupnum }}</div><span class="kpi-unit">عدد · مازاد پس از تهاتر کسری‌ها</span></div>
+    <div class="material-month-kpi"><span class="kpi-label">اعمال‌شده به موجودی</span><div class="kpi-value">{{ material_month_summary.applied|groupnum }}</div><span class="kpi-unit">عدد · جدا از تحویل ثبت‌شده</span></div>
+    <div class="material-month-kpi highlight" data-material-kpi="average-cut"><span class="kpi-label">میانگین برش اعمال‌نشده {{ material_selected_month_label }}</span><div class="kpi-value">{{ material_cut_summary.average_cut|groupnum }}</div><span class="kpi-unit">عدد · {{ material_cut_summary.cut_entry_count|groupnum }} برش با مواد اعمال‌نشده در ۵ رنگ پایه</span></div>
+  </div>
+  <div class="material-color-progress" data-material-color-progress="final">
+    <div class="material-color-progress-title">پیشرفت پنج رنگ اصلی — برش و تحویل صورت‌های با مواد اعمال‌نشده {{ material_selected_month_label }}</div>
+    <div class="material-color-progress-grid">
+      {% for item in material_base_color_progress %}
+      <div class="material-color-progress-card {% if not item.pending and not item.open_blocks %}is-done{% endif %}" data-base-color="{{ item.key }}">
+        <div class="material-color-progress-head">
+          <h4>{{ item.label }}</h4>
+          <span class="material-color-rolls">طاقه اعمال‌نشده <b>{{ item.roll_count|groupnum }}</b></span>
+        </div>
+        <div class="material-color-progress-row" data-color-total-weight="{{ item.key }}"><span>وزن پارچه اعمال‌نشده</span><b>{{ item.total_weight_display }} کیلو</b></div>
+        <div class="material-color-progress-row"><span>باید تحویل شود</span><b>{{ item.expected|groupnum }}</b></div>
+        <div class="material-color-progress-row"><span>تحویل ثبت‌شده</span><b>{{ item.delivered|groupnum }}</b></div>
+        <div class="material-color-progress-row pending"><span>مانده خالص</span><b>{{ item.pending|groupnum }}</b></div>
+        <div class="material-color-progress-row"><span>مازاد خالص</span><b>{{ item.surplus|groupnum }}</b></div>
+        <div class="material-color-progress-row"><span>اعمال‌شده به موجودی</span><b>{{ item.applied|groupnum }}</b></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% if material_selected_is_archive %}
+  <section class="material-month-full-delivery" data-material-all-delivery="{{ material_selected_month_key }}">
+    <div class="material-full-delivery-header">
+      <strong>مانده تحویل تمام صورت‌های {{ material_selected_month_label }}</strong>
+      <span class="material-full-delivery-hint">شامل رنگ‌هایی که موادشان قبلاً اعمال شده اما تحویل هنوز کامل نیست</span>
+    </div>
+    <div class="material-full-delivery-totals">
+      <div><span>کل برش</span><b>{{ material_archive_deliveries.expected|groupnum }}</b></div>
+      <div><span>کل تحویل ثبت‌شده</span><b>{{ material_archive_deliveries.delivered|groupnum }}</b></div>
+      <div><span>مانده خالص</span><b>{{ material_archive_deliveries.pending|groupnum }}</b></div>
+      <div><span>مازاد خالص</span><b>{{ material_archive_deliveries.surplus|groupnum }}</b></div>
+    </div>
+    {% if material_archive_deliveries.rows %}
+    <div class="material-full-delivery-rows">
+      {% for item in material_archive_deliveries.rows %}
+      <div class="material-full-delivery-row" data-archive-color="{{ item.key }}">
+        <strong>{{ item.label }}</strong>
+        <span>برش: {{ item.expected|groupnum }}</span>
+        <span>تحویل: {{ item.delivered|groupnum }}</span>
+        <span class="material-full-pending">مانده: {{ item.pending|groupnum }}</span>
+        <span>مازاد: {{ item.surplus|groupnum }}</span>
+        <span>اعمال به موجودی: {{ item.applied|groupnum }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="material-full-delivery-empty">برای این ماه هنوز برش یا تحویلی ثبت نشده است.</div>
+    {% endif %}
+  </section>
+  {% endif %}
+</template>
+
+<script>
+(() => {
+  const monthNames = {
+    1:'فروردین',2:'اردیبهشت',3:'خرداد',4:'تیر',5:'مرداد',6:'شهریور',
+    7:'مهر',8:'آبان',9:'آذر',10:'دی',11:'بهمن',12:'اسفند'
+  };
+  const tpl = document.getElementById('materialV92Kpis');
+  const currentMonth = String(tpl?.dataset.currentMonth || '');
+  const selectedMonth = String(tpl?.dataset.selectedMonth || currentMonth);
+
+  // V92 header is intentionally compact: keep title/create form, remove explanatory prose.
+  document.querySelector('.mobile-page-head .page-muted')?.remove();
+  document.querySelector('.material-stock-note')?.remove();
+
+  const header = document.querySelector('.mobile-page-head');
+  if (header && tpl) {
+    const mount = document.createElement('div');
+    mount.className = 'material-v105-kpi-wrap mb-3';
+    mount.appendChild(tpl.content.cloneNode(true));
+    header.insertAdjacentElement('afterend', mount);
+  }
+
+  const blocks = Array.from(document.querySelectorAll('.material-block'));
+  const archives = new Map();
+  const keyToNumber = (key) => {
+    const parts = String(key || '').split('/');
+    return (Number(parts[0]) * 100) + Number(parts[1]);
+  };
+  const currentNumber = keyToNumber(currentMonth);
+
+  blocks.forEach((block) => {
+    const rawDate = String(block.querySelector('.material-date')?.textContent || '').trim();
+    const parts = rawDate.split('/');
+    if (parts.length < 2) return;
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    if (!year || !month) return;
+    const key = `${String(year).padStart(4,'0')}/${String(month).padStart(2,'0')}`;
+
+    // Only completed/past Jalali months collapse. Current/future sheets remain normal rows.
+    if (keyToNumber(key) >= currentNumber) return;
+
+    let entry = archives.get(key);
+    if (!entry) {
+      const archive = document.createElement('details');
+      archive.className = 'material-month-archive mb-3';
+      archive.dataset.monthKey = key;
+      const label = `${monthNames[month] || month} ${year}`;
+      archive.dataset.search = `صورت ${label}`.toLowerCase();
+
+      const summary = document.createElement('summary');
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'material-month-archive-title';
+      const title = document.createElement('strong');
+      title.textContent = `صورت ${label}`;
+      const count = document.createElement('span');
+      count.className = 'material-month-count';
+      count.textContent = '0 صورت';
+      titleWrap.append(title, count);
+      const toggle = document.createElement('span');
+      toggle.className = 'material-month-archive-toggle';
+      toggle.textContent = 'باز / بسته';
+      summary.append(titleWrap, toggle);
+      // Opening a past Jalali month selects that period's server-calculated
+      // report. The archive itself still opens normally after navigation.
+      // No old sheet is copied to the current-month work list.
+      summary.addEventListener('click', (event) => {
+        if (key === selectedMonth) return;
+        event.preventDefault();
+        const url = new URL(window.location.href);
+        url.searchParams.set('report_month', key);
+        url.hash = 'material-report-summary';
+        window.location.assign(url.toString());
+      });
+      if (key === selectedMonth) {
+        archive.open = true;
+        archive.dataset.selectedReport = 'true';
+      }
+
+      const body = document.createElement('div');
+      body.className = 'material-month-archive-body';
+      archive.append(summary, body);
+      block.parentNode.insertBefore(archive, block);
+      entry = {archive, body, count, total:0};
+      archives.set(key, entry);
+    }
+
+    entry.body.appendChild(block);
+    entry.total += 1;
+    entry.count.textContent = `${entry.total} صورت`;
+  });
+
+  const targetId = location.hash && location.hash.startsWith('#block-') ? location.hash : '';
+  if (targetId) {
+    const target = document.querySelector(targetId);
+    if (target) {
+      target.open = true;
+      const archive = target.closest('.material-month-archive');
+      if (archive) {
+        archive.open = true;
+        // Save/apply actions return to #block-ID. Preserve the archived
+        // month summary even after that redirect, not just the open sheet.
+        if (archive.dataset.monthKey !== selectedMonth) {
+          const url = new URL(window.location.href);
+          url.searchParams.set('report_month', archive.dataset.monthKey);
+          window.location.replace(url.toString());
+        }
+      }
+    }
+  }
+
+  const normalizeDigits = (value) => String(value || '')
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('materialBlockSearch');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      const query = normalizeDigits(input.value).trim().toLowerCase();
+      archives.forEach((entry) => {
+        const monthMatch = Boolean(query) && normalizeDigits(entry.archive.dataset.search || '').includes(query);
+        const children = Array.from(entry.body.querySelectorAll('.material-block'));
+        if (monthMatch) children.forEach((child) => child.classList.remove('d-none'));
+        const hasVisible = children.some((child) => !child.classList.contains('d-none'));
+        entry.archive.classList.toggle('d-none', Boolean(query) && !hasVisible);
+        if (query && hasVisible) entry.archive.open = true;
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'core/report_excel_v36.html' %}{% load jalali %}
+{% block scripts %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const section=document.getElementById('section-accounts');
+  const tbody=section?.querySelector('.manual-table tbody');
+  if(!tbody) return;
+  const empty=tbody.querySelector('.empty-state')?.closest('tr');
+  if(empty) empty.remove();
+  const tr=document.createElement('tr');
+  tr.setAttribute('data-dia-gallery-account','1');
+  tr.innerHTML='<td><div class="fw-bold">فروش Dia Gallery <span class="badge badge-soft-success ms-1">خودکار</span></div></td>'+
+    '<td><strong class="money text-warning">{{ dia_gallery_receivable|groupnum }}</strong></td>'+
+    '<td><span class="text-secondary small">طلب حاصل از فروش‌های Dia Gallery</span></td>'+
+    '<td><span class="text-secondary small">خودکار</span></td>';
+  tbody.insertBefore(tr,tbody.firstChild);
+});
+</script>
+{% endblock %}

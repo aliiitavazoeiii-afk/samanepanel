@@ -1,0 +1,18 @@
+{% extends 'core/report_excel_v2.html' %}{% load jalali %}
+{% block scripts %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const key=document.querySelector('form input[name="key"][value="digikala_receivable"]');
+  const form=key?.closest('form');
+  if(!form) return;
+  const label=form.querySelector('label');
+  if(label){
+    label.innerHTML='طلب دیجی‌کالا <span class="badge badge-soft-success ms-1">خودکار</span>';
+  }
+  const note=document.createElement('div');
+  note.className='text-secondary small mt-2';
+  note.innerHTML='پایه: <span class="money">{{ digikala_base_receivable|groupnum }}</span> + گردش فروش/دریافت: <span class="money">{{ digikala_ledger_total|groupnum }}</span>';
+  form.appendChild(note);
+});
+</script>
+{% endblock %}

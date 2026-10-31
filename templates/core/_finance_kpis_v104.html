@@ -1,0 +1,18 @@
+{% load jalali %}
+<style>
+.finance-kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:22px}
+.finance-kpi-card{min-width:0;border:1px solid rgba(255,255,255,.11);border-radius:15px;background:rgba(255,255,255,.035);padding:14px 14px 13px}
+.finance-kpi-card .finance-kpi-label{color:#9fb0c4;font-size:.72rem;font-weight:700;margin-bottom:8px}
+.finance-kpi-card .finance-kpi-value{direction:ltr;unicode-bidi:isolate;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:clamp(1rem,1.4vw,1.35rem);font-weight:900;line-height:1.2;color:#f7f9fc;overflow:hidden;text-overflow:ellipsis}
+.finance-kpi-card.positive .finance-kpi-value{color:#55dfa0}
+@media(max-width:1199.98px){.finance-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:575.98px){.finance-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.finance-kpi-card{padding:12px 10px}.finance-kpi-card .finance-kpi-value{font-size:1rem}}
+</style>
+<div class="finance-kpi-grid" data-finance-kpis="v104">
+  <div class="finance-kpi-card" data-finance-kpi="mellat"><div class="finance-kpi-label">موجودی ملت</div><div class="finance-kpi-value money">{{ mellat_balance|groupnum }}</div></div>
+  <div class="finance-kpi-card" data-finance-kpi="mofid"><div class="finance-kpi-label">موجودی مفید</div><div class="finance-kpi-value money">{{ mofid_balance|groupnum }}</div></div>
+  <div class="finance-kpi-card positive" data-finance-kpi="digikala"><div class="finance-kpi-label">طلب دیجی‌کالا</div><div class="finance-kpi-value money">{{ digikala_receivable|groupnum }}</div></div>
+  <div class="finance-kpi-card positive" data-finance-kpi="dia"><div class="finance-kpi-label">طلب Dia Gallery</div><div class="finance-kpi-value money">{{ dia_gallery_receivable|groupnum }}</div></div>
+  <div class="finance-kpi-card" data-finance-kpi="tailor"><div class="finance-kpi-label">حساب خیاط</div><div class="finance-kpi-value money">{{ tailor_balance|groupnum }}</div></div>
+  <div class="finance-kpi-card" data-finance-kpi="takvin"><div class="finance-kpi-label">بدهی تکوین</div><div class="finance-kpi-value money">{{ takvin_debt|groupnum }}</div></div>
+</div>

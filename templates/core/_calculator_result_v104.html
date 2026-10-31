@@ -1,0 +1,12 @@
+{% load jalali %}
+{% if error %}
+<div class="alert alert-danger mb-0">{{ error }}</div>
+{% else %}
+<div class="calc104-result-grid">
+  <div class="summary-cell"><span>کارمزد دیجی‌کالا</span><strong class="money">{{ fee|groupnum }}</strong><small>تومان</small></div>
+  <div class="summary-cell"><span>سود خالص</span><strong class="money {% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ profit|groupnum }}</strong><small>تومان</small></div>
+  <div class="summary-cell"><span>حاشیه سود از فروش</span><strong class="num {% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ profit_on_sale|pct1 }}٪</strong><small>سود خالص / قیمت فروش</small></div>
+  <div class="summary-cell"><span>سود / بهای تمام‌شده</span><strong class="num {% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ profit_on_cost|pct1 }}٪</strong><small>سود خالص / هزینه</small></div>
+</div>
+<div class="calc104-formula">سود خالص = قیمت فروش − کارمزد واقعی دیجی‌کالا − قیمت تمام‌شده</div>
+{% endif %}

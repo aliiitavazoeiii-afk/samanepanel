@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}مالی و ابزار | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.finance97-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.finance97-card{display:block;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.13);border-radius:20px;padding:24px;min-height:150px;background:linear-gradient(145deg,rgba(24,54,84,.48),rgba(5,20,36,.28));transition:.16s}.finance97-card:hover{transform:translateY(-2px);border-color:rgba(251,101,20,.48);color:#fff}.finance97-icon{width:48px;height:48px;border-radius:14px;background:rgba(251,101,20,.14);color:#ffb27d;display:grid;place-items:center;font-size:1.3rem;margin-bottom:15px}.finance97-card h2{font-size:1.12rem;margin:0 0 8px;font-weight:900}.finance97-card p{color:#9fb0c4;margin:0;font-size:.82rem;line-height:1.9}.finance97-arrow{margin-top:20px;color:#ffd08a;font-weight:800}@media(max-width:900px){.finance97-grid{grid-template-columns:1fr 1fr}}@media(max-width:575.98px){.finance97-grid{grid-template-columns:1fr}.finance97-card{min-height:150px}}
+</style>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head"><div><h1 class="page-title mb-1">مالی و ابزار</h1></div></div>
+{% include 'core/_finance_kpis_v104.html' %}
+<div class="finance97-grid" data-finance-hub="v102">
+  <a class="finance97-card" data-finance-card="payments" href="{% url 'payments' %}"><div class="finance97-icon">↔</div><h2>دریافتی‌ها و پرداختی‌ها</h2><div class="finance97-arrow">ورود ←</div></a>
+  <a class="finance97-card" data-finance-card="accounts" href="{% url 'finance_accounts' %}"><div class="finance97-icon">▤</div><h2>حساب‌ها</h2><div class="finance97-arrow">ورود ←</div></a>
+  <a class="finance97-card" data-finance-card="calculator" href="{% url 'calculator' %}"><div class="finance97-icon">∑</div><h2>محاسبه‌گر</h2><div class="finance97-arrow">ورود ←</div></a>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% load jalali %}{% block title %}مرکز دیجی‌کالا | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3 mobile-page-head">
+  <div><div class="page-kicker">Digikala Center</div><h1 class="page-title mb-1">مرکز دیجی‌کالا</h1></div>
+  <a class="btn btn-primary" href="{% url 'dashboard' %}">داشبورد اصلی</a>
+</div>
+{% include 'core/_digikala_nav_v43.html' with dk_section='home' %}
+<div class="row g-3">
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_orders' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">کار روزانه</div><h3 class="mt-2">سفارش روزانه</h3>{% if delivery.effective_total != None %}<div class="kpi num text-warning mt-3">{{ delivery.effective_total|groupnum }}</div>{% else %}{% endif %}</div></div></a></div>
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_products' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">کاتالوگ فعلی</div><h3 class="mt-2">محصولات</h3></div></div></a></div>
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_packages' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">ارسال</div><h3 class="mt-2">محموله‌ها</h3></div></div></a></div>
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_sales' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">تحلیل</div><h3 class="mt-2">گزارش فروش</h3></div></div></a></div>
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_warehouse' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">انبار دیجی‌کالا</div><h3 class="mt-2">موجودی انبار</h3></div></div></a></div>
+  <div class="col-md-6 col-xl-4"><a class="text-decoration-none" href="{% url 'digikala_returns' %}"><div class="card glass-card h-100"><div class="card-body p-4"><div class="page-kicker">انبار مرجوعی</div><h3 class="mt-2">مرجوعی‌ها</h3></div></div></a></div>
+</div>
+
+{% endblock %}

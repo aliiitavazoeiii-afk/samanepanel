@@ -1,0 +1,39 @@
+{% load jalali %}
+<div class="raw-location-card">
+  <div class="raw-location-head">
+    <div>
+      <strong>{{ location_title }}</strong>
+      <div class="text-secondary small">{{ location_subtitle }}</div>
+    </div>
+    <div class="raw-location-total"><span>ارزش</span><strong class="money">{{ section_total|groupnum }}</strong><small>تومان</small></div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-vcenter raw-stock-table mb-0">
+      <thead><tr><th>{{ title_label }}</th><th>مقدار</th><th>واحد</th><th>فی</th><th>مبلغ کل</th><th>توضیح</th><th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr class="raw-calc-row">
+          <td><form id="raw-{{ row.id }}" method="post" action="{% url 'manual_report_action' %}">{% csrf_token %}<input type="hidden" name="action" value="raw_save"><input type="hidden" name="id" value="{{ row.id }}"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="location" value="{{ location }}"><input class="form-control form-control-sm" name="title" value="{{ row.title }}" required></form></td>
+          <td><input form="raw-{{ row.id }}" class="form-control form-control-sm raw-quantity num" name="quantity" value="{{ row.quantity }}" inputmode="decimal"></td>
+          <td><input form="raw-{{ row.id }}" class="form-control form-control-sm" name="unit" value="{{ row.unit }}"></td>
+          <td><input form="raw-{{ row.id }}" class="form-control form-control-sm raw-unit-price money-input" name="unit_price" value="{% if row.unit_price %}{{ row.unit_price }}{% endif %}" inputmode="numeric"></td>
+          <td class="money fw-bold raw-line-total" data-value="{{ row.total_value }}">{{ row.total_value|groupnum }}</td>
+          <td><input form="raw-{{ row.id }}" class="form-control form-control-sm" name="note" value="{{ row.note }}"></td>
+          <td class="text-nowrap"><button form="raw-{{ row.id }}" class="btn btn-sm btn-primary" type="submit">ذخیره</button><form class="d-inline" method="post" action="{% url 'manual_report_action' %}">{% csrf_token %}<input type="hidden" name="action" value="raw_delete"><input type="hidden" name="id" value="{{ row.id }}"><button class="btn btn-sm btn-ghost-danger" type="submit" onclick="return confirm('این ردیف حذف شود؟')">×</button></form></td>
+        </tr>
+      {% empty %}<tr><td colspan="7" class="empty-state py-4">هنوز موردی ثبت نشده.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="raw-add-row">
+    <form method="post" action="{% url 'manual_report_action' %}" class="raw-add-form raw-calc-row">{% csrf_token %}
+      <input type="hidden" name="action" value="raw_add"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="location" value="{{ location }}">
+      <div><label class="form-label">{{ title_label }}</label><input class="form-control" name="title" placeholder="{{ title_placeholder }}" required></div>
+      <div><label class="form-label">مقدار</label><input class="form-control raw-quantity num" name="quantity" inputmode="decimal" placeholder="0"></div>
+      <div><label class="form-label">واحد</label><input class="form-control" name="unit" value="کیلو"></div>
+      <div><label class="form-label">فی</label><input class="form-control raw-unit-price money-input" name="unit_price" inputmode="numeric" placeholder="0"></div>
+      <div><label class="form-label">مبلغ کل</label><div class="raw-preview-total raw-line-total">0</div></div>
+      <div class="raw-add-button"><button class="btn btn-primary w-100" type="submit">＋ افزودن</button></div>
+    </form>
+  </div>
+</div>

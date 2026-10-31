@@ -1,0 +1,24 @@
+{% extends 'core/settings_products.html' %}{% load static %}
+{% block scripts %}
+{{ block.super }}
+<script>
+(function(){
+  const style=document.createElement('style');
+  style.textContent='.bulk-price-row{grid-template-columns:130px 165px repeat(6,minmax(105px,1fr)) 150px!important}.bulk-date-cell label{display:block;font-size:.69rem;color:#aebdcd;margin-bottom:5px}.bulk-price-inner{min-width:1230px!important}';
+  document.head.appendChild(style);
+  document.querySelectorAll('.bulk-price-row').forEach(function(form){
+    if(form.querySelector('[name="effective_from"]'))return;
+    const pack=form.querySelector('.bulk-pack');
+    const cell=document.createElement('div');
+    cell.className='bulk-date-cell';
+    cell.innerHTML='<label>قیمت از تاریخ</label><input class="form-control jalali-date ltr" name="effective_from" value="{{ bulk_effective_j }}" required>';
+    if(pack&&pack.nextSibling)form.insertBefore(cell,pack.nextSibling);else form.appendChild(cell);
+  });
+  const title=document.querySelector('.bulk-price-title');
+  if(title)title.textContent='ویرایش گروهی قیمت فروش دارما با تاریخ شروع';
+  const note=document.querySelector('.bulk-price-note');
+  if(note)note.textContent='قیمت جدید را با تاریخ شروع ثبت کن. اگر تاریخ فردا باشد، فروش امروز با قیمت فعلی می‌ماند و قیمت جدید از فردا برای فروش‌های جدید استفاده می‌شود.';
+})();
+</script>
+<script src="{% static 'core/jalali_picker.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'core/daily_report_v21.html' %}
+{% block content %}{{ block.super }}<div id="daily-return-source">{% include 'core/_daily_returns_v36.html' %}</div>{% endblock %}
+{% block scripts %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const source=document.getElementById('daily-return-source');
+  const box=document.getElementById('daily-returns-box');
+  const sold=document.getElementById('sold-model-browser');
+  if(source&&box&&sold&&sold.parentNode){
+    sold.parentNode.insertBefore(box,sold);
+    source.remove();
+  }
+});
+</script>
+{% endblock %}

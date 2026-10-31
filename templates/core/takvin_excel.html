@@ -1,0 +1,41 @@
+{% extends 'base.html' %}{% load jalali static %}{% block title %}خرید تکوین | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<style>@media(max-width:767.98px){.takvin-top-fields>div{flex:0 0 100%;max-width:100%}.takvin-history{min-width:620px}.takvin-grid .grid-input{font-size:16px!important}.takvin-save-row{display:grid!important;grid-template-columns:1fr;gap:10px!important}.takvin-save-row .btn{width:100%}}</style>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head"><div><div class="page-kicker">خرید روز — مطابق اکسل</div><h1 class="page-title mb-1">خرید تکوین</h1><div class="page-muted">فقط گزارش خرید را ثبت می‌کند؛ موجودی، بدهی تکوین و سرمایه به‌صورت دستی باقی می‌مانند.</div></div><div class="mobile-page-actions"><a class="btn btn-outline-light" href="{% url 'report' %}">گزارش جامع</a></div></div>
+
+<div class="card glass-strong mb-4"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="save"><div class="card-body">
+<div class="row g-2 g-md-3 align-items-end mb-4 takvin-top-fields"><div class="col-md-3"><label class="form-label">تاریخ خرید</label><input class="form-control ltr" name="date" value="{{ selected_date }}" required></div><div class="col-md-2"><label class="form-label">تخفیف</label><div class="input-group"><input class="form-control ltr" name="discount_percent" id="discountInput" value="{{ discount_value }}" inputmode="decimal"><span class="input-group-text">٪</span></div></div><div class="col-md-7"><label class="form-label">توضیح</label><input class="form-control" name="note" value="{{ note_value }}" placeholder="اختیاری"></div></div>
+
+<div class="mobile-scroll-note">رنگ ثابت می‌ماند؛ جدول را برای سایزها بکش</div><div class="table-responsive excel-scroll"><table class="table table-bordered table-vcenter takvin-grid mb-0"><thead><tr><th class="sticky-col">رنگ / مدل</th>{% for item in sizes %}<th>{{ item.name }}<div class="small fw-normal text-secondary mt-1">قیمت واحد</div><input class="grid-input ltr takvin-price" name="price_{{ item.obj.id }}" data-size="{{ item.obj.id }}" value="{% for s in size_rows %}{% if s.obj.id == item.obj.id %}{{ s.price }}{% endif %}{% endfor %}" inputmode="numeric"></th>{% endfor %}</tr></thead><tbody>{% for row in grid_rows %}<tr><th class="sticky-col">{{ row.color.name }}</th>{% for cell in row.cells %}<td><input class="grid-input ltr takvin-qty" name="{{ cell.name }}" data-size="{{ cell.size.id }}" value="{% if cell.value %}{{ cell.value }}{% endif %}" placeholder="—" inputmode="numeric"></td>{% endfor %}</tr>{% endfor %}</tbody><tfoot><tr><th class="sticky-col">تعداد</th>{% for s in size_rows %}<th class="num-center" id="qty-total-{{ s.obj.id }}">{{ s.qty|groupnum }}</th>{% endfor %}</tr><tr><th class="sticky-col">قبل تخفیف</th>{% for s in size_rows %}<th class="money-center" id="before-total-{{ s.obj.id }}">{{ s.before|groupnum }}</th>{% endfor %}</tr><tr class="takvin-net-row"><th class="sticky-col">بعد تخفیف</th>{% for s in size_rows %}<th class="money-center" id="net-total-{{ s.obj.id }}">{{ s.net|groupnum }}</th>{% endfor %}</tr></tfoot></table></div>
+
+<div class="row g-2 g-md-3 mt-3"><div class="col-4"><div class="summary-cell glass-inset"><span>تعداد کل</span><strong class="num" id="dayQty">{{ day_total_qty|groupnum }}</strong></div></div><div class="col-4"><div class="summary-cell glass-inset"><span>قبل تخفیف</span><strong class="money" id="dayBefore">{{ day_before|groupnum }}</strong></div></div><div class="col-4"><div class="summary-cell glass-inset"><span>خرید خالص</span><strong class="money text-success" id="dayNet">{{ day_net|groupnum }}</strong></div></div></div>
+<div class="d-flex flex-wrap justify-content-between gap-2 mt-4 takvin-save-row"><div class="text-secondary small">قیمت‌های پیش‌فرض اکسل: M=120 000، L=140 000، XL=155 000، XXL=170 000 تومان؛ قابل تغییر برای هر روز.</div><button class="btn btn-primary px-5">ذخیره خرید روز</button></div>
+</div></form></div>
+
+<div class="card"><div class="card-header"><div><h3 class="card-title">تاریخچه خرید تکوین</h3><div class="text-secondary">روزهای قبلی را باز کن و در صورت نیاز ویرایش یا حذف کن.</div></div></div><div class="mobile-scroll-note">تاریخچه را به چپ و راست بکش</div><div class="table-responsive"><table class="table table-vcenter card-table takvin-history"><thead><tr><th>تاریخ</th><th>تعداد</th><th>قبل تخفیف</th><th>خرید خالص</th><th></th></tr></thead><tbody>{% for row in history_rows %}<tr><td><a href="?date={{ row.jalali }}" class="fw-bold">{{ row.jalali }}</a></td><td class="num">{{ row.qty|groupnum }}</td><td class="money">{{ row.before|groupnum }}</td><td class="money fw-bold">{{ row.net|groupnum }}</td><td class="text-end"><form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="delete_day"><input type="hidden" name="date" value="{{ row.jalali }}"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('خرید تکوین این روز حذف شود؟')">حذف</button></form></td></tr>{% empty %}<tr><td colspan="5" class="empty-state">هنوز خرید تکوین ثبت نشده.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'core/jalali_picker.js' %}"></script><script>
+(function(){
+ const qtyInputs=[...document.querySelectorAll('.takvin-qty')];
+ const priceInputs=[...document.querySelectorAll('.takvin-price')];
+ const discount=document.getElementById('discountInput');
+ const fmt=n=>Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+ function num(v){return parseFloat(String(v||'').replace(/[ ,٬]/g,''))||0}
+ function refresh(){
+   const d=Math.max(0,Math.min(100,num(discount.value)));
+   let allQty=0, allBefore=0, allNet=0;
+   priceInputs.forEach(p=>{
+     const sid=p.dataset.size, price=num(p.value);
+     const q=qtyInputs.filter(x=>x.dataset.size===sid).reduce((a,x)=>a+num(x.value),0);
+     const before=q*price, net=before*(1-d/100);
+     allQty+=q; allBefore+=before; allNet+=net;
+     document.getElementById('qty-total-'+sid).textContent=fmt(q);
+     document.getElementById('before-total-'+sid).textContent=fmt(before);
+     document.getElementById('net-total-'+sid).textContent=fmt(net);
+   });
+   document.getElementById('dayQty').textContent=fmt(allQty);
+   document.getElementById('dayBefore').textContent=fmt(allBefore);
+   document.getElementById('dayNet').textContent=fmt(allNet);
+ }
+ qtyInputs.forEach(x=>x.addEventListener('input',refresh)); priceInputs.forEach(x=>x.addEventListener('input',refresh)); discount.addEventListener('input',refresh); refresh();
+})();
+</script>{% endblock %}

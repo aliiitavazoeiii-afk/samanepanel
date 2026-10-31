@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% load jalali %}
+{% block title %}فروش Dia Gallery | DARMA{% endblock %}
+{% block content %}{% include 'core/_mobile_shell.html' %}
+<style>
+.dia-grid{min-width:820px}.dia-grid th,.dia-grid td{text-align:center;vertical-align:middle}.dia-grid th:first-child,.dia-grid td:first-child{text-align:right;position:sticky;right:0;background:rgba(8,24,42,.96);z-index:2}.dia-grid input{min-width:82px;text-align:center}.dia-price-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,153,51,.3);background:rgba(255,153,51,.09)}
+</style>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head">
+  <div><div class="page-kicker">فروش روزانه</div><h1 class="page-title mb-1">Dia Gallery</h1><div class="page-muted">{{ day.date|jalali }} · فروش مستقیم از موجودی دارما بر اساس رنگ و سایز</div></div>
+  <div class="d-flex flex-wrap gap-2 mobile-page-actions"><a class="btn btn-outline-light" href="{% url 'sale_brand' day.id %}">فروش روزانه</a><a class="btn btn-outline-light" href="{% url 'daily_report' day.id %}">صورت روز</a></div>
+</div>
+
+<div class="row g-2 g-md-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">فی ثابت هر شورت</div><div class="kpi money mt-2">{{ unit_price|groupnum }}</div><small class="text-secondary">تومان</small></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">تعداد امروز</div><div class="kpi num mt-2">{{ day_metrics.total.shorts|groupnum }}</div><small class="text-secondary">شورت</small></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">فروش امروز</div><div class="kpi money mt-2 text-success">{{ day_metrics.total.gross|groupnum }}</div><small class="text-secondary">تومان</small></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">طلب از Dia Gallery</div><div class="kpi money mt-2 text-warning">{{ receivable|groupnum }}</div><small class="text-secondary">تومان · خودکار</small></div></div></div>
+</div>
+
+<div class="card glass-card mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h3 class="card-title mb-1">رنگ‌های دارما</h3><div class="text-secondary small">تعداد فروش هر رنگ را در سایز مربوط وارد کن. صفر کردن یک مقدار، فروش همان خانه را برمی‌گرداند.</div></div><span class="dia-price-badge"><strong class="money">{{ unit_price|groupnum }}</strong><span class="text-secondary">تومان / عدد</span></span></div>
+  <form method="post">{% csrf_token %}
+    <div class="table-responsive"><table class="table table-vcenter mb-0 dia-grid"><thead><tr><th>رنگ</th>{% for size in sizes %}<th>{{ size.name }}</th>{% endfor %}<th>جمع</th></tr></thead><tbody>
+    {% for row in matrix %}<tr><td class="fw-bold">{{ row.color.name }}</td>{% for cell in row.cells %}<td><input class="form-control form-control-sm num" type="number" min="0" step="1" inputmode="numeric" name="{{ cell.field }}" value="{% if cell.quantity %}{{ cell.quantity }}{% endif %}" placeholder="0"></td>{% endfor %}<td class="text-secondary">—</td></tr>{% empty %}<tr><td colspan="8"><div class="empty-state py-4">رنگ فعالی برای دارما پیدا نشد.</div></td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-3"><div class="text-secondary small">ثبت این صفحه از موجودی واقعی دارما کم می‌کند و طلب Dia Gallery را با فی ثابت ۷۱٬۰۰۰ تومان افزایش می‌دهد. هزینه دیجی‌کالا ندارد.</div><button class="btn btn-primary btn-lg" type="submit">ثبت فروش Dia Gallery</button></div>
+  </form>
+</div>
+{% endblock %}

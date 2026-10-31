@@ -1,0 +1,365 @@
+{% extends 'base.html' %}{% load jalali static %}
+{% block title %}گردش موجودی | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.inventory-op-card .card-header{padding:.8rem 1rem}
+.inventory-op-card .card-body{padding:1rem}
+.inventory-op-card .card-title{font-size:1rem}
+.inventory-op-card .form-label{font-size:.78rem;margin-bottom:.3rem}
+.inventory-op-card .form-control,.inventory-op-card .form-select{min-height:36px;padding:.4rem .55rem}
+.color-entry-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.color-entry-cell{border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:7px;background:rgba(255,255,255,.022)}
+.color-entry-cell .form-label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.stock-current-line{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 6px}
+.stock-current-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid rgba(255,255,255,.09);border-radius:999px;background:rgba(255,255,255,.025);font-size:.66rem;color:#9fb1c3;white-space:nowrap}
+.stock-current-chip b{color:#edf5fb;font-size:.7rem}
+.stock-current-chip.stock-total{border-color:rgba(251,101,20,.18);background:rgba(251,101,20,.055)}
+.stock-current-selected{margin:0 0 6px;padding:5px 7px;border-radius:8px;background:rgba(18,183,106,.065);border:1px solid rgba(18,183,106,.16);font-size:.68rem;color:#a9c6b7}
+.stock-current-selected b{color:#9af0c4}
+.compact-help{font-size:.72rem;line-height:1.55}
+.movement-delete-form{display:inline}
+.movement-delete-form .btn{white-space:nowrap}
+.transfer-history{min-width:720px}
+.transfer-edit-form{display:flex;align-items:center;gap:6px;min-width:190px}
+.transfer-edit-form .form-control{width:90px;min-height:32px;padding:.3rem .45rem}
+.transfer-edit-form .btn{white-space:nowrap}
+@media(max-width:1199.98px){.color-entry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:767.98px){
+  .inventory-op-form .row>div{flex:0 0 100%;max-width:100%}
+  .inventory-op-form .btn{width:100%}
+  .inventory-moves{min-width:860px}
+  .color-entry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3 mobile-page-head">
+  <div>
+    <div class="text-secondary">عملیات انبار</div>
+    <h1 class="page-title mb-0">انتقال و اصلاح موجودی</h1>
+  </div>
+  <div class="mobile-page-actions">
+    <a href="{% url 'inventory' %}" class="btn btn-outline-light btn-sm">بازگشت به موجودی</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4 align-items-start">
+  <div class="col-12 col-lg-6">
+    <div class="card inventory-op-card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title mb-1">انتقال</h3>
+          <div class="text-secondary compact-help">جهت انتقال، برند و سایز را انتخاب کن و تعداد رنگ‌ها را یکجا ثبت کن.</div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'inventory_transfer_direction_v123' %}" class="card-body inventory-op-form" id="stock-transfer-form" autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="transfer">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label">تاریخ</label>
+            <input class="form-control ltr" name="date" value="{{ today_j }}" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">برند</label>
+            <select class="form-select" name="brand" id="transfer-brand">
+              {% for x in transfer_brands %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">سایز</label>
+            <select class="form-select" name="size" id="transfer-size">
+              {% for x in sizes %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="transfer-direction">مسیر انتقال</label>
+            <select class="form-select" id="transfer-direction" name="direction">
+              <option value="warehouse_to_home" selected>از انبار به خانه</option>
+              <option value="home_to_warehouse">از خانه به انبار</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="color-entry-grid">
+          {% for color in transfer_colors %}
+          <div class="color-entry-cell transfer-color-cell" data-color-id="{{ color.id }}">
+            <label class="form-label" for="transfer-color-{{ color.id }}">{{ color.name }}</label>
+            <div class="stock-current-line">
+              <span class="stock-current-chip">خورشید <b data-stock-value="khorshid">0</b></span>
+              <span class="stock-current-chip">خانه <b data-stock-value="home">0</b></span>
+              <span class="stock-current-chip stock-total">کل <b data-stock-value="total">0</b></span>
+            </div>
+            <input id="transfer-color-{{ color.id }}" type="number" min="0" class="form-control" name="qty_{{ color.id }}" placeholder="تعداد انتقال" inputmode="numeric">
+          </div>
+          {% empty %}
+          <div class="text-secondary">رنگ فعالی برای انتقال پیدا نشد.</div>
+          {% endfor %}
+        </div>
+        <div class="text-secondary compact-help mt-2">فیلد خالی یا صفر نادیده گرفته می‌شود. از موجودی مبدأ کم و به مقصد افزوده می‌شود.</div>
+        <div id="stock-transfer-result" role="status" aria-live="polite" class="mt-2 text-secondary compact-help"></div>
+        <button class="btn btn-primary btn-sm mt-3">ثبت انتقال</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card inventory-op-card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title mb-1">اصلاح موجودی</h3>
+          <div class="text-secondary compact-help">تاریخ، برند، سایز و محل را انتخاب کن؛ موجودی واقعی همه رنگ‌های همان ردیف را سریع وارد و یکجا ثبت کن.</div>
+        </div>
+      </div>
+      <form method="post" class="card-body inventory-op-form" id="bulk-adjust-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="adjust">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label">تاریخ</label>
+            <input class="form-control ltr" name="date" value="{{ today_j }}" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">برند</label>
+            <select class="form-select" name="brand" id="adjust-brand">
+              {% for x in brands %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">سایز</label>
+            <select class="form-select" name="size" id="adjust-size">
+              {% for x in sizes %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">محل</label>
+            <select class="form-select" name="location" id="adjust-location">
+              {% for x in locations %}<option value="{{ x.id }}" data-location-key="{{ x.key }}">{{ x.title }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        {% for group in adjustment_groups %}
+        <div class="adjust-color-group" data-brand-id="{{ group.brand.id }}"{% if not forloop.first %} style="display:none"{% endif %}>
+          <div class="color-entry-grid">
+            {% for color in group.colors %}
+            <div class="color-entry-cell adjust-color-cell" data-brand-id="{{ group.brand.id }}" data-color-id="{{ color.id }}">
+              <label class="form-label" for="adjust-{{ group.brand.id }}-{{ color.id }}">{{ color.name }}</label>
+              <div class="stock-current-line">
+                <span class="stock-current-chip">خانه <b data-stock-value="home">0</b></span>
+                <span class="stock-current-chip">خورشید <b data-stock-value="khorshid">0</b></span>
+                <span class="stock-current-chip stock-total">کل <b data-stock-value="total">0</b></span>
+              </div>
+              <div class="stock-current-selected">فعلیِ <span data-current-location-label>محل انتخابی</span>: <b data-current-location-value>0</b></div>
+              <input id="adjust-{{ group.brand.id }}-{{ color.id }}" type="number" min="0" class="form-control" name="target_{{ group.brand.id }}_{{ color.id }}" placeholder="مقدار جدید" inputmode="numeric">
+            </div>
+            {% empty %}
+            <div class="text-secondary">رنگ فعالی برای این برند پیدا نشد.</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="text-secondary compact-help mt-2">بالای هر فیلد، موجودی فعلی خانه، خورشید و کل را می‌بینی. «فعلیِ محل انتخابی» با تغییر برند/سایز/محل زنده عوض می‌شود. فیلد ورودی عمداً خالی می‌ماند: خالی = بدون تغییر، 0 = موجودی نهایی صفر. موجودی کل فقط جمع خانه + خورشید است و مستقیم اصلاح نمی‌شود.</div>
+        <button class="btn btn-primary btn-sm mt-3">ثبت اصلاح موجودی</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <div>
+      <h3 class="card-title mb-1">آخرین انتقال‌های خانه و انبار</h3>
+      <div class="text-secondary compact-help">اگر تعداد یک رنگ را اشتباه ثبت کردی، همین‌جا مقدار درست را وارد و ذخیره کن. عدد ۰ یعنی حذف همان انتقال و برگرداندن اثرش با همان جهت ثبت‌شده.</div>
+    </div>
+  </div>
+  <div class="mobile-scroll-note">برای دیدن همه ستون‌ها جدول را بکش</div>
+  <div class="table-responsive">
+    <table class="table card-table table-vcenter transfer-history mb-0">
+      <thead><tr><th>تاریخ</th><th>مسیر</th><th>رنگ</th><th>سایز</th><th>تعداد ثبت‌شده</th><th>ویرایش</th></tr></thead>
+      <tbody>
+        {% for t in recent_transfers %}
+        <tr>
+          <td class="ltr">{{ t.date|jalali }}</td>
+          <td>{% if t.from_location.key == "home" %}از خانه به انبار{% else %}از انبار به خانه{% endif %}</td>
+          <td>{{ t.color.name }}</td>
+          <td>{{ t.size.name }}</td>
+          <td class="num fw-bold">{{ t.qty|groupnum }}</td>
+          <td>
+            <form method="post" action="{% url 'inventory_transfer_update' t.id %}" class="transfer-edit-form" onsubmit="return confirm('مقدار این انتقال اصلاح شود؟ اگر ۰ وارد کرده‌ای، انتقال کامل حذف و اثر آن بر موجودی برگردانده می‌شود.');">
+              {% csrf_token %}
+              <input type="number" min="0" class="form-control" name="qty" value="{{ t.qty }}" inputmode="numeric" aria-label="تعداد صحیح انتقال {{ t.color.name }} {{ t.size.name }}">
+              <button type="submit" class="btn btn-outline-warning btn-sm">ذخیره اصلاح</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="empty-state">انتقال ثبت‌شده‌ای پیدا نشد.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3 class="card-title mb-1">آخرین گردش‌های موجودی</h3>
+      <div class="text-secondary compact-help">حذف فقط برای «اصلاح موجودی» دستی فعال است. انتقال‌های خورشید به خانه را از جدول بالاتر ویرایش کن.</div>
+    </div>
+  </div>
+  <div class="mobile-scroll-note">برای دیدن همه ستون‌ها جدول را بکش</div>
+  <div class="table-responsive">
+    <table class="table card-table table-vcenter inventory-moves">
+      <thead><tr><th>نوع</th><th>برند</th><th>رنگ</th><th>سایز</th><th>محل</th><th>تغییر</th><th>مرجع</th><th>عملیات</th></tr></thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td>{{ r.get_movement_type_display }}</td>
+          <td>{{ r.brand.name }}</td>
+          <td>{{ r.color.name }}</td>
+          <td>{{ r.size.name }}</td>
+          <td>{{ r.location.title }}</td>
+          <td class="num {% if r.delta < 0 %}text-danger{% else %}text-success{% endif %}">{{ r.delta|groupnum }}</td>
+          <td class="code-cell small">{{ r.reference }}</td>
+          <td>
+            {% if r.adjustment_delete_id %}
+            <form method="post" action="{% url 'inventory_adjustment_delete' r.adjustment_delete_id %}" class="movement-delete-form" onsubmit="return confirm('این اصلاح موجودی حذف شود و موجودی دقیقاً به قبل از همین اصلاح برگردد؟');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+            </form>
+            {% else %}
+            <span class="text-secondary">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="empty-state">گردشی ثبت نشده.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'core/jalali_picker.js' %}"></script>
+{{ stock_snapshot|json_script:"inventory-stock-snapshot" }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const snapshotNode=document.getElementById('inventory-stock-snapshot');
+  let snapshot={};
+  try{snapshot=JSON.parse(snapshotNode ? snapshotNode.textContent : '{}');}catch(_e){snapshot={};}
+
+  function stockFor(brandId,sizeId,colorId){
+    return snapshot[String(brandId)+':'+String(sizeId)+':'+String(colorId)] || {home:0,khorshid:0,total:0};
+  }
+
+  function paintChips(container,stock){
+    container.querySelectorAll('[data-stock-value]').forEach(function(node){
+      const key=node.dataset.stockValue;
+      node.textContent=Number(stock[key] || 0).toLocaleString('en-US');
+    });
+  }
+
+  const transferForm=document.getElementById('stock-transfer-form');
+  const direction=document.getElementById('transfer-direction');
+  const transferFeedback=document.getElementById('stock-transfer-result');
+  const nav=performance.getEntriesByType('navigation')[0];
+  if(transferForm && nav && nav.type==='reload')transferForm.reset();
+  const transferBrand=document.getElementById('transfer-brand');
+  const transferSize=document.getElementById('transfer-size');
+  const transferCells=[...document.querySelectorAll('.transfer-color-cell')];
+
+  function syncTransferStock(){
+    const brandId=transferBrand ? transferBrand.value : '';
+    const sizeId=transferSize ? transferSize.value : '';
+    transferCells.forEach(function(cell){
+      paintChips(cell,stockFor(brandId,sizeId,cell.dataset.colorId));
+    });
+  }
+
+  if(transferBrand) transferBrand.addEventListener('change',syncTransferStock);
+  if(transferSize) transferSize.addEventListener('change',syncTransferStock);
+  syncTransferStock();
+
+  const brand=document.getElementById('adjust-brand');
+  const size=document.getElementById('adjust-size');
+  const location=document.getElementById('adjust-location');
+  const groups=[...document.querySelectorAll('.adjust-color-group')];
+
+  function selectedLocation(){
+    if(!location) return {key:'home',label:'خانه'};
+    const option=location.options[location.selectedIndex];
+    const key=(option && option.dataset.locationKey) || 'home';
+    const label=(option && option.textContent.trim()) || 'خانه';
+    return {key:key,label:label};
+  }
+
+  function syncGroups(){
+    const id=brand ? brand.value : '';
+    groups.forEach(function(group){
+      group.style.display=(group.dataset.brandId===id)?'block':'none';
+    });
+  }
+
+  function syncAdjustmentStock(){
+    const brandId=brand ? brand.value : '';
+    const sizeId=size ? size.value : '';
+    const loc=selectedLocation();
+    document.querySelectorAll('.adjust-color-cell').forEach(function(cell){
+      const stock=stockFor(cell.dataset.brandId,sizeId,cell.dataset.colorId);
+      paintChips(cell,stock);
+      const label=cell.querySelector('[data-current-location-label]');
+      const value=cell.querySelector('[data-current-location-value]');
+      const input=cell.querySelector('input[type="number"]');
+      const current=(loc.key==='khorshid') ? Number(stock.khorshid || 0) : Number(stock.home || 0);
+      if(label) label.textContent=loc.label;
+      if(value) value.textContent=current.toLocaleString('en-US');
+      if(input) input.placeholder='فعلی: '+current.toLocaleString('en-US')+' — مقدار جدید';
+    });
+  }
+
+  function syncAdjustmentUI(){
+    syncGroups();
+    syncAdjustmentStock();
+  }
+
+  if(brand) brand.addEventListener('change',syncAdjustmentUI);
+  if(size) size.addEventListener('change',syncAdjustmentStock);
+  if(location) location.addEventListener('change',syncAdjustmentStock);
+  syncAdjustmentUI();
+
+  if(transferForm){
+    transferForm.addEventListener('submit',async function(event){
+      event.preventDefault();
+      const submit=transferForm.querySelector('button[type="submit"],button:not([type])');
+      if(submit)submit.disabled=true;
+      if(transferFeedback)transferFeedback.textContent='در حال ثبت انتقال...';
+      try{
+        const response=await fetch(transferForm.action,{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-Requested-With':'XMLHttpRequest'},
+          body:new FormData(transferForm)
+        });
+        const result=await response.json();
+        if(!response.ok||!result.ok)throw new Error(result.message||'انتقال ثبت نشد');
+        snapshot=result.stock_snapshot||snapshot;
+        transferForm.querySelectorAll('input[name^="qty_"]').forEach(input=>input.value='');
+        syncTransferStock();
+        syncAdjustmentUI();
+        if(transferFeedback){
+          transferFeedback.textContent=result.message;
+          transferFeedback.style.color='#8ff0be';
+        }
+      }catch(error){
+        if(transferFeedback){
+          transferFeedback.textContent=error.message||'خطای انتقال';
+          transferFeedback.style.color='#ff9b9b';
+        }
+      }finally{if(submit)submit.disabled=false;}
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'core/report_excel_v45.html' %}
+{% block scripts %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  // V96: inventory/raw-material management moved to the Inventory center.
+  // Keep capital math untouched; remove only the detailed inventory domain UI.
+  document.querySelectorAll('.v76-domain').forEach(function(section){
+    const title=(section.querySelector('.v76-domain-title')?.textContent||'').trim();
+    if(title==='موجودی و مواد اولیه') section.remove();
+  });
+  document.querySelectorAll('h2.page-title').forEach(function(title){
+    if((title.textContent||'').trim()==='سرمایه، موجودی و حساب‌ها') title.textContent='سرمایه و حساب‌ها';
+  });
+  document.querySelectorAll('.badge').forEach(function(badge){
+    if((badge.textContent||'').trim()==='موجودی کالا خودکار') badge.remove();
+  });
+});
+</script>
+{% endblock %}

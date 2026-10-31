@@ -1,0 +1,9 @@
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a class="btn btn-sm {% if dk_section == 'home' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala' %}">خانه دیجی‌کالا</a>
+  <a class="btn btn-sm {% if dk_section == 'orders' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_orders' %}">سفارش روزانه</a>
+  <a class="btn btn-sm {% if dk_section == 'products' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_products' %}">محصولات</a>
+  <a class="btn btn-sm {% if dk_section == 'packages' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_packages' %}">محموله‌ها</a>
+  <a class="btn btn-sm {% if dk_section == 'sales' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_sales' %}">گزارش فروش</a>
+  <a class="btn btn-sm {% if dk_section == 'warehouse' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_warehouse' %}">موجودی انبار</a>
+  <a class="btn btn-sm {% if dk_section == 'returns' %}btn-primary{% else %}btn-outline-light{% endif %}" href="{% url 'digikala_returns' %}">مرجوعی</a>
+</div>

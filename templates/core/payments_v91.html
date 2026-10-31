@@ -1,0 +1,61 @@
+{% extends 'core/payments_v62.html' %}{% load static jalali %}
+{% block scripts %}
+{{ block.super }}
+{% if section == 'receipts' %}
+<style>
+.receipt-filter-head{width:100%;display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}.receipt-filter-summary{min-width:210px}.receipt-filter-total{font-size:1.15rem;font-weight:850}.receipt-filter-form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.receipt-filter-field{min-width:145px}.receipt-filter-field.source{min-width:180px}.receipt-filter-actions{display:flex;gap:6px}.receipt-filter-error{width:100%;margin-top:10px}.receipt-filter-count{font-size:.75rem;color:#91a4b8;margin-top:4px}
+@media(max-width:767.98px){.receipt-filter-form{width:100%}.receipt-filter-field,.receipt-filter-field.source{min-width:0;flex:1 1 46%}.receipt-filter-actions{width:100%}.receipt-filter-actions .btn{flex:1}.receipt-filter-summary{width:100%}}
+</style>
+<template id="receipt-v91-header-template">
+  <div class="receipt-filter-head">
+    <div class="receipt-filter-summary">
+      <h3 class="card-title mb-1">آخرین دریافتی‌ها</h3>
+      <div class="receipt-filter-total money text-success">
+        {% if receipt_filter_active %}جمع فیلتر:{% else %}جمع کل:{% endif %}
+        {{ receipt_filtered_total|groupnum }} تومان
+      </div>
+      <div class="receipt-filter-count">{{ receipt_filtered_count|groupnum }} دریافتی</div>
+    </div>
+    <form method="get" action="{% url 'payments' %}" class="receipt-filter-form">
+      <input type="hidden" name="section" value="receipts">
+      <div class="receipt-filter-field">
+        <label class="form-label mb-1">از تاریخ</label>
+        <input class="form-control form-control-sm ltr" name="receipt_from" value="{{ receipt_filter_from }}" placeholder="۱۴۰۵/۰۷/۰۱" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="receipt-filter-field">
+        <label class="form-label mb-1">تا تاریخ</label>
+        <input class="form-control form-control-sm ltr" name="receipt_to" value="{{ receipt_filter_to }}" placeholder="۱۴۰۵/۰۷/۳۰" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="receipt-filter-field source">
+        <label class="form-label mb-1">منبع</label>
+        <select class="form-select form-select-sm" name="receipt_source">
+          {% for key,label in receipt_filter_sources %}
+          <option value="{{ key }}" {% if receipt_filter_source == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="receipt-filter-actions">
+        <button class="btn btn-sm btn-success" type="submit">اعمال فیلتر</button>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'payments' %}?section=receipts">پاک کردن</a>
+      </div>
+    </form>
+    {% if receipt_filter_error %}
+    <div class="alert alert-danger receipt-filter-error mb-0">{{ receipt_filter_error }}</div>
+    {% endif %}
+  </div>
+</template>
+<script>
+(function(){
+  const title = Array.from(document.querySelectorAll('.card-header .card-title')).find(function(el){
+    return (el.textContent || '').trim() === 'آخرین دریافتی‌ها';
+  });
+  const tpl = document.getElementById('receipt-v91-header-template');
+  if(!title || !tpl) return;
+  const header = title.closest('.card-header');
+  if(!header) return;
+  header.innerHTML = '';
+  header.appendChild(tpl.content.cloneNode(true));
+})();
+</script>
+{% endif %}
+{% endblock %}

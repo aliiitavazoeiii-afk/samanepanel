@@ -1,0 +1,176 @@
+/* V116 — icon rail overlays content rather than resizing it.
+   Desktop navigation is pure CSS; full-page loads never wait for animation. */
+.v116-icon{width:21px;height:21px;display:block;flex:none;stroke:currentColor}
+.nav114-icon{font-size:0!important}
+.nav115-power .v116-icon{width:21px;height:21px}
+@media (min-width:992px){
+  body.sidebar-collapsed .erp-main,
+  body:not(.sidebar-collapsed) .erp-main{
+    margin-right:72px!important;
+    transition:none!important;
+  }
+  body.sidebar-collapsed .erp-sidebar,
+  body:not(.sidebar-collapsed) .erp-sidebar{
+    box-sizing:border-box;
+    width:72px!important;
+    padding:12px 9px!important;
+    overflow-x:hidden!important;
+    overflow-y:auto;
+    transform:none!important;
+    transition:width 170ms cubic-bezier(.2,.8,.2,1),box-shadow 170ms ease!important;
+    will-change:auto;
+    background:rgba(4,15,29,.96);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  body.sidebar-collapsed .erp-sidebar:is(:hover,:focus-within),
+  body:not(.sidebar-collapsed) .erp-sidebar:is(:hover,:focus-within){
+    width:246px!important;
+    box-shadow:-12px 12px 38px rgba(0,6,18,.38)!important;
+  }
+  .erp-sidebar-head{
+    min-height:52px!important;
+    height:52px!important;
+    margin:0 0 12px!important;
+  }
+  .erp-sidebar .darma-logo-wrap-v74{
+    flex:0 0 52px!important;
+    width:52px!important;
+    height:52px!important;
+    min-height:52px!important;
+    margin:0!important;
+    overflow:hidden!important;
+  }
+  .erp-sidebar .darma-logo-wrap-v74 img{
+    width:44px!important;
+    height:44px!important;
+    max-width:44px!important;
+    max-height:44px!important;
+    object-fit:contain!important;
+  }
+  .erp-sidebar .sidebar-close{display:none!important}
+  .sidebar-collapsed .erp-sidebar .erp-nav .nav114-link,body:not(.sidebar-collapsed) .erp-sidebar .erp-nav .nav114-link{
+    display:flex!important;
+    align-items:center;
+    justify-content:flex-start!important;
+    gap:12px!important;
+    height:46px;
+    min-height:46px;
+    padding:6px 9px!important;
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .sidebar-collapsed .erp-sidebar .nav114-icon,body:not(.sidebar-collapsed) .erp-sidebar .nav114-icon{
+    width:34px!important;
+    height:34px!important;
+    min-width:34px!important;
+    flex:0 0 34px!important;
+  }
+  .sidebar-collapsed .erp-sidebar .nav114-label,body:not(.sidebar-collapsed) .erp-sidebar .nav114-label{
+    display:block!important;
+    flex:0 0 auto;
+    max-width:0;
+    opacity:0;
+    visibility:hidden;
+    overflow:hidden;
+    white-space:nowrap;
+    transform:translateX(4px);
+    transition:opacity 110ms ease, transform 155ms ease,visibility 0s linear 110ms!important;
+  }
+  .erp-sidebar:is(:hover,:focus-within) .nav114-label{
+    max-width:160px;
+    visibility:visible;
+    opacity:1!important;
+    transform:none;
+    transition:opacity 120ms ease 35ms,transform 155ms ease,visibility 0s!important;
+  }
+  .erp-sidebar .nav114-separator{margin:7px 4px!important}
+  .sidebar-collapsed .erp-sidebar .nav115-logout-btn,body:not(.sidebar-collapsed) .erp-sidebar .nav115-logout-btn{
+    display:flex;
+    height:46px;
+    min-height:46px;
+    justify-content:flex-start!important;
+    padding:6px 9px!important;
+    gap:12px!important;
+    overflow:hidden;
+  }
+  .erp-sidebar .nav115-power{width:34px;min-width:34px;height:34px;flex:0 0 34px}
+  .sidebar-collapsed .erp-sidebar .nav115-logout-label,body:not(.sidebar-collapsed) .erp-sidebar .nav115-logout-label{
+    display:block!important;
+    max-width:0;
+    opacity:0;
+    overflow:hidden;
+    visibility:hidden;
+    white-space:nowrap;
+    transition:opacity 110ms ease!important;
+  }
+  .erp-sidebar:is(:hover,:focus-within) .nav115-logout-label{
+    max-width:160px;
+    opacity:1;
+    visibility:visible;
+  }
+}
+@media (max-width:991.98px){
+  .erp-sidebar .nav114-label,.erp-sidebar .nav115-logout-label{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    max-width:none!important;
+  }
+  .erp-sidebar .nav114-icon{display:grid;place-items:center}
+  .erp-sidebar .nav115-logout-btn{justify-content:flex-start!important}
+}
+/* V116: only presentation-only explanations, not form hints, money, warnings or data. */
+.page-kicker,.page-muted:not([data-ui-keep]),.chart-summary-note,
+.v76-domain-sub,.v76-fold-sub{display:none!important}
+/* Summary and capital are visible on first paint, before the legacy folding JS. */
+.excel-section .brand-report{display:none!important}
+.excel-section + .row{display:none!important}
+/* Monthly/selected-period overview: five requested metrics, then capital. */
+.erp-content .excel-section > .card-body > .v76-top-metrics,
+.erp-content .excel-section > .card-body > .row:first-child{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:10px!important;
+  margin-bottom:12px!important;
+}
+.erp-content .v76-top-metrics > div:nth-child(n+5){
+  display:block!important;
+}
+.erp-content .excel-section .summary-cell{
+  min-height:84px!important;
+  padding:12px 8px!important;
+}
+.erp-content .excel-section .summary-cell>strong{
+  font-size:clamp(.93rem,1.35vw,1.30rem)!important;
+}
+.erp-content .capital-hero{margin-bottom:14px!important}\n.v116-capital-head{margin-top:14px!important;margin-bottom:8px!important}
+.v76-secondary-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.v116-pricing-card{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  min-height:76px;padding:15px 16px;border:1px solid rgba(255,255,255,.11);
+  border-radius:16px;color:#f7f9fc;text-decoration:none;
+  background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.014));
+  font-size:.95rem;font-weight:800;
+}
+.v116-pricing-card:hover,.v116-pricing-card:focus-visible{
+  color:#fff;border-color:rgba(251,101,20,.5);background:rgba(251,101,20,.09);
+}
+.v116-pricing-card .v116-icon{color:#ffac72;width:24px;height:24px}
+@media (max-width:1199px){
+ .erp-content .excel-section>.card-body>.v76-top-metrics,
+ .erp-content .excel-section>.card-body>.row:first-child{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media (max-width:767.98px){
+ .v76-secondary-grid{grid-template-columns:1fr!important}
+}
+@media (max-width:575.98px){
+ .erp-content .excel-section>.card-body>.v76-top-metrics,
+ .erp-content .excel-section>.card-body>.row:first-child{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .erp-content .excel-section .summary-cell{min-height:78px!important}
+}
+/* The link remains meaningful for keyboard and reduced-motion navigation. */
+@media (prefers-reduced-motion:reduce){
+ body.sidebar-collapsed .erp-sidebar,body:not(.sidebar-collapsed) .erp-sidebar,
+ .erp-sidebar .nav114-label{transition:none!important}
+}

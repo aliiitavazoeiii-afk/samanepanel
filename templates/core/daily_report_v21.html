@@ -1,0 +1,132 @@
+{% extends 'base.html' %}{% load jalali %}
+{% block title %}صورت فروش {{ jalali_date }} | DARMA{% endblock %}
+{% block content %}{% include 'core/_mobile_shell.html' %}
+<style>
+.mobile-summary-card{border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(255,255,255,.035);padding:13px;margin-bottom:10px}.mobile-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mobile-metric{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.mobile-metric span{display:block;color:#9fb0c4;font-size:.68rem}.brand-summary-table{min-width:940px;direction:rtl}.brand-summary-table th,.brand-summary-table td{text-align:center!important;white-space:nowrap}.brand-summary-table th:first-child,.brand-summary-table td:first-child{text-align:right!important}
+.sold-browser{overflow:hidden}.sold-browser-head{padding:18px 18px 8px}.sold-brand-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.sold-brand-card{appearance:none;width:100%;text-align:right;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));color:inherit;padding:15px 16px;transition:.15s ease;cursor:pointer}.sold-brand-card:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.24)}.sold-brand-card.active{border-color:rgba(255,153,51,.75);box-shadow:0 0 0 1px rgba(255,153,51,.20) inset;background:linear-gradient(145deg,rgba(255,153,51,.13),rgba(255,255,255,.025))}.sold-brand-title{font-size:1.05rem;font-weight:800}.sold-brand-meta{color:#9fb0c4;font-size:.78rem;margin-top:4px}.sold-size-panels{padding:10px 18px 15px}.sold-size-panel{display:flex;gap:7px;flex-wrap:wrap}.sold-size-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.035);color:#dce7f5;border-radius:999px;padding:7px 13px;font-weight:700;font-size:.82rem}.sold-size-btn:hover{border-color:rgba(255,255,255,.25)}.sold-size-btn.active{background:rgba(255,153,51,.16);border-color:rgba(255,153,51,.68);color:#fff}.sold-size-btn:disabled{opacity:.34;cursor:not-allowed}.sold-filter-state{padding:0 18px 12px;color:#91a4ba;font-size:.78rem}
+.sold-table-wrap{border-top:1px solid rgba(255,255,255,.08)}.sold-table{width:100%;table-layout:fixed;min-width:900px}.sold-table th{font-size:.74rem;color:#9fb0c4;font-weight:700;white-space:nowrap}.sold-table td{vertical-align:middle}.sold-table .model-col{width:28%}.sold-table .qty-col{width:23%}.sold-table .money-col{width:13%}.sold-table .profit-col{width:16%}.sold-table .action-col{width:7%}.sold-model-code{font-size:1rem;font-weight:900;letter-spacing:.02em}.sold-size-badge{display:inline-flex;margin-right:7px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.09);font-size:.72rem;color:#c7d5e5}.sold-colors{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.sold-color-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:rgba(81,145,211,.10);border:1px solid rgba(117,171,226,.15);font-size:.72rem;color:#c8def4}.sold-color-chip.replacement{border-color:rgba(255,177,76,.38);background:rgba(255,153,51,.10)}.sold-color-note{display:block;margin-top:6px;color:#8295ab;font-size:.68rem}.sold-color-warning{display:block;margin-top:6px;color:#ff9c9c;font-size:.7rem;font-weight:700}.sale-price-form{display:flex;gap:6px;align-items:center}.sale-price-form input{min-width:0;width:130px}.sold-counts{margin-top:6px;color:#9fb0c4;font-size:.72rem}.sold-money-main{font-weight:800}.sold-money-sub{display:block;color:#879bb2;font-size:.69rem;margin-top:4px}.sold-profit-positive{color:#55d69b}.sold-profit-negative{color:#ff7d89}.sold-delete-btn{white-space:nowrap}.sold-empty{padding:26px;text-align:center;color:#8397ae;border-top:1px solid rgba(255,255,255,.08)}
+.sold-mobile-list{padding:0 12px 12px}.sold-mobile-card{border:1px solid rgba(255,255,255,.105);border-radius:15px;padding:13px;margin-bottom:9px;background:linear-gradient(135deg,rgba(18,43,72,.34),rgba(5,19,34,.20))}.sold-mobile-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.sold-mobile-profit{text-align:left}.sold-mobile-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}.sold-mobile-stat{padding:8px 9px;border-radius:10px;background:rgba(255,255,255,.032);border:1px solid rgba(255,255,255,.065)}.sold-mobile-stat span{display:block;color:#8da1b8;font-size:.67rem}.sold-mobile-actions{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.075)}.other-sales-card{margin-top:18px}
+@media(max-width:767.98px){.sold-browser-head{padding:14px 12px 6px}.sold-brand-grid{gap:8px}.sold-brand-card{padding:12px}.sold-size-panels{padding:9px 12px 13px}.sold-filter-state{padding:0 12px 10px}.sale-price-form input{width:100%;flex:1}.sold-brand-title{font-size:.96rem}.sold-brand-meta{font-size:.7rem}}
+</style>
+<div class="mb-3">{% include 'core/_daily_order_upload.html' %}</div>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4"><div><div class="text-secondary">صورت فروش روزانه</div><h1 class="page-title mb-1 ltr">{{ jalali_date }}</h1><div class="text-secondary">قیمت هر مدل را همین‌جا اصلاح کن؛ حذف، موجودی و طلب دیجی همان ردیف را هم برمی‌گرداند.</div></div><div class="d-flex gap-2 flex-wrap"><a class="btn btn-outline-light" href="{% url 'sale_start' %}">تقویم فروش</a><form method="post" action="{% url 'daily_sale_day_delete' day.id %}" class="m-0">{% csrf_token %}<button class="btn btn-outline-danger" type="submit" onclick="return confirm('کل صورت این روز حذف شود؟ همه فروش‌های این روز، طلب دیجی و Dia و اثر موجودی فروش‌ها برمی‌گردد. این عملیات خودکار قابل Undo نیست.')">حذف صورت روز</button></form><a class="btn btn-primary" href="{% url 'sale_brand' day.id %}">ویرایش / ادامه</a></div></div>
+
+<div class="row row-cards mb-4"><div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="subheader">فروش کل</div><div class="kpi money mt-2">{{ total.gross|groupnum }}</div></div></div></div><div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="subheader">سود فروش</div><div class="kpi money mt-2 {% if total.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ total.profit|groupnum }}</div><small class="text-secondary">{{ total.margin|pct1 }}%</small></div></div></div><div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="subheader">هزینه دیجی‌کالا</div><div class="kpi money mt-2">{{ total.digikala_fee|groupnum }}</div></div></div></div><div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="subheader">کالای فروخته‌شده</div><div class="kpi num mt-2">{{ total.packs|groupnum }}</div><small class="text-secondary">{{ total.shorts|groupnum }} شورت</small></div></div></div></div>
+
+<div class="card mb-4"><div class="card-header"><h3 class="card-title">خلاصه برندها</h3></div><div class="d-none d-md-block table-responsive"><table class="table table-vcenter brand-summary-table"><thead><tr><th>برند</th><th>فروش</th><th>دیجی</th><th>بهای کالا</th><th>سود</th><th>حاشیه</th><th>شورت</th><th>کالا</th></tr></thead><tbody>{% for name,v in by_brand %}<tr><td class="fw-bold">{{ name }}</td><td class="money">{{ v.gross|groupnum }}</td><td class="money">{{ v.digikala_fee|groupnum }}</td><td class="money">{{ v.cogs|groupnum }}</td><td class="money {% if v.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ v.profit|groupnum }}</td><td>{{ v.margin|pct1 }}%</td><td>{{ v.shorts|groupnum }}</td><td>{{ v.packs|groupnum }}</td></tr>{% empty %}<tr><td colspan="8">فروشی ثبت نشده.</td></tr>{% endfor %}</tbody></table></div><div class="d-md-none card-body">{% for name,v in by_brand %}<div class="mobile-summary-card"><div class="d-flex justify-content-between"><strong>{{ name }}</strong><span>{{ v.packs|groupnum }} کالا</span></div><div class="mobile-metric-grid mt-2"><div class="mobile-metric"><span>فروش</span><strong class="money">{{ v.gross|groupnum }}</strong></div><div class="mobile-metric"><span>سود</span><strong class="money">{{ v.profit|groupnum }}</strong></div><div class="mobile-metric"><span>دیجی</span><strong class="money">{{ v.digikala_fee|groupnum }}</strong></div><div class="mobile-metric"><span>بهای کالا</span><strong class="money">{{ v.cogs|groupnum }}</strong></div></div></div>{% empty %}<div class="empty-state">فروشی ثبت نشده.</div>{% endfor %}</div></div>
+
+<div id="sold-model-browser" class="card sold-browser" data-default-brand="{{ default_brand }}">
+  <div class="sold-browser-head">
+    <div><h3 class="card-title mb-1">مدل‌های فروخته‌شده</h3><div class="text-secondary small">اول برند را انتخاب کن، بعد سایز؛ رنگ‌ها از موجودی واقعی کم‌شده همان فروش خوانده می‌شوند.</div></div>
+    <div class="sold-brand-grid">
+      {% for brand in filter_brands %}
+      <button type="button" class="sold-brand-card{% if brand.name == default_brand %} active{% endif %}" data-brand-button="{{ brand.name }}">
+        <div class="d-flex justify-content-between align-items-center gap-2"><span class="sold-brand-title">{{ brand.name }}</span><span class="badge bg-transparent border">{{ brand.line_count }} مدل</span></div>
+        <div class="sold-brand-meta">{{ brand.packs|groupnum }} کالا · {{ brand.shorts|groupnum }} شورت</div>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="sold-size-panels">
+    {% for brand in filter_brands %}
+    <div class="sold-size-panel{% if brand.name != default_brand %} d-none{% endif %}" data-size-panel="{{ brand.name }}">
+      <button type="button" class="sold-size-btn active" data-size-button="all" data-size-brand="{{ brand.name }}">همه سایزها</button>
+      {% for size in brand.sizes %}
+      <button type="button" class="sold-size-btn" data-size-button="{{ size.name }}" data-size-brand="{{ brand.name }}"{% if not size.line_count %} disabled{% endif %}>{{ size.name }}{% if size.line_count %} · {{ size.line_count }} مدل{% endif %}</button>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <div id="sold-filter-state" class="sold-filter-state"></div>
+
+  <div class="d-none d-md-block table-responsive sold-table-wrap">
+    <table class="table table-vcenter card-table sold-table mb-0">
+      <colgroup><col class="model-col"><col class="qty-col"><col class="money-col"><col class="money-col"><col class="profit-col"><col class="action-col"></colgroup>
+      <thead><tr><th>مدل / رنگ شورت‌ها</th><th>قیمت / تعداد</th><th>فروش</th><th>دیجی</th><th>سود</th><th></th></tr></thead>
+      <tbody>
+      {% for row in primary_detail_rows %}
+        <tr class="sold-filter-row" data-brand="{{ row.brand_name }}" data-size="{{ row.size_name }}">
+          <td>
+            <div><span class="sold-model-code code-cell">{{ row.code }}</span><span class="sold-size-badge">{{ row.size_name }}</span></div>
+            <div class="sold-colors">
+              {% for color in row.colors %}<span class="sold-color-chip{% if color.replacement_qty %} replacement{% endif %}">{{ color.name }} × {{ color.qty|groupnum }}{% if color.replacement_qty %} ↺{% endif %}</span>{% empty %}<span class="sold-color-chip">رنگ ثبت نشده</span>{% endfor %}
+            </div>
+            {% if row.color_source == 'composition' %}<span class="sold-color-note">Allocation تاریخی ندارد؛ این‌ها ترکیب ثبت‌شده مدل هستند.</span>{% endif %}
+            {% if row.color_mismatch %}<span class="sold-color-warning">هشدار: جمع رنگ‌ها {{ row.color_total|groupnum }} است ولی فروش {{ row.shorts|groupnum }} شورت ثبت شده.</span>{% endif %}
+          </td>
+          <td>
+            <form method="post" action="{% url 'daily_sale_price_update' row.line.id %}" class="sale-price-form">{% csrf_token %}<input class="form-control form-control-sm money-input" name="sale_price" value="{{ row.line.sale_price }}" inputmode="numeric"><button class="btn btn-sm btn-outline-light">ذخیره</button></form>
+            <div class="sold-counts">{{ row.packs|groupnum }} کالا · <strong>{{ row.shorts|groupnum }} شورت</strong></div>
+          </td>
+          <td><span class="money sold-money-main">{{ row.gross|groupnum }}</span></td>
+          <td><span class="money sold-money-main">{{ row.digikala_fee|groupnum }}</span></td>
+          <td><span class="money sold-money-main {% if row.profit >= 0 %}sold-profit-positive{% else %}sold-profit-negative{% endif %}">{{ row.profit|groupnum }}</span><span class="sold-money-sub">بهای کالا {{ row.cogs|groupnum }} · حاشیه {{ row.margin|pct1 }}%</span></td>
+          <td><form method="post" action="{% url 'daily_sale_line_delete' row.line.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger sold-delete-btn" onclick="return confirm('این مدل از صورت روزانه حذف شود و موجودی آن برگردد؟')">حذف</button></form></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-md-none sold-mobile-list">
+    {% for row in primary_detail_rows %}
+    <div class="sold-mobile-card sold-filter-row" data-brand="{{ row.brand_name }}" data-size="{{ row.size_name }}">
+      <div class="sold-mobile-top"><div><div><span class="sold-model-code code-cell">{{ row.code }}</span><span class="sold-size-badge">{{ row.size_name }}</span></div><div class="sold-colors">{% for color in row.colors %}<span class="sold-color-chip{% if color.replacement_qty %} replacement{% endif %}">{{ color.name }} × {{ color.qty|groupnum }}{% if color.replacement_qty %} ↺{% endif %}</span>{% empty %}<span class="sold-color-chip">رنگ ثبت نشده</span>{% endfor %}</div>{% if row.color_source == 'composition' %}<span class="sold-color-note">ترکیب ثبت‌شده مدل</span>{% endif %}{% if row.color_mismatch %}<span class="sold-color-warning">جمع رنگ‌ها با تعداد شورت برابر نیست.</span>{% endif %}</div><div class="sold-mobile-profit"><strong class="money {% if row.profit >= 0 %}sold-profit-positive{% else %}sold-profit-negative{% endif %}">{{ row.profit|groupnum }}</strong><div class="sold-money-sub">سود</div></div></div>
+      <div class="sold-mobile-stats"><div class="sold-mobile-stat"><span>تعداد</span><strong>{{ row.packs|groupnum }} کالا · {{ row.shorts|groupnum }} شورت</strong></div><div class="sold-mobile-stat"><span>فروش</span><strong class="money">{{ row.gross|groupnum }}</strong></div><div class="sold-mobile-stat"><span>دیجی</span><strong class="money">{{ row.digikala_fee|groupnum }}</strong></div><div class="sold-mobile-stat"><span>بهای کالا</span><strong class="money">{{ row.cogs|groupnum }}</strong></div></div>
+      <div class="sold-mobile-actions"><form method="post" action="{% url 'daily_sale_price_update' row.line.id %}" class="sale-price-form mb-2">{% csrf_token %}<input class="form-control form-control-sm money-input" name="sale_price" value="{{ row.line.sale_price }}" inputmode="numeric"><button class="btn btn-sm btn-outline-light">اصلاح قیمت</button></form><form method="post" action="{% url 'daily_sale_line_delete' row.line.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger w-100" onclick="return confirm('این مدل حذف شود و موجودی آن برگردد؟')">حذف این مدل</button></form></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div id="sold-filter-empty" class="sold-empty d-none">در این برند/سایز مدلی فروخته نشده.</div>
+</div>
+
+{% if other_detail_rows %}
+<div class="card other-sales-card"><div class="card-header"><div><h3 class="card-title">فروش‌های دستی / سایر</h3><div class="text-secondary small">این بخش جداست تا فیلتر دارما و تکوین روی فروش‌های دستی اثر نگذارد.</div></div></div><div class="card-body">
+{% for row in other_detail_rows %}<div class="mobile-summary-card"><div class="d-flex flex-wrap justify-content-between gap-2"><div><strong class="code-cell">{{ row.brand_name }} · {{ row.code }} · {{ row.size_name }}</strong><div class="sold-colors">{% for color in row.colors %}<span class="sold-color-chip">{{ color.name }} × {{ color.qty|groupnum }}</span>{% empty %}<span class="sold-color-chip">رنگ ثبت نشده</span>{% endfor %}</div></div><div class="text-end"><strong class="money {% if row.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.profit|groupnum }}</strong><div class="text-secondary small">{{ row.packs|groupnum }} کالا · {{ row.shorts|groupnum }} شورت</div></div></div><div class="mobile-metric-grid mt-2"><div class="mobile-metric"><span>فروش</span><strong class="money">{{ row.gross|groupnum }}</strong></div><div class="mobile-metric"><span>دیجی</span><strong class="money">{{ row.digikala_fee|groupnum }}</strong></div></div><div class="mt-2 d-flex gap-2 flex-wrap"><form method="post" action="{% url 'daily_sale_price_update' row.line.id %}" class="sale-price-form">{% csrf_token %}<input class="form-control form-control-sm money-input" name="sale_price" value="{{ row.line.sale_price }}" inputmode="numeric"><button class="btn btn-sm btn-outline-light">ذخیره قیمت</button></form><form method="post" action="{% url 'daily_sale_line_delete' row.line.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" onclick="return confirm('این مدل حذف شود و موجودی آن برگردد؟')">حذف</button></form></div></div>{% endfor %}
+</div></div>
+{% endif %}
+
+<script>
+(function(){
+  const root=document.getElementById('sold-model-browser');
+  if(!root)return;
+  const brandButtons=[...root.querySelectorAll('[data-brand-button]')];
+  const sizePanels=[...root.querySelectorAll('[data-size-panel]')];
+  const sizeButtons=[...root.querySelectorAll('[data-size-button]')];
+  const rows=[...root.querySelectorAll('.sold-filter-row')];
+  const empty=document.getElementById('sold-filter-empty');
+  const state=document.getElementById('sold-filter-state');
+  let brand=root.dataset.defaultBrand || 'دارما';
+  let size='all';
+
+  function apply(){
+    let visible=0;
+    rows.forEach(row=>{
+      const show=row.dataset.brand===brand && (size==='all' || row.dataset.size===size);
+      row.classList.toggle('d-none',!show);
+      if(show)visible++;
+    });
+    if(empty) empty.classList.toggle('d-none',visible>0);
+    if(state) state.textContent=brand+' · '+(size==='all'?'همه سایزها':'سایز '+size);
+  }
+
+  function selectBrand(next){
+    brand=next;size='all';
+    brandButtons.forEach(btn=>btn.classList.toggle('active',btn.dataset.brandButton===brand));
+    sizePanels.forEach(panel=>panel.classList.toggle('d-none',panel.dataset.sizePanel!==brand));
+    sizeButtons.forEach(btn=>btn.classList.toggle('active',btn.dataset.sizeBrand===brand && btn.dataset.sizeButton==='all'));
+    apply();
+  }
+
+  brandButtons.forEach(btn=>btn.addEventListener('click',()=>selectBrand(btn.dataset.brandButton)));
+  sizeButtons.forEach(btn=>btn.addEventListener('click',()=>{
+    if(btn.disabled || btn.dataset.sizeBrand!==brand)return;
+    size=btn.dataset.sizeButton;
+    sizeButtons.forEach(item=>item.classList.toggle('active',item.dataset.sizeBrand===brand && item.dataset.sizeButton===size));
+    apply();
+  }));
+  selectBrand(brand);
+})();
+</script>
+{% endblock %}

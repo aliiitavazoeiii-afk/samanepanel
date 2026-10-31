@@ -1,0 +1,39 @@
+{% load jalali %}
+<form method="post" action="{% url 'payment_update' row.id %}" class="payment-form v22-edit-form">
+  {% csrf_token %}
+  <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">تاریخ</label><input class="form-control ltr" name="date" value="{{ row.date|jalali }}"></div>
+    <div class="col-md-2"><label class="form-label">پرداخت به</label><select class="form-select payee-select" name="payee">{% for key,label in payees %}<option value="{{ key }}" {% if row.payee == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label">مبلغ پرداخت واقعی</label><input class="form-control money-input actual-paid" name="amount" value="{{ row.amount }}" inputmode="numeric"></div>
+    <div class="col-md-4"><label class="form-label">توضیح / فروشنده</label><input class="form-control" name="note" value="{{ row.display_note }}" placeholder="مثلاً پارچه فروش حسینی"></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100">ذخیره ویرایش</button></div>
+  </div>
+
+  <div class="material-box mt-3 fabric-fields {% if row.payee != 'fabric' %}d-none{% endif %}">
+    <div class="subheader mb-2">جزئیات پارچه — فقط اگر خود کالا/فی/وزن را می‌خواهی تغییر بدهی</div>
+    <div class="material-grid">
+      <div><label class="form-label">رنگ</label><select class="form-select" name="material_key">{% for key,label in material_colors %}<option value="{{ key }}" {% if row.purchase_data.m == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="form-label">نام پارچه</label><input class="form-control" name="fabric_name" value="{{ row.purchase_data.t }}"></div>
+      <div><label class="form-label">وزن کیلو</label><input class="form-control ltr material-qty" name="fabric_qty" value="{{ row.purchase_data.q }}" inputmode="decimal"></div>
+      <div><label class="form-label">فی هر کیلو</label><input class="form-control money-input material-price" name="fabric_price" value="{{ row.purchase_data.p }}" inputmode="numeric"></div>
+    </div>
+    <div class="material-hint mt-2">ارزش خرید: <strong class="money invoice-preview">{{ row.invoice_value|groupnum }}</strong> تومان · مبلغ پرداخت واقعی را از فیلد بالا مستقل اصلاح کن.</div>
+  </div>
+
+  <div class="material-box mt-3 elastic-fields {% if row.payee != 'elastic' %}d-none{% endif %}">
+    <div class="subheader mb-2">جزئیات کش — مبلغ پرداخت واقعی مستقل از ارزش خرید است</div>
+    <div class="material-grid">
+      <div><label class="form-label">رنگ</label><select class="form-select" name="material_key">{% for key,label in material_colors %}<option value="{{ key }}" {% if row.purchase_data.m == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="form-label">کیلو کش 16</label><input class="form-control ltr material-qty" name="elastic16_qty" value="{{ row.purchase_data.q16 }}" inputmode="decimal"></div>
+      <div><label class="form-label">فی کش 16</label><input class="form-control money-input material-price" name="elastic16_price" value="{{ row.purchase_data.p16 }}" inputmode="numeric"></div>
+      <div></div>
+      <div></div>
+      <div><label class="form-label">کیلو کش 25</label><input class="form-control ltr material-qty" name="elastic25_qty" value="{{ row.purchase_data.q25 }}" inputmode="decimal"></div>
+      <div><label class="form-label">فی کش 25</label><input class="form-control money-input material-price" name="elastic25_price" value="{{ row.purchase_data.p25 }}" inputmode="numeric"></div>
+      <div></div>
+    </div>
+    <div class="material-hint mt-2">ارزش خرید: <strong class="money invoice-preview">{{ row.invoice_value|groupnum }}</strong> تومان · مثلاً اگر ارزش ۲۶ میلیون است ولی ۲۵٬۵۸۴٬۰۰۰ پرداخت کردی، فقط مبلغ بالا را ۲۵٬۵۸۴٬۰۰۰ بزن.</div>
+  </div>
+
+  {% if row.is_material_purchase %}<div class="safe-edit-note mt-2">تغییر فقط تاریخ، توضیح یا مبلغ پرداخت واقعی، موجودی مواد را Reverse نمی‌کند. فقط تغییر وزن/رنگ/نام/فی کالا نیاز به بازسازی موجودی دارد.</div>{% endif %}
+</form>

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}{% load jalali %}
+{% block title %}موجودی | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.inventory-center-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.inventory-center-card{display:block;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,.12);border-radius:20px;background:linear-gradient(145deg,rgba(27,56,86,.40),rgba(7,22,39,.28));padding:24px;min-height:190px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);transition:.16s}.inventory-center-card:hover{transform:translateY(-2px);border-color:rgba(251,101,20,.42);color:inherit}.inventory-center-icon{width:52px;height:52px;border-radius:15px;background:rgba(251,101,20,.12);display:grid;place-items:center;font-size:1.5rem;color:#ffad72;margin-bottom:24px}.inventory-center-card h2{font-size:1.55rem;margin:0 0 12px;font-weight:950}.inventory-center-value{font-size:1.05rem;color:#b8c8d8}.inventory-center-value strong{display:block;color:#fff;font-size:1.35rem;margin-top:4px}.inventory-center-arrow{margin-top:22px;color:#ffad72;font-weight:900}@media(max-width:767.98px){.inventory-center-grid{grid-template-columns:1fr}.inventory-center-card{min-height:160px;padding:20px}}
+</style>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head">
+  <div><h1 class="page-title mb-0">موجودی</h1></div>
+</div>
+<div class="inventory-center-grid">
+  <a class="inventory-center-card" href="{% url 'inventory_stock' %}">
+    <div class="inventory-center-icon">▦</div>
+    <h2>موجودی کالا</h2>
+    <div class="inventory-center-value">ارزش موجودی کالای آماده<strong class="money">{{ finished_inventory_total|groupnum }} تومان</strong></div>
+    <div class="inventory-center-arrow">ورود ←</div>
+  </a>
+  <a class="inventory-center-card" href="{% url 'inventory_materials' %}">
+    <div class="inventory-center-icon">◫</div>
+    <h2>مواد اولیه</h2>
+    <div class="inventory-center-value">ارزش پارچه و کش<strong class="money">{{ materials_total|groupnum }} تومان</strong></div>
+    <div class="inventory-center-arrow">ورود ←</div>
+  </a>
+  <a class="inventory-center-card" href="{% url 'returns' %}" data-inventory-returns="v114">
+    <div class="inventory-center-icon">↩</div>
+    <h2>مرجوعی</h2>
+    
+    <div class="inventory-center-arrow">ورود ←</div>
+  </a>
+</div>
+{% endblock %}

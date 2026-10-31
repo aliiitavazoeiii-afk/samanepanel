@@ -1,0 +1,110 @@
+{% extends 'base.html' %}{% load jalali %}{% block title %}دیجی‌کالا | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head">
+  <div>
+    <div class="page-kicker">Open API دیجی‌کالا</div>
+    <h1 class="page-title mb-1">تعهدات و تحویل دیجی‌کالا</h1>
+    <div class="page-muted">اطلاعات زنده و فقط خواندنی · بدون تغییر فروش، موجودی یا حسابداری داخلی</div>
+  </div>
+  <div class="mobile-page-actions d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-light" href="{% url 'digikala_warehouse' %}">موجودی آزاد انبار</a>
+    <a class="btn btn-outline-light" href="{% url 'digikala' %}?refresh=1">بروزرسانی API</a>
+    <a class="btn btn-primary" href="{% url 'dashboard' %}">داشبورد اصلی</a>
+  </div>
+</div>
+
+{% if digikala_error %}<div class="alert alert-danger glass-card mb-4">{{ digikala_error }}</div>{% endif %}
+{% if not delivery.counts_match %}<div class="alert alert-warning glass-card mb-4">عدد «تعهد مؤثر» متادیتای دیجی‌کالا با جمع ردیف‌های قابل تحویل یکی نیست. تا همگام‌شدن API هر دو عدد جدا نمایش داده می‌شوند.</div>{% endif %}
+
+<div class="row g-2 g-md-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">باید تحویل بدهم</div><div class="kpi num mt-2 text-warning">{{ delivery.effective_total|default:0|groupnum }}</div><div class="text-secondary small">تعهد مؤثر طبق متادیتای دیجی‌کالا</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">کل تعهدات</div><div class="kpi num mt-2">{{ delivery.total_commitments|default:0|groupnum }}</div><div class="text-secondary small">موثر + غیرموثر</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">مدل/تنوع قابل تحویل</div><div class="kpi num mt-2">{{ delivery.variant_count|default:0|groupnum }}</div><div class="text-secondary small">ردیف‌هایی که امروز یا روزهای بعد تعهد دارند</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">عقب‌افتاده</div><div class="kpi num mt-2 {% if delivery.delayed_total %}text-danger{% endif %}">{{ delivery.delayed_total|default:0|groupnum }}</div><div class="text-secondary small">تعهد Delayed گزارش‌شده</div></div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-8">
+    <div class="card glass-card h-100">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div><h3 class="card-title mb-1">ریز کالاهایی که باید تحویل بدهی</h3><div class="text-secondary small">جمع ردیف‌ها: {{ delivery.actionable_rows_total|default:0|groupnum }} · روزهای بعد: {{ delivery.future_total|default:0|groupnum }} · امروز: {{ delivery.today_total|default:0|groupnum }}</div></div>
+        <input id="dkDeliverySearch" class="form-control" style="max-width:280px" type="search" placeholder="جستجو کد، مدل، سایز…">
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0" id="dkDeliveryTable">
+            <thead><tr><th>کد</th><th>سایز</th><th>عنوان کالا</th><th class="text-center">تعداد تحویل</th><th class="text-center">سفارش</th></tr></thead>
+            <tbody>
+              {% for row in delivery.rows %}
+              <tr data-search="{{ row.supplier_code }} {{ row.size }} {{ row.title }} {{ row.variant_id }}">
+                <td><strong class="ltr">{{ row.supplier_code }}</strong><small class="d-block text-secondary ltr">V{{ row.variant_id }}</small></td>
+                <td><span class="badge badge-soft-orange">{{ row.size }}</span></td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    {% if row.product_image %}<img src="{{ row.product_image }}" alt="" loading="lazy" width="42" height="42" style="object-fit:cover;border-radius:10px">{% endif %}
+                    <div><div>{{ row.title }}</div>{% if row.product_link %}<a class="small" href="{{ row.product_link }}" target="_blank" rel="noopener">مشاهده در دیجی‌کالا</a>{% endif %}</div>
+                  </div>
+                </td>
+                <td class="text-center"><strong class="num fs-5">{{ row.due_qty|groupnum }}</strong>{% if row.today_qty %}<small class="d-block text-warning">امروز {{ row.today_qty|groupnum }}</small>{% endif %}</td>
+                <td class="text-center"><span class="num">{{ row.orders|groupnum }}</span></td>
+              </tr>
+              {% empty %}<tr><td colspan="5"><div class="empty-state py-5">تعهد قابل تحویلی از API دریافت نشد.</div></td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card glass-card mb-3">
+      <div class="card-header"><h3 class="card-title mb-0">دسترسی سریع</h3></div>
+      <div class="card-body">
+        <a class="btn btn-outline-light w-100" href="{% url 'digikala_warehouse' %}">مشاهده موجودی آزاد و فروش‌نرفته انبار دیجی‌کالا</a>
+      </div>
+    </div>
+
+    <div class="card glass-card mb-3">
+      <div class="card-header"><h3 class="card-title mb-0">خلاصه تعهد</h3></div>
+      <div class="card-body">
+        <div class="summary-cell mb-2"><span>روزهای آینده</span><strong class="num">{{ delivery.future_total|default:0|groupnum }}</strong></div>
+        <div class="summary-cell mb-2"><span>امروز</span><strong class="num">{{ delivery.today_total|default:0|groupnum }}</strong></div>
+        <div class="summary-cell mb-2"><span>عقب‌افتاده</span><strong class="num {% if delivery.delayed_total %}text-danger{% endif %}">{{ delivery.delayed_total|default:0|groupnum }}</strong></div>
+        <div class="summary-cell"><span>غیرموثر</span><strong class="num">{{ delivery.non_effective_total|default:0|groupnum }}</strong></div>
+      </div>
+    </div>
+
+    <div class="card glass-card mb-3">
+      <div class="card-header"><h3 class="card-title mb-0">سفارش و ارسال</h3></div>
+      <div class="card-body">
+        <div class="summary-cell mb-2"><span>ارسال توسط دیجی‌کالا</span><strong class="num">{{ digikala.all_shipped_by_dk|default:0|groupnum }}</strong></div>
+        <div class="summary-cell mb-2"><span>ارسال توسط فروشنده</span><strong class="num">{{ digikala.shipped_by_seller_count|default:0|groupnum }}</strong></div>
+        <div class="summary-cell"><span>صورتحساب‌ها</span><strong class="num">{{ digikala.invoices_total|default:0|groupnum }}</strong></div>
+      </div>
+    </div>
+
+    <div class="card glass-card">
+      <div class="card-header"><h3 class="card-title mb-0">وضعیت اتصال</h3></div>
+      <div class="card-body">
+        <div class="mb-2"><span class="text-secondary">API:</span> <strong class="{% if digikala.connected %}text-success{% else %}text-danger{% endif %}">{% if digikala.connected %}متصل{% else %}قطع{% endif %}</strong></div>
+        <div class="mb-2"><span class="text-secondary">Access Token:</span> <span class="ltr">{{ digikala.access_token_expires_at.date|default:'—' }}</span></div>
+        <div class="text-secondary small mt-3">این صفحه هیچ SaleLine، موجودی داخلی، حساب دیجی‌کالا یا سرمایه‌ای را تغییر نمی‌دهد.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if digikala.errors %}<div class="card glass-card mt-4"><div class="card-header"><h3 class="card-title mb-0">خطاهای جزئی API</h3></div><div class="card-body">{% for name, error in digikala.errors.items %}<div class="mb-2"><strong>{{ name }}</strong>: <span class="text-secondary">{{ error }}</span></div>{% endfor %}</div></div>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  const input=document.getElementById('dkDeliverySearch');
+  const table=document.getElementById('dkDeliveryTable');
+  if(!input||!table) return;
+  input.addEventListener('input',function(){
+    const q=this.value.trim().toLowerCase();
+    table.querySelectorAll('tbody tr[data-search]').forEach(row=>{
+      row.style.display=!q||String(row.dataset.search||'').toLowerCase().includes(q)?'':'none';
+    });
+  });
+})();
+</script>{% endblock %}

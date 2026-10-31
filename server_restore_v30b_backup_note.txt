@@ -1,0 +1,1 @@
+V30B always creates a full pg_dump backup before applying. If rollback is ever required, stop and restore from the exact backup path printed by server_reset_shahrivar_workflow_v30b.sh rather than attempting partial manual reversal.

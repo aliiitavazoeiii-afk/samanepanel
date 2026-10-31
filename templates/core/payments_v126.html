@@ -1,0 +1,99 @@
+{% extends 'core/payments_v91.html' %}{% load jalali %}
+
+{% block scripts %}
+{{ block.super }}
+{% if section == 'payments' %}
+<style>
+.payment-filter-head{width:100%;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.payment-filter-summary{min-width:225px}
+.payment-filter-total{font-size:1.12rem;font-weight:850;line-height:1.75}
+.payment-filter-alltime{color:#c0d1df;font-size:.83rem;font-weight:720;margin-top:3px}
+.payment-filter-count{font-size:.75rem;color:#91a4b8;margin-top:3px}
+.payment-filter-form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.payment-filter-field{min-width:146px}
+.payment-filter-actions{display:flex;gap:6px}
+.payment-filter-error{width:100%;margin-top:10px}
+.payment-filter-page{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.09);padding-top:10px;margin-top:2px;font-size:.75rem;color:#a9bfd0}
+.payment-filter-page-actions{display:flex;gap:8px;align-items:center}
+@media(max-width:767.98px){
+  .payment-filter-form{width:100%}
+  .payment-filter-field{min-width:0;flex:1 1 46%}
+  .payment-filter-actions{width:100%}
+  .payment-filter-actions .btn{flex:1}
+  .payment-filter-summary{width:100%}
+  .payment-filter-page{align-items:flex-start}
+}
+</style>
+<template id="payment-v126-header-template">
+  <div class="payment-filter-head">
+    <div class="payment-filter-summary">
+      <h3 class="card-title mb-1">سوابق پرداختی‌ها</h3>
+      <div class="payment-filter-total money text-danger">
+        {% if payment_filter_active %}جمع پرداختی بازه انتخاب‌شده:{% else %}جمع کل پرداختی‌ها:{% endif %}
+        {{ payment_filtered_total|groupnum }} تومان
+      </div>
+      <div class="payment-filter-alltime money" data-payment-all-time-total="{{ payment_all_time_total }}">
+        مجموع پرداختی از ابتدا (بدون فیلتر): {{ payment_all_time_total|groupnum }} تومان
+      </div>
+      <div class="payment-filter-count">
+        {{ payment_filtered_count|groupnum }} پرداختی
+        {% if payment_filter_active %}در بازه انتخاب‌شده{% else %}از ابتدا{% endif %}
+      </div>
+    </div>
+    <form method="get" action="{% url 'payments' %}" class="payment-filter-form">
+      <input type="hidden" name="section" value="payments">
+      <div class="payment-filter-field">
+        <label class="form-label mb-1" for="payment-filter-from">از تاریخ</label>
+        <input id="payment-filter-from" class="form-control form-control-sm ltr"
+               name="payment_from" value="{{ payment_filter_from }}"
+               placeholder="۱۴۰۵/۰۷/۰۱" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="payment-filter-field">
+        <label class="form-label mb-1" for="payment-filter-to">تا تاریخ</label>
+        <input id="payment-filter-to" class="form-control form-control-sm ltr"
+               name="payment_to" value="{{ payment_filter_to }}"
+               placeholder="۱۴۰۵/۰۷/۳۰" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="payment-filter-actions">
+        <button class="btn btn-sm btn-danger" type="submit">اعمال فیلتر</button>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'payments' %}?section=payments">پاک کردن</a>
+      </div>
+    </form>
+    {% if payment_filter_error %}
+    <div class="alert alert-danger payment-filter-error mb-0">{{ payment_filter_error }}</div>
+    {% endif %}
+    {% if payment_filter_page.paginator.num_pages > 1 %}
+    <nav class="payment-filter-page" aria-label="صفحه‌بندی پرداختی‌ها">
+      <span>نمایش {{ payment_filter_page.start_index|groupnum }} تا {{ payment_filter_page.end_index|groupnum }} از {{ payment_filtered_count|groupnum }} پرداختی</span>
+      <div class="payment-filter-page-actions">
+        {% if payment_filter_page.has_previous %}
+          <a class="btn btn-sm btn-outline-light" href="?section=payments&amp;payment_from={{ payment_filter_from|urlencode }}&amp;payment_to={{ payment_filter_to|urlencode }}&amp;payment_page={{ payment_filter_page.previous_page_number }}">صفحه قبل</a>
+        {% endif %}
+        <span>صفحه {{ payment_filter_page.number|groupnum }} از {{ payment_filter_page.paginator.num_pages|groupnum }}</span>
+        {% if payment_filter_page.has_next %}
+          <a class="btn btn-sm btn-outline-light" href="?section=payments&amp;payment_from={{ payment_filter_from|urlencode }}&amp;payment_to={{ payment_filter_to|urlencode }}&amp;payment_page={{ payment_filter_page.next_page_number }}">صفحه بعد</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </div>
+</template>
+<script>
+(function(){
+  const target=Array.from(document.querySelectorAll('.card-header .card-title')).find(function(el){
+    return (el.textContent || '').trim()==='آخرین پرداخت‌ها';
+  });
+  const tpl=document.getElementById('payment-v126-header-template');
+  if(!target || !tpl) return;
+  const header=target.closest('.card-header');
+  if(!header) return;
+  header.innerHTML='';
+  header.appendChild(tpl.content.cloneNode(true));
+  {% if payment_filter_active or payment_filter_error %}
+  const empty=document.querySelector('.payment-table .empty-state');
+  if(empty)empty.textContent='پرداختی‌ای در این بازه پیدا نشد.';
+  {% endif %}
+})();
+</script>
+{% endif %}
+{% endblock %}

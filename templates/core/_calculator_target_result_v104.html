@@ -1,0 +1,12 @@
+{% load jalali %}
+{% if error %}
+<div class="alert alert-danger mb-0">{{ error }}</div>
+{% else %}
+<div class="calc104-result-grid">
+  <div class="summary-cell primary-result"><span>قیمت فروش پیشنهادی</span><strong class="money text-success">{{ suggested_price|groupnum }}</strong><small>تومان · رند به بالا روی ۱٬۰۰۰</small></div>
+  <div class="summary-cell"><span>کارمزد دیجی‌کالا</span><strong class="money">{{ fee|groupnum }}</strong><small>تومان</small></div>
+  <div class="summary-cell"><span>سود خالص</span><strong class="money text-success">{{ profit|groupnum }}</strong><small>تومان</small></div>
+  <div class="summary-cell"><span>حاشیه سود واقعی از فروش</span><strong class="num text-success">{{ profit_on_sale|pct1 }}٪</strong><small>هدف واردشده: {{ target_profit_percent|pct1 }}٪</small></div>
+</div>
+<div class="calc104-formula">حداقل قیمت ریاضی: <strong class="money">{{ exact_price|groupnum }}</strong> تومان · سود خالص نسبت به بهای تمام‌شده در قیمت پیشنهادی: <strong class="num">{{ profit_on_cost|pct1 }}٪</strong></div>
+{% endif %}

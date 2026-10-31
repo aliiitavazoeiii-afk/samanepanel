@@ -1,0 +1,20 @@
+{% extends 'core/report_excel_v96.html' %}
+{% block scripts %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  // V97: account management moved to Finance & Tools. Capital calculation remains unchanged.
+  document.querySelectorAll('.v76-domain').forEach(function(section){
+    const title=(section.querySelector('.v76-domain-title')?.textContent||'').trim();
+    if(title==='حساب‌ها') section.remove();
+  });
+  document.querySelectorAll('h2.page-title').forEach(function(title){
+    if((title.textContent||'').trim()==='سرمایه و حساب‌ها') title.textContent='سرمایه';
+  });
+  document.querySelectorAll('.page-muted').forEach(function(node){
+    if((node.textContent||'').includes('حساب‌ها و مانده‌ها را اینجا مدیریت کن')){
+      node.textContent='گزارش فروش و سرمایه؛ مدیریت حساب‌ها به بخش مالی و ابزار منتقل شده است.';
+    }
+  });
+});
+</script>
+{% endblock %}

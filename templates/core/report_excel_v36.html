@@ -1,0 +1,263 @@
+{% extends 'core/report_excel_v9.html' %}
+{% block scripts %}{{ block.super }}
+<style>
+/* V76 report information architecture — presentation only. */
+.v76-sales-overview>.card-header{display:none!important}
+.v76-sales-overview>.card-body{padding:0!important}
+.v76-top-metrics{margin:0!important;padding:0}
+.v76-top-metrics>div{padding-top:0!important;padding-bottom:0!important}
+.v76-top-metrics>div:nth-child(n+5){display:none!important}
+.v76-top-metrics .summary-cell{
+  height:100%;
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+  border:1px solid rgba(255,255,255,.11)
+}
+
+.v76-domain-stack{display:grid;gap:16px;margin:0 0 28px}
+.v76-domain{
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(255,255,255,.048),rgba(255,255,255,.016));
+  overflow:hidden
+}
+.v76-domain-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:17px 18px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.008))
+}
+.v76-domain-kicker{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:34px;
+  height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  background:rgba(251,101,20,.12);
+  border:1px solid rgba(255,132,64,.16);
+  color:#ffad7d;
+  font-size:.68rem;
+  font-weight:900;
+  direction:ltr
+}
+.v76-domain-title{font-size:1.08rem;font-weight:900;letter-spacing:-.02em}
+.v76-domain-sub{color:#8fa2b7;font-size:.74rem;margin-top:3px}
+.v76-domain-body{padding:16px}
+.v76-domain-body>.row:last-child,
+.v76-domain-body>.mb-4:last-child{margin-bottom:0!important}
+
+.v76-summary-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px!important;
+  margin:0 0 16px!important
+}
+.v76-summary-grid>.col-6,
+.v76-summary-grid>.col-12,
+.v76-summary-grid>[class*="col-md-"]{
+  width:auto!important;
+  max-width:none!important;
+  flex:none!important;
+  padding:0!important
+}
+.v76-summary-grid .card{height:100%!important}
+.v76-inventory-summary{
+  grid-template-columns:minmax(260px,1fr);
+  max-width:520px
+}
+
+.v76-financial-tools{
+  margin:2px 0 16px;
+  padding:14px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.018)
+}
+.v76-financial-tools>.financial-tools-head{margin-bottom:10px!important}
+.v76-financial-tools>.financial-extra-row{margin-bottom:0!important}
+
+.v76-domain .raw-materials-wrap{margin-bottom:0!important}
+.v76-domain>.v76-domain-body>.raw-materials-wrap{
+  border:0!important;
+  border-radius:14px!important;
+  background:transparent!important
+}
+
+.v76-secondary-grid{
+  display:grid;
+  grid-template-columns:1.35fr .65fr;
+  gap:12px
+}
+.v76-fold{
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:16px;
+  background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.014));
+  overflow:hidden
+}
+.v76-fold>summary{
+  list-style:none;
+  cursor:pointer;
+  min-height:76px;
+  padding:15px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px
+}
+.v76-fold>summary::-webkit-details-marker{display:none}
+.v76-fold>summary:hover{background:rgba(255,255,255,.025)}
+.v76-fold[open]{grid-column:1/-1}
+.v76-fold[open]>summary{
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:rgba(255,153,51,.045)
+}
+.v76-fold-title{font-weight:900;font-size:.95rem}
+.v76-fold-sub{display:block;color:#8fa2b7;font-size:.7rem;margin-top:3px}
+.v76-fold-arrow{font-size:1.25rem;color:#ff9a54;transition:.16s}
+.v76-fold[open] .v76-fold-arrow{transform:rotate(-90deg)}
+.v76-fold-body{padding:16px}
+.v76-fold-body>.row:last-child,
+.v76-fold-body>.mb-4:last-child{margin-bottom:0!important}
+.v76-report-details .brand-report:last-child{margin-bottom:0!important}
+
+@media(max-width:991.98px){
+  .v76-summary-grid{grid-template-columns:1fr 1fr}
+  .v76-secondary-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:575.98px){
+  .v76-top-metrics>div{width:50%!important;flex:0 0 50%!important}
+  .v76-domain-stack{gap:12px}
+  .v76-domain-head{padding:14px}
+  .v76-domain-body{padding:10px}
+  .v76-domain-title{font-size:.94rem}
+  .v76-domain-sub{font-size:.66rem}
+  .v76-summary-grid{grid-template-columns:1fr;gap:8px!important}
+  .v76-inventory-summary{max-width:none}
+  .v76-secondary-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .v76-fold>summary{min-height:70px;padding:12px}
+  .v76-fold-title{font-size:.84rem}
+  .v76-fold-sub{font-size:.64rem}
+  .v76-fold[open]{grid-column:1/-1}
+  .v76-fold-body{padding:10px}
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const accountManagementMoved=Boolean(document.querySelector('[data-report-finance-moved-server="1"]'));
+  const salesCard=document.querySelector('.excel-section');
+  const capitalHero=document.querySelector('.capital-hero');
+  const raw=document.querySelector('.raw-materials-wrap');
+  if(!salesCard||!capitalHero||!raw) return;
+
+  // Keep the compact sales snapshot exactly where it already is.
+  salesCard.classList.add('v76-sales-overview');
+  const salesBody=salesCard.querySelector('.card-body');
+  const summaryRow=salesBody?.querySelector(':scope > .row');
+  if(summaryRow) summaryRow.classList.add('v76-top-metrics');
+
+  const productColorRow=salesCard.nextElementSibling && salesCard.nextElementSibling.classList.contains('row')
+    ? salesCard.nextElementSibling : null;
+  const capitalMini=capitalHero.nextElementSibling;
+  const accountsRow=capitalMini?.nextElementSibling;
+  const assetWrap=raw.nextElementSibling;
+  if(!capitalMini||!accountsRow||!assetWrap) return;
+
+  function domain(kicker,title,sub){
+    const section=document.createElement('section');
+    section.className='v76-domain';
+    const head=document.createElement('div');
+    head.className='v76-domain-head';
+    head.innerHTML='<div><div class="v76-domain-title">'+title+'</div><div class="v76-domain-sub">'+sub+'</div></div><span class="v76-domain-kicker">'+kicker+'</span>';
+    const body=document.createElement('div');
+    body.className='v76-domain-body';
+    section.appendChild(head);
+    section.appendChild(body);
+    return {section,body};
+  }
+
+  function fold(title,sub,klass){
+    const d=document.createElement('details');
+    d.className='v76-fold '+(klass||'');
+    const s=document.createElement('summary');
+    s.innerHTML='<span><span class="v76-fold-title">'+title+'</span><span class="v76-fold-sub">'+sub+'</span></span><span class="v76-fold-arrow">‹</span>';
+    const b=document.createElement('div');
+    b.className='v76-fold-body';
+    d.appendChild(s);
+    d.appendChild(b);
+    return {details:d,body:b};
+  }
+
+  function miniLabel(node){
+    return (node.querySelector('.subheader,label')?.textContent||'').replace(/\s+/g,' ').trim();
+  }
+
+  const miniCards=Array.from(capitalMini.children);
+  const accountSummary=document.createElement('div');
+  accountSummary.className='v76-summary-grid';
+  const inventorySummary=document.createElement('div');
+  inventorySummary.className='v76-summary-grid v76-inventory-summary';
+
+  miniCards.forEach(function(node){
+    const label=miniLabel(node);
+    if(label.includes('موجودی کالا')){
+      inventorySummary.appendChild(node);
+    }else{
+      // Bank/person accounts, Digikala receivable, Takvin debt and any future
+      // financial mini-card all belong under the Accounts domain.
+      accountSummary.appendChild(node);
+    }
+  });
+
+  const accounts=domain('01','حساب‌ها','بانک و اشخاص، طلب‌ها، بدهی تکوین و ابزارهای مالی');
+  if(accountSummary.children.length) accounts.body.appendChild(accountSummary);
+
+  // Some deployments render the finance shortcut/balance strip separately.
+  // If present, move the existing DOM nodes here without changing their forms,
+  // URLs, values or backend data sources.
+  const financialHead=document.querySelector('.financial-tools-head');
+  const financialRow=document.querySelector('.financial-extra-row');
+  if(financialHead||financialRow){
+    const tools=document.createElement('div');
+    tools.className='v76-financial-tools';
+    if(financialHead) tools.appendChild(financialHead);
+    if(financialRow) tools.appendChild(financialRow);
+    accounts.body.appendChild(tools);
+  }
+  accounts.body.appendChild(accountsRow);
+
+  const inventory=domain('02','موجودی و مواد اولیه','ارزش موجودی کالا، پارچه، کش و محل نگهداری');
+  if(inventorySummary.children.length) inventory.body.appendChild(inventorySummary);
+  inventory.body.appendChild(raw);
+
+  const report=fold('گزارش‌های تحلیلی','برندها، سایزها، سوددهی محصولات و رنگ‌ها','v76-report-details');
+  salesBody?.querySelectorAll(':scope > .brand-report').forEach(node=>report.body.appendChild(node));
+  if(productColorRow) report.body.appendChild(productColorRow);
+
+  const assets=fold('کالای سرمایه‌ای','دارایی‌های سرمایه‌ای و اقلام حاشیه‌ای');
+  assets.body.appendChild(assetWrap);
+
+  const secondary=document.createElement('div');
+  secondary.className='v76-secondary-grid';
+  secondary.appendChild(report.details);
+  secondary.appendChild(assets.details);
+  const pricingLink=document.querySelector('[data-report-pricing-link="v116"]');
+  if(pricingLink) secondary.appendChild(pricingLink);
+
+  const stack=document.createElement('div');
+  stack.className='v76-domain-stack';
+  if(!accountManagementMoved) stack.appendChild(accounts.section);
+  stack.appendChild(inventory.section);
+  stack.appendChild(secondary);
+
+  capitalHero.insertAdjacentElement('afterend',stack);
+
+  // Remove only the now-empty layout wrapper. No form or data node is deleted.
+  if(!capitalMini.children.length) capitalMini.remove();
+});
+</script>
+{% endblock %}

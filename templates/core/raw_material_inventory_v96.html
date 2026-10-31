@@ -1,0 +1,88 @@
+{% extends 'base.html' %}{% load jalali %}
+{% block title %}مواد اولیه | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.rm-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}.rm-kpi{border:1px solid rgba(255,255,255,.11);border-radius:14px;background:rgba(255,255,255,.035);padding:13px 14px}.rm-kpi span{display:block;color:#9fb0c4;font-size:.72rem}.rm-kpi strong{display:block;margin-top:3px;font-size:1.12rem}.rm-panel{border:1px solid rgba(255,255,255,.11);border-radius:18px;background:linear-gradient(145deg,rgba(25,53,82,.34),rgba(6,21,37,.22));overflow:hidden;margin-bottom:18px}.rm-panel-head{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:12px}.rm-panel-head h2{margin:0}.rm-panel-body{padding:16px}.rm-form-grid{display:grid;grid-template-columns:1.1fr .75fr .7fr .8fr 1fr 145px;gap:9px;align-items:end}.rm-elastic-grid{display:grid;grid-template-columns:1.05fr repeat(4,.72fr) 150px;gap:9px;align-items:end}.rm-transfer-grid{display:grid;grid-template-columns:1fr .7fr .7fr 150px;gap:9px;align-items:end}.rm-form-grid label,.rm-elastic-grid label,.rm-transfer-grid label,.rm-edit-grid label{font-size:.72rem;color:#aebdcd;margin-bottom:5px}.rm-location-grid{display:grid;grid-template-columns:1fr;gap:14px}.rm-location{border:1px solid rgba(255,255,255,.09);border-radius:14px;overflow:hidden}.rm-location-title{padding:12px 14px;background:rgba(255,255,255,.035);display:flex;justify-content:space-between;gap:10px;align-items:center}.rm-table{min-width:760px}.rm-table td,.rm-table th{vertical-align:middle}.rm-lots{margin:0}.rm-lots>summary{cursor:pointer;color:#ffad72;font-size:.78rem;font-weight:800;white-space:nowrap}.rm-lot{border-top:1px solid rgba(255,255,255,.08);padding:12px 0}.rm-lot:first-child{margin-top:9px}.rm-lot-meta{display:grid;grid-template-columns:.6fr .7fr 1fr;gap:8px;margin-bottom:8px}.rm-edit-grid{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr)) auto;gap:8px;align-items:end}.rm-transfer-one{display:grid;grid-template-columns:minmax(140px,.8fr) auto;gap:8px;align-items:end;margin-bottom:8px}.rm-note{font-size:.72rem;color:#8fa2b7}.rm-empty{padding:20px;color:#8fa2b7;text-align:center}.rm-elastic-table{min-width:800px}.rm-elastic-actions{display:grid;gap:8px;min-width:420px}.rm-elastic-edit{display:grid;grid-template-columns:repeat(4,minmax(95px,1fr)) auto;gap:7px;align-items:end}@media(max-width:900px){.rm-form-grid,.rm-elastic-grid,.rm-transfer-grid{grid-template-columns:1fr 1fr}.rm-form-grid button,.rm-elastic-grid button,.rm-transfer-grid button{grid-column:1/-1}.rm-edit-grid,.rm-elastic-edit{grid-template-columns:1fr 1fr}.rm-edit-grid button,.rm-elastic-edit button{grid-column:1/-1}}@media(max-width:575.98px){.rm-kpis{grid-template-columns:1fr}.rm-panel-body{padding:11px}.rm-form-grid,.rm-elastic-grid,.rm-transfer-grid,.rm-edit-grid,.rm-elastic-edit,.rm-transfer-one{grid-template-columns:1fr}.rm-form-grid button,.rm-elastic-grid button,.rm-transfer-grid button,.rm-edit-grid button,.rm-elastic-edit button{grid-column:auto}.rm-lot-meta{grid-template-columns:1fr}.rm-elastic-actions{min-width:260px}}
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head">
+  <div><div class="text-secondary">مرکز موجودی</div><h1 class="page-title mb-0">مواد اولیه</h1></div>
+  <div class="mobile-page-actions"><a class="btn btn-outline-light" href="{% url 'inventory' %}">مرکز موجودی</a><a class="btn btn-outline-light" href="{% url 'material_report' %}">گزارش مواد اولیه</a></div>
+</div>
+
+<div class="rm-kpis">
+  <div class="rm-kpi"><span>کل مواد اولیه</span><strong class="money">{{ materials_total|groupnum }} تومان</strong></div>
+  <div class="rm-kpi"><span>پارچه</span><strong class="money">{{ fabric_total|groupnum }} تومان</strong></div>
+  <div class="rm-kpi"><span>کش</span><strong class="money">{{ elastic_total|groupnum }} تومان</strong></div>
+</div>
+
+<section class="rm-panel">
+  <div class="rm-panel-head"><div><div class="text-secondary small">پارچه</div><h2>موجودی پارچه</h2></div><strong class="money">{{ fabric_total|groupnum }} تومان</strong></div>
+  <div class="rm-panel-body">
+    <form method="post" action="{% url 'inventory_material_action' %}" class="rm-form-grid mb-4">
+      {% csrf_token %}<input type="hidden" name="action" value="fabric_add">
+      <div><label class="form-label">رنگ پارچه</label><select class="form-select" name="material_key" required><option value="">انتخاب رنگ</option>{% for key,label in material_colors %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="form-label">محل</label><select class="form-select" name="location"><option value="warehouse">انبار</option><option value="depot">دپو</option></select></div>
+      <div><label class="form-label">وزن</label><input class="form-control ltr" name="quantity" inputmode="decimal" placeholder="کیلو" required></div>
+      <div><label class="form-label">قیمت هر کیلو</label><input class="form-control money-input" name="unit_price" inputmode="numeric" required></div>
+      <div><label class="form-label">یادداشت</label><input class="form-control" name="note"></div>
+      <button class="btn btn-primary" type="submit">اضافه کردن</button>
+    </form>
+    <div class="rm-note mb-3">هر رنگ فقط یک ردیف تجمیعی نشان داده می‌شود. خریدهای جدا با قیمت‌های مختلف در جزئیات داخلی حفظ می‌شوند تا ارزش‌گذاری و سابقه خرید تغییر نکند.</div>
+
+    <div class="rm-location-grid">
+      {% for loc in fabric_locations_v96 %}
+      <div class="rm-location">
+        <div class="rm-location-title"><strong>{{ loc.title }}</strong><span class="money">{{ loc.total|groupnum }} تومان</span></div>
+        <div class="table-responsive"><table class="table table-vcenter rm-table mb-0"><thead><tr><th>رنگ</th><th>وزن کل</th><th>میانگین قیمت</th><th>ارزش</th><th>جزئیات</th></tr></thead><tbody>
+        {% for group in loc.groups %}
+          <tr>
+            <td class="fw-bold">{{ group.title }}</td>
+            <td>{{ group.quantity }} {{ group.unit }}</td>
+            <td class="money">{{ group.unit_price|groupnum }}</td>
+            <td class="money">{{ group.total_value|groupnum }}</td>
+            <td>
+              <details class="rm-lots"><summary>{{ group.row_count }} ردیف داخلی</summary><div>
+              {% for row in group.rows %}
+                <div class="rm-lot">
+                  <div class="rm-lot-meta"><span>وزن: <b>{{ row.quantity }}</b></span><span>قیمت: <b class="money">{{ row.unit_price|groupnum }}</b></span><span class="rm-note">{{ row.note|default:'-' }}</span></div>
+                  {% if loc.can_transfer %}
+                  <form method="post" action="{% url 'inventory_material_action' %}" class="rm-transfer-one">{% csrf_token %}<input type="hidden" name="action" value="fabric_transfer"><input type="hidden" name="source_id" value="{{ row.id }}"><div><label class="form-label">تحویل به خیاط</label><input class="form-control ltr" name="quantity" inputmode="decimal" placeholder="کیلو" required></div><button class="btn btn-outline-primary" type="submit">انتقال</button></form>
+                  {% endif %}
+                  <form method="post" action="{% url 'inventory_material_action' %}" class="rm-edit-grid">{% csrf_token %}<input type="hidden" name="action" value="fabric_update"><input type="hidden" name="id" value="{{ row.id }}"><div><label class="form-label">وزن</label><input class="form-control ltr" name="quantity" value="{{ row.quantity }}" inputmode="decimal"></div><div><label class="form-label">قیمت</label><input class="form-control money-input" name="unit_price" value="{{ row.unit_price }}" inputmode="numeric"></div><div><label class="form-label">یادداشت</label><input class="form-control" name="note" value="{{ row.note }}"></div><button class="btn btn-outline-success" type="submit">ذخیره</button></form>
+                  <form method="post" action="{% url 'inventory_material_action' %}" class="mt-2" onsubmit="return confirm('{{ loc.delete_warning|escapejs }}')">{% csrf_token %}<input type="hidden" name="action" value="fabric_delete"><input type="hidden" name="id" value="{{ row.id }}"><button class="btn btn-sm btn-outline-danger" type="submit">حذف ردیف</button></form>
+                </div>
+              {% endfor %}
+              </div></details>
+            </td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="rm-empty">موجودی ثبت نشده.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="rm-panel">
+  <div class="rm-panel-head"><div><div class="text-secondary small">کش</div><h2>موجودی کش</h2></div><strong class="money">{{ elastic_total|groupnum }} تومان</strong></div>
+  <div class="rm-panel-body">
+    <form method="post" action="{% url 'inventory_material_action' %}" class="rm-elastic-grid mb-3">{% csrf_token %}<input type="hidden" name="action" value="elastic_add"><div><label class="form-label">رنگ کش</label><select class="form-select" name="material_key" required><option value="">انتخاب رنگ</option>{% for key,label in material_colors %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div><div><label class="form-label">کیلو 16</label><input class="form-control ltr" name="qty16" inputmode="decimal"></div><div><label class="form-label">قیمت 16</label><input class="form-control money-input" name="price16" inputmode="numeric"></div><div><label class="form-label">کیلو 25</label><input class="form-control ltr" name="qty25" inputmode="decimal"></div><div><label class="form-label">قیمت 25</label><input class="form-control money-input" name="price25" inputmode="numeric"></div><button class="btn btn-primary" type="submit">اضافه کردن</button></form>
+    <form method="post" action="{% url 'inventory_material_action' %}" class="rm-transfer-grid mb-4">{% csrf_token %}<input type="hidden" name="action" value="elastic_transfer"><div><label class="form-label">تحویل کش به خیاط</label><select class="form-select" name="material_key" required><option value="">انتخاب رنگ</option>{% for key,label in material_colors %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div><div><label class="form-label">کیلو 16</label><input class="form-control ltr" name="qty16" inputmode="decimal"></div><div><label class="form-label">کیلو 25</label><input class="form-control ltr" name="qty25" inputmode="decimal"></div><button class="btn btn-outline-primary" type="submit">انتقال</button></form>
+
+    <div class="rm-location-grid">
+      {% for loc in elastic_locations_v96 %}
+      <div class="rm-location">
+        <div class="rm-location-title"><strong>{{ loc.title }}</strong><span class="money">{{ loc.total|groupnum }} تومان</span></div>
+        <div class="table-responsive"><table class="table table-vcenter rm-elastic-table mb-0"><thead><tr><th>رنگ</th><th>کیلو 16</th><th>قیمت 16</th><th>کیلو 25</th><th>قیمت 25</th><th>ارزش</th><th>عملیات</th></tr></thead><tbody>
+        {% for row in loc.groups %}
+          <tr><td class="fw-bold">{{ row.title }}</td><td>{{ row.q16 }}</td><td class="money">{{ row.p16|groupnum }}</td><td>{{ row.q25 }}</td><td class="money">{{ row.p25|groupnum }}</td><td class="money">{{ row.total|groupnum }}</td><td><details class="rm-lots"><summary>ویرایش</summary><div class="rm-elastic-actions mt-2"><form method="post" action="{% url 'inventory_material_action' %}" class="rm-elastic-edit">{% csrf_token %}<input type="hidden" name="action" value="elastic_update"><input type="hidden" name="location" value="{{ loc.key }}"><input type="hidden" name="material_key" value="{{ row.key }}"><div><label class="form-label">کیلو 16</label><input class="form-control ltr" name="qty16" value="{{ row.q16 }}"></div><div><label class="form-label">قیمت 16</label><input class="form-control money-input" name="price16" value="{{ row.p16 }}"></div><div><label class="form-label">کیلو 25</label><input class="form-control ltr" name="qty25" value="{{ row.q25 }}"></div><div><label class="form-label">قیمت 25</label><input class="form-control money-input" name="price25" value="{{ row.p25 }}"></div><button class="btn btn-outline-success" type="submit">ذخیره</button></form><form method="post" action="{% url 'inventory_material_action' %}" onsubmit="return confirm('{{ loc.delete_warning|escapejs }}')">{% csrf_token %}<input type="hidden" name="action" value="elastic_delete"><input type="hidden" name="location" value="{{ loc.key }}"><input type="hidden" name="material_key" value="{{ row.key }}"><button class="btn btn-sm btn-outline-danger" type="submit">حذف</button></form></div></details></td></tr>
+        {% empty %}<tr><td colspan="7" class="rm-empty">موجودی ثبت نشده.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

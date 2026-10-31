@@ -1,0 +1,207 @@
+{% extends 'base.html' %}{% load jalali static %}
+{% block title %}گزارش مواد اولیه | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<div id="materialReportConfig" data-wage-rate="{{ sewing_wage_rate }}"></div>
+
+<style>
+.delivery-destination-dialog{border:1px solid rgba(255,255,255,.18);border-radius:18px;background:#142437;color:#f8fafc;padding:0;width:min(420px,calc(100vw - 32px));box-shadow:0 24px 75px rgba(0,0,0,.45)}.delivery-destination-dialog::backdrop{background:rgba(1,8,18,.76);backdrop-filter:blur(3px)}.delivery-choice-body{padding:22px}.delivery-choice-body h3{font-size:1.14rem;margin:0 0 7px;font-weight:850}.delivery-choice-body p{font-size:.84rem;color:#b6c9db;line-height:1.8;margin:0 0 14px}.delivery-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.delivery-choice-grid .btn{min-height:52px;font-weight:800}.delivery-choice-cancel{margin-top:10px;width:100%}.material-page-tools{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.material-search{min-width:260px;max-width:420px}.material-block{border:1px solid rgba(255,255,255,.10);border-radius:15px;background:rgba(255,255,255,.018);overflow:hidden}.material-block>summary{cursor:pointer;list-style:none;padding:13px 15px;display:flex;justify-content:space-between;align-items:center;gap:12px}.material-block>summary::-webkit-details-marker{display:none}.material-block>summary:hover{background:rgba(255,255,255,.025)}.material-date{color:#97a9bb;font-size:.8rem;margin-right:8px}.material-summary-main{flex:1 1 auto;min-width:0}.material-summary-main>strong{font-size:1rem}.summary-pills{display:grid;grid-template-columns:minmax(120px,1fr) minmax(220px,1.65fr) minmax(170px,1.25fr) minmax(150px,1fr) minmax(170px,1.1fr);gap:7px;margin-top:7px;align-items:stretch;width:100%}.apply-state{display:flex;align-items:center;justify-content:center;min-width:0;width:100%;min-height:34px;border-radius:10px;padding:5px 9px;font-size:.76rem;font-weight:700;line-height:1.25;text-align:center;border:1px solid rgba(255,255,255,.11);overflow:hidden}.apply-state .summary-main-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.apply-state .summary-sub-line{display:block;margin-top:2px;font-size:.66rem;font-weight:600;opacity:.86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.summary-output-box{display:block}.summary-output-box .summary-main-line{display:block}.apply-state.applied{color:#8ff0be;background:rgba(18,183,106,.10);border-color:rgba(18,183,106,.25)}.apply-state.pending{color:#ffd09b;background:rgba(251,101,20,.08);border-color:rgba(251,101,20,.22)}.apply-state.reduction{color:#ff9b9b;background:rgba(255,73,73,.08);border-color:rgba(255,73,73,.25)}.brand-pill{color:#d8eaff;background:rgba(73,132,255,.10);border-color:rgba(73,132,255,.28)}.material-toggle{color:#95a7ba;font-size:.72rem;white-space:nowrap}.material-card{border:0!important;border-top:1px solid rgba(255,255,255,.08)!important;border-radius:0!important}.material-stock-note{border:1px solid rgba(18,183,106,.20);background:rgba(18,183,106,.055);border-radius:14px;padding:11px 13px;color:#b7f3d2;margin-bottom:14px}.material-stock-note small{display:block;color:#91bda7;margin-top:3px}.material-head-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr 1fr;gap:10px;margin-bottom:16px}.live-cost-box{border:1px solid rgba(251,101,20,.25);background:rgba(251,101,20,.075);border-radius:12px;padding:9px 11px}.live-cost-box span{display:block;color:#b9c6d3;font-size:.69rem}.live-cost-box strong{display:block;color:#ffd2b6;font-size:1.08rem;margin-top:2px}.model-add-bar{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:10px 0}.model-add-bar .form-select{min-width:230px}.material-grid th,.material-grid td{padding:7px 8px!important;vertical-align:middle}.material-grid .sticky-col{min-width:140px}.material-grid .grid-input,.material-grid .form-select{min-width:112px}.material-grid .select-cell{min-width:155px}.auto-field{background:rgba(18,183,106,.07)!important;border-color:rgba(18,183,106,.20)!important}.cost-note{font-size:.74rem;color:#9eafc0;margin-top:7px}.section-action{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:11px;padding:11px;border:1px solid rgba(255,255,255,.09);border-radius:12px;background:rgba(255,255,255,.022)}.section-action p{margin:0;color:#9fb0c1;font-size:.75rem;max-width:760px}.output-status{font-size:.68rem;color:#aebdcd;display:block;margin-top:4px}.output-status b{color:#8ff0be}.output-status .reduce{color:#ff9999}.cut-cell{font-weight:700;text-align:center;color:#dce8f5;background:rgba(255,255,255,.025)!important}.diff-cell{font-weight:800;text-align:center;white-space:nowrap}.diff-cell.shortage{color:#ff8f8f;background:rgba(255,70,70,.075)!important}.diff-cell.surplus{color:#78e9ad;background:rgba(18,183,106,.075)!important}.diff-cell.exact{color:#aebdcd}.delivery-total-box{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:9px;padding:10px 13px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.025);font-size:.84rem}.delivery-total-box b{font-size:1rem;color:#f2f7fc}.output-grid .delivery-cell{min-width:112px}.delivery-split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;width:100%;min-width:0}.delivery-split .grid-input{min-width:0!important;width:100%!important;padding:7px 2px!important;font-size:.78rem!important}.delivery-split .grid-input::placeholder{color:#60758b}.material-color-apply-panel{margin-top:10px;padding:12px;border:1px solid rgba(251,160,61,.22);border-radius:12px;background:rgba(251,160,61,.04)}.material-color-apply-buttons{display:flex;flex-wrap:wrap;gap:7px}.material-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.empty-filtered{display:none}
+@media(max-width:1200px){.summary-pills{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:991.98px){.material-head-grid{grid-template-columns:1fr 1fr}.material-search{max-width:none;flex:1 1 100%}.summary-pills{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:575.98px){.material-head-grid{grid-template-columns:1fr}.material-create-form .card-body{display:grid!important;grid-template-columns:1fr!important}.material-create-form .card-body>div,.material-create-form .btn{width:100%}.material-grid .grid-input,.material-grid .form-select{font-size:16px!important}.section-action{display:grid;grid-template-columns:1fr}.section-action .btn{width:100%}.material-actions{display:grid;grid-template-columns:1fr}.material-actions .btn{width:100%}.delivery-total-box{justify-content:space-between}}
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3 mobile-page-head">
+  <div>
+    <div class="page-kicker">گزارش تولید و مواد اولیه</div>
+    <h1 class="page-title mb-1">گزارش مواد اولیه</h1>
+    <div class="page-muted">پنج مدل پایه همیشه حاضرند؛ مدل‌های دیگر را فقط وقتی لازم داری به همان صورت اضافه کن.</div>
+  </div>
+  <form method="post" class="card compact-form material-create-form">{% csrf_token %}
+    <div class="card-body d-flex flex-wrap gap-2 align-items-end">
+      <div><label class="filter-label">تاریخ</label><input class="form-control ltr" name="date" value="{{ today_j }}" required></div>
+      <div><label class="filter-label">عنوان اختیاری</label><input class="form-control" name="title" placeholder="مثلاً بچ B7 تا K1"></div>
+      <div><label class="filter-label">برند</label><select class="form-select" name="brand" required>{% for b in brands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+      <button class="btn btn-primary px-4">+ صورت جدید</button>
+    </div>
+  </form>
+</div>
+
+<div class="material-stock-note">
+  <strong>قیمت تمام‌شده زنده است.</strong>
+  <small>هر بار صفحه باز یا صورت ذخیره می‌شود، فی پارچه و کش از موجودی فعلی «نزد خیاط» خوانده می‌شود. تغییر دستی فی مواد اولیه، قیمت تمام‌شده این صفحه را هم به‌روز می‌کند.</small>
+</div>
+
+<div class="material-page-tools mb-3">
+  <div class="material-search">
+    <label class="filter-label">جستجو در صورت‌ها</label>
+    <input class="form-control" id="materialBlockSearch" placeholder="عنوان، کد پارچه، مدل یا تاریخ...">
+  </div>
+</div>
+
+{% for block in blocks %}
+<details class="material-block mb-3" id="block-{{ block.obj.id }}" data-search="{{ block.obj.title }} {{ block.jalali_date }} {{ block.used_model_labels|join:' ' }} {{ block.fabric_codes|join:' ' }}">
+  <summary>
+    <div class="material-summary-main">
+      <strong>{{ block.obj.title|default:'صورت مواد اولیه' }}</strong>
+      <span class="material-date">{{ block.jalali_date }}</span>
+      <div class="summary-pills" data-summary-box-grid="v110">
+        <span class="apply-state brand-pill summary-brand-box"><span class="summary-main-line">{{ block.obj.brand.name }} → {{ block.destination_label }}</span></span>
+        <span class="apply-state summary-models-box"><span class="summary-main-line">{% if block.used_model_labels %}مدل‌ها: {{ block.used_model_labels|join:'، ' }}{% else %}مدل‌ها: —{% endif %}</span></span>
+        <span class="apply-state summary-codes-box"><span class="summary-main-line">{% if block.fabric_codes %}کد پارچه: {{ block.fabric_codes|join:'، ' }}{% else %}کد پارچه: —{% endif %}</span></span>
+        {% if block.materials_applied %}
+        <span class="apply-state applied summary-material-box"><span class="summary-main-line">{% if block.materials_all_applied %}مواد اعمال‌شده{% else %}مواد بعضی رنگ‌ها اعمال شده{% endif %}</span></span>
+        {% else %}
+        <span class="apply-state pending summary-material-box"><span class="summary-main-line">مواد هنوز اعمال نشده</span></span>
+        {% endif %}
+        <span class="apply-state applied summary-output-box">
+          <span class="summary-main-line">تحویل اعمال‌شده: {{ block.output_applied|groupnum }}</span>
+          {% if block.output_pending %}<span class="summary-sub-line">افزایش منتظر: {{ block.output_pending|groupnum }}</span>{% endif %}
+          {% if block.output_reduction %}<span class="summary-sub-line">کاهش منتظر: {{ block.output_reduction|groupnum }}</span>{% endif %}
+        </span>
+      </div>
+    </div>
+    <span class="material-toggle">باز / بسته</span>
+  </summary>
+
+  <div class="card material-card">
+    <form method="post" action="{% url 'material_block_save' block.obj.id %}" data-block-id="{{ block.obj.id }}">{% csrf_token %}
+      <input type="hidden" name="active_material_keys" value="{{ block.active_keys_csv }}">
+      <script type="application/json" class="material-cost-catalog">{{ block.cost_catalog_json|safe }}</script>
+      <div class="card-body">
+        <div class="material-head-grid">
+          <div><label class="form-label">تاریخ</label><input class="form-control ltr" name="date" value="{{ block.jalali_date }}" required></div>
+          <div><label class="form-label">عنوان</label><input class="form-control" name="title" value="{{ block.obj.title }}"></div>
+          <div><label class="form-label">برند</label><select class="form-select" name="brand" required>{% for b in brands %}<option value="{{ b.id }}" {% if b.id == block.obj.brand.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></div>
+          <div class="live-cost-box"><span>میانگین قیمت تمام‌شده بر اساس برش</span><strong><span class="live-average-cost">{{ block.average_cost|groupnum }}</span> تومان</strong></div>
+        </div>
+
+        <div class="excel-subtitle">۱) پارچه، کش و صورت برش</div>
+        <div class="mobile-scroll-note">مدل‌های پایه: مشکی، سفید، سرمه‌ای، صورتی و کرم. هر مدل اضافه‌شده در همین صورت، پایین در «محصول تحویلی» هم خودکار ظاهر می‌شود.</div>
+
+        {% if block.add_model_choices %}
+        <div class="model-add-bar">
+          <div>
+            <label class="form-label">افزودن رنگ / مدل بعد از مدل‌های فعلی</label>
+            <select class="form-select" name="add_material_key">
+              <option value="">انتخاب مدل...</option>
+              {% for key,label in block.add_model_choices %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-outline-light" type="submit" formaction="{% url 'material_block_add_model' block.obj.id %}">＋ افزودن به این صورت</button>
+        </div>
+        {% endif %}
+
+        <div class="table-responsive excel-scroll">
+          <table class="table table-bordered table-vcenter material-grid input-grid">
+            <thead><tr><th class="sticky-col">فیلد</th>{% for model in block.model_headers %}<th data-material-key="{{ model.key }}">{{ model.label }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for row in block.input_rows %}
+              <tr data-field-key="{{ row.field_key }}">
+                <th class="sticky-col">{{ row.label }}</th>
+                {% for cell in row.cells %}
+                <td class="{% if cell.type == 'elastic16' or cell.type == 'elastic25' %}select-cell{% endif %}">
+                  {% if cell.type == 'elastic16' or cell.type == 'elastic25' %}
+                    <select class="form-select material-source-select" name="{{ cell.name }}" data-material-key="{{ cell.material_key }}" data-source-type="{{ cell.type }}">
+                      <option value="">انتخاب...</option>
+                      {% for choice_key,choice_label in cell.choices %}
+                        <option value="{{ choice_key }}" {% if cell.value == choice_key %}selected{% endif %}>{{ choice_label }}</option>
+                      {% endfor %}
+                    </select>
+                  {% else %}
+                    <input
+                      class="grid-input {% if cell.type != 'text' %}ltr{% endif %}{% if cell.type == 'money' %} money-input{% endif %}{% if cell.readonly %} auto-field{% endif %}"
+                      name="{{ cell.name }}"
+                      value="{{ cell.value }}"
+                      data-material-key="{{ cell.material_key }}"
+                      data-field-type="{{ row.field_key }}"
+                      {% if cell.readonly %}readonly{% elif cell.type == 'money' %}inputmode="numeric"{% elif cell.type == 'decimal' or cell.type == 'number' %}inputmode="decimal"{% endif %}
+                    >
+                  {% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="cost-note">فی پارچه و کش از موجودی فعلی نزد خیاط می‌آید. اگر فردا فی را در گزارش جامع اصلاح کنی، با باز کردن این صفحه قیمت تمام‌شده دوباره با فی جدید محاسبه می‌شود.</div>
+
+        <div class="material-color-apply-panel">
+          <div class="text-secondary compact-help mb-2">اعمال جداگانه مواد هر رنگ — پارچه و سهم کش همان رنگ از موجودی نزد خیاط کم می‌شود؛ بقیه رنگ‌ها منتظر می‌مانند.</div>
+          <div class="material-color-apply-buttons">
+            {% for model in block.model_headers %}
+              <button type="submit" class="btn btn-outline-warning btn-sm" name="material_color_key" value="{{ model.key }}" formaction="{% url 'material_block_apply_color' block.obj.id %}" onclick="return confirm('فقط پارچه و کش رنگ {{ model.label|escapejs }} اعمال شود؟')">اعمال فقط {{ model.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="section-action">
+          <div><strong>اعمال مصرف مواد</strong><p>پارچه هر مدل و کش 16/25 دقیقاً از رنگ/مدلی که در ردیف منبع کش انتخاب کرده‌ای، از موجودی نزد خیاط کم/همگام می‌شود. چند مدل می‌توانند از یک رنگ کش استفاده کنند و مصرف‌ها با هم جمع می‌شوند.</p></div>
+          <button class="btn btn-warning px-4" type="submit" formaction="{% url 'material_block_apply' block.obj.id %}" onclick="return confirm('مصرف پارچه و کش این صورت با موجودی نزد خیاط همگام شود؟')">اعمال مصرف مواد</button>
+        </div>
+
+        <div class="excel-subtitle mt-4">۲) محصول تحویلی از خیاط</div>
+        <div class="mobile-scroll-note">فقط مدل‌هایی که در جدول بالا فعال‌اند نمایش داده می‌شوند. برای Darma تمام صورت‌های قدیمی و جدید ستون 4XL را هم دارند.</div>
+        <div class="table-responsive excel-scroll">
+          <table class="table table-bordered table-vcenter material-grid output-grid">
+            <thead><tr><th class="sticky-col">مدل / رنگ</th>{% for key,label in block.output_sizes %}<th>{{ label }}</th>{% endfor %}<th>مجموع</th><th>برش</th><th>کسری / مازاد</th></tr></thead>
+            <tbody>
+            {% for row in block.output_rows %}
+              <tr class="output-data-row" data-model-key="{{ row.model_key }}" data-cut-source="{{ row.cut_source }}">
+                <th class="sticky-col">{{ row.label }}<span class="output-status">اعمال‌شده: <b>{{ row.applied_total|groupnum }}</b>{% if row.pending_total %} · جدید: {{ row.pending_total|groupnum }}{% endif %}{% if row.reduction_total %} · <span class="reduce">کاهش لازم: {{ row.reduction_total|groupnum }}</span>{% endif %}</span></th>
+                {% for cell in row.cells %}<td class="delivery-cell"><div class="delivery-split">{% for part in cell.parts %}<input class="grid-input ltr" name="{{ part.name }}" value="{{ part.value }}" inputmode="numeric" aria-label="تحویل نوبت {{ part.index }}">{% endfor %}</div></td>{% endfor %}
+                <td class="num-center fw-bold output-row-total">{{ row.total|groupnum }}</td>
+                <td class="cut-cell output-cut-total">{{ row.cut_total|groupnum }}</td>
+                <td class="diff-cell output-row-diff {% if row.cut_diff < 0 %}shortage{% elif row.cut_diff > 0 %}surplus{% else %}exact{% endif %}" data-diff="{{ row.cut_diff }}">{% if row.cut_diff < 0 %}کسری {{ row.cut_diff_abs|groupnum }}{% elif row.cut_diff > 0 %}مازاد {{ row.cut_diff_abs|groupnum }}{% else %}۰{% endif %}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="delivery-total-box"><span>جمع کل کارهای تحویل‌گرفته‌شده</span><b class="output-grand-total">{{ block.output_entered|groupnum }}</b></div>
+
+        <div class="section-action">
+          <div><strong>همگام‌سازی تحویل ↔ موجودی</strong><p>افزایش و کاهش فقط روی موجودی همان برند و مزد خیاط اعمال می‌شود. مواد اولیه در این دکمه دست نمی‌خورند.</p></div>
+          <button class="btn btn-success px-4" type="button" onclick="document.getElementById('deliveryChoice{{ block.obj.id }}').showModal()">همگام‌سازی تحویل و موجودی</button>
+        </div>
+        <dialog class="delivery-destination-dialog" id="deliveryChoice{{ block.obj.id }}" aria-label="انتخاب انبار تحویل">
+          <div class="delivery-choice-body">
+            <h3>تحویل جدید به کدام انبار اضافه شود؟</h3>
+            <p>فقط اختلاف جدید تمام رنگ‌ها و سایزهای این صورت در انبار انتخابی ثبت می‌شود. تحویل‌های قبلی جابه‌جا یا دوباره ثبت نمی‌شوند و مزد خیاط خودکار محاسبه می‌شود.</p>
+            {% if block.obj.brand.name == 'دارما' %}
+            <div class="delivery-choice-grid">
+              <button class="btn btn-primary" type="submit" name="delivery_destination" value="home" formaction="{% url 'material_block_apply_output' block.obj.id %}">خانه</button>
+              <button class="btn btn-success" type="submit" name="delivery_destination" value="khorshid" formaction="{% url 'material_block_apply_output' block.obj.id %}">خورشید</button>
+            </div>
+            {% else %}
+            <button class="btn btn-success w-100" type="submit" name="delivery_destination" value="home" formaction="{% url 'material_block_apply_output' block.obj.id %}">افزودن به موجودی Novani (خانه)</button>
+            {% endif %}
+            <button class="btn btn-outline-light delivery-choice-cancel" type="button" onclick="document.getElementById('deliveryChoice{{ block.obj.id }}').close()">انصراف</button>
+          </div>
+        </dialog>
+
+        <div class="mt-4"><label class="form-label">یادداشت</label><textarea class="form-control" name="note" rows="2" placeholder="توضیحات این صورت...">{{ block.obj.note }}</textarea></div>
+        <div class="material-actions mt-3"><button class="btn btn-primary px-5" type="submit">فقط ذخیره این صورت</button></div>
+      </div>
+    </form>
+
+    <div class="card-footer d-flex justify-content-between align-items-center material-footer">
+      <span class="text-secondary">آخرین تغییر: {{ block.obj.updated_at|date:'Y-m-d H:i' }}</span>
+      <div class="d-flex gap-2 flex-wrap">
+        {% if block.materials_applied %}
+        <form method="post" action="{% url 'material_block_unapply' block.obj.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-warning" onclick="return confirm('فقط اثر مواد اولیه این صورت به موجودی خیاط برگردد؟ تحویل شورت‌ها دست نمی‌خورد.')">↶ برگرداندن فقط مواد</button></form>
+        {% endif %}
+        <form method="post" action="{% url 'material_block_delete' block.obj.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" onclick="return confirm('اگر این صورت اثر اعمال‌شده داشته باشد حذف متوقف می‌شود. ادامه؟')">× حذف صورت</button></form>
+      </div>
+    </div>
+  </div>
+</details>
+{% empty %}
+<div class="card"><div class="empty-state"><h3>هنوز صورت مواد اولیه‌ای ثبت نشده</h3><div>از فرم بالا اولین صورت را بساز.</div></div></div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'core/jalali_picker.js' %}"></script>
+<script src="{% static 'core/number_format.js' %}"></script>
+<script src="{% static 'core/material_report_v6.js' %}"></script>
+{% endblock %}

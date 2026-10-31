@@ -1,0 +1,219 @@
+{% extends 'base.html' %}{% load static jalali %}
+{% block title %}محاسبه‌گر فروش | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.calc104-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px}
+.calc104-card{overflow:hidden}.calc113-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}.calc113-inputs label{font-size:.77rem}.calc113-inputs .form-control{min-width:0}.calc113-kpi{border:1px solid rgba(18,183,106,.3);background:rgba(18,183,106,.055);border-radius:12px;padding:13px;margin-top:14px}.calc113-kpi strong{font-size:1.5rem;display:block}.calc113-breakdown{display:grid;grid-template-columns:1fr;gap:7px;margin-top:11px}.calc113-breakdown>div{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px;font-size:.8rem}.calc113-breakdown b{white-space:nowrap}.calc113-help{font-size:.75rem;color:#9fb0c4;margin-top:10px;line-height:1.8}
+.calc104-card .card-header{align-items:flex-start}
+.calc104-card .card-body{padding:20px}
+.calc104-form-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.calc104-result-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.calc104-result-grid .summary-cell{min-width:0}
+.calc104-result-grid .summary-cell strong{display:block;font-size:1.2rem;margin-top:5px}
+.calc104-result-grid .summary-cell small{display:block;color:#8fa2b7;font-size:.7rem;margin-top:5px}
+.calc104-result-grid .primary-result{border-color:rgba(18,183,106,.30);background:rgba(18,183,106,.055)}
+.calc104-formula{margin-top:12px;color:#9fb0c4;font-size:.76rem;line-height:1.8}
+.calc105-table{width:100%;min-width:980px;table-layout:fixed}
+.calc105-table th,.calc105-table td{vertical-align:middle;text-align:center!important;white-space:nowrap}
+.calc105-table th:first-child,.calc105-table td:first-child{width:130px}
+.calc105-table th:nth-child(2),.calc105-table td:nth-child(2){width:95px}
+.calc105-money{direction:ltr!important;unicode-bidi:isolate!important;text-align:center!important;font-variant-numeric:tabular-nums}
+.calc105-code-toggle{border:0;background:transparent;color:#ffd08a;font-weight:900;padding:4px 8px;border-radius:8px;cursor:pointer}
+.calc105-code-toggle:hover{background:rgba(255,255,255,.06)}
+.calc105-detail-row>td{padding:0!important;background:rgba(255,255,255,.018)!important}
+.calc105-detail-wrap{padding:12px}
+.calc105-detail-table{width:100%;min-width:860px}
+.calc105-detail-table th,.calc105-detail-table td{text-align:center!important;white-space:nowrap}
+.calc105-detail-table thead th{font-size:.72rem;color:#aebdcd}
+.calc105-summary-row{cursor:default}
+.calc105-summary-row:hover td{background:rgba(255,255,255,.035)!important}
+.calc105-profit{font-weight:900}
+.calc104-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.calc104-count{font-size:.72rem;color:#9fb0c4}
+.calc104-note{border:1px solid rgba(255,255,255,.09);border-radius:12px;background:rgba(255,255,255,.025);padding:10px 12px;color:#9fb0c4;font-size:.76rem;line-height:1.8}
+@media(max-width:1100px){.calc104-tools{grid-template-columns:1fr}.calc104-result-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:767.98px){.calc104-form-grid{grid-template-columns:1fr}.calc104-form-grid .btn{width:100%}.calc104-card .card-body{padding:14px}}
+@media(max-width:575.98px){.calc104-result-grid{grid-template-columns:1fr 1fr;gap:8px}.calc104-result-grid .summary-cell strong{font-size:1.05rem}}
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head">
+  <div>
+    <div class="page-kicker">قیمت و سود</div>
+    <h1 class="page-title mb-1">محاسبه‌گر</h1>
+    <div class="page-muted">محاسبه قیمت فروش، سود خالص و بهای تولید هر عدد کالا؛ به‌همراه خلاصه سوددهی دارما و تکوین.</div>
+  </div>
+  <a class="btn btn-outline-light" href="{% url 'finance' %}">مالی و ابزار</a>
+</div>
+
+<div class="calc104-tools">
+  <div class="card glass-strong calc104-card" data-calculator-box="target">
+    <div class="card-header"><div><h3 class="card-title mb-1">محاسبه قیمت فروش از حاشیه سود هدف</h3><div class="text-secondary small">درصد واردشده نسبت به خود قیمت فروش سنجیده می‌شود: سود خالص ÷ قیمت فروش.</div></div></div>
+    <div class="card-body">
+      <form hx-get="{% url 'calculator_target_quote' %}" hx-target="#targetCalcResult" hx-trigger="input changed delay:250ms" hx-swap="innerHTML" class="calc104-form-grid">
+        <div><label class="form-label">قیمت تمام‌شده کالا</label><div class="input-group"><input class="form-control money-input" name="cost" inputmode="numeric" placeholder="مثلاً 210٬000"><span class="input-group-text">تومان</span></div></div>
+        <div><label class="form-label">حاشیه سود هدف از قیمت فروش</label><div class="input-group"><input class="form-control ltr" name="target_profit_percent" inputmode="decimal" placeholder="مثلاً 15"><span class="input-group-text">٪</span></div></div>
+        <button class="btn btn-primary" type="submit">محاسبه قیمت</button>
+      </form>
+      <div id="targetCalcResult" class="mt-4"><div class="empty-state py-4">قیمت تمام‌شده و حاشیه سود هدفت را وارد کن.</div></div>
+    </div>
+  </div>
+
+  <div class="card glass-strong calc104-card" data-calculator-box="profit">
+    <div class="card-header"><div><h3 class="card-title mb-1">محاسبه سود از قیمت فروش</h3><div class="text-secondary small">قیمت فروش و قیمت تمام‌شده را بده تا سود خالص، حاشیه سود فروش و سود نسبت به هزینه مشخص شود.</div></div></div>
+    <div class="card-body">
+      <form hx-get="{% url 'calculator_quote' %}" hx-target="#calcResult" hx-trigger="input changed delay:250ms" hx-swap="innerHTML" class="calc104-form-grid">
+        <div><label class="form-label">قیمت فروش</label><div class="input-group"><input class="form-control money-input" name="sale_price" inputmode="numeric" placeholder="مثلاً 380٬000"><span class="input-group-text">تومان</span></div></div>
+        <div><label class="form-label">قیمت تمام‌شده</label><div class="input-group"><input class="form-control money-input" name="cost" inputmode="numeric" placeholder="مثلاً 210٬000"><span class="input-group-text">تومان</span></div></div>
+        <button class="btn btn-primary" type="submit">محاسبه سود</button>
+      </form>
+      <div id="calcResult" class="mt-4"><div class="empty-state py-4">قیمت فروش و قیمت تمام‌شده را وارد کن.</div></div>
+    </div>
+  </div>
+  <div class="card glass-strong calc104-card" data-calculator-box="production-cost">
+    <div class="card-header"><div><h3 class="card-title mb-1">محاسبه قیمت تمام‌شده</h3><div class="text-secondary small">هزینه تولید یک عدد شورت از روی مصرف یک طاقه پارچه و کش و مزد هر جین.</div></div></div>
+    <div class="card-body">
+      <div class="calc113-inputs" id="productionCostInputs">
+        <div><label class="form-label" for="pcFabricPrice">قیمت هر کیلو پارچه</label><div class="input-group"><input id="pcFabricPrice" class="form-control" type="number" min="0" step="any" inputmode="decimal" placeholder="مثلاً ۲۵۰۰۰۰"><span class="input-group-text">تومان</span></div></div>
+        <div><label class="form-label" for="pcFabricWeight">وزن هر طاقه پارچه</label><div class="input-group"><input id="pcFabricWeight" class="form-control" type="number" min="0.001" step="any" inputmode="decimal" value="20"><span class="input-group-text">کیلو</span></div></div>
+        <div><label class="form-label" for="pcCutCount">تعداد برش هر طاقه</label><div class="input-group"><input id="pcCutCount" class="form-control" type="number" min="1" step="1" inputmode="numeric" value="750"><span class="input-group-text">عدد</span></div></div>
+        <div><label class="form-label" for="pcElasticWeight">کش مصرفی برای هر طاقه</label><div class="input-group"><input id="pcElasticWeight" class="form-control" type="number" min="0" step="any" inputmode="decimal" value="5"><span class="input-group-text">کیلو</span></div></div>
+        <div><label class="form-label" for="pcElasticPrice">قیمت هر کیلو کش</label><div class="input-group"><input id="pcElasticPrice" class="form-control" type="number" min="0" step="any" inputmode="decimal" placeholder="مثلاً ۱۵۰۰۰۰"><span class="input-group-text">تومان</span></div></div>
+        <div><label class="form-label" for="pcDozenWage">مزد دوخت هر جین (۱۲ عدد)</label><div class="input-group"><input id="pcDozenWage" class="form-control" type="number" min="0" step="any" inputmode="decimal" value="110000"><span class="input-group-text">تومان</span></div></div>
+      </div>
+      <div class="calc113-kpi" aria-live="polite"><div class="text-secondary small">قیمت تمام‌شده هر عدد کالا</div><strong id="pcUnitTotal">—</strong><div class="small text-secondary">تومان</div></div>
+      <div class="calc113-breakdown" aria-live="polite">
+        <div><span>سهم پارچه در هر عدد</span><b id="pcUnitFabric">—</b></div>
+        <div><span>سهم کش در هر عدد</span><b id="pcUnitElastic">—</b></div>
+        <div><span>مزد دوخت هر عدد</span><b id="pcUnitWage">—</b></div>
+        <div><span>هزینه کل یک طاقه (پارچه + کش + دوخت)</span><b id="pcRollTotal">—</b></div>
+      </div>
+      <div id="pcUnitError" class="text-warning small mt-2" role="status"></div>
+      <div class="calc113-help">فرمول: (وزن پارچه × قیمت هر کیلو پارچه + وزن کش × قیمت هر کیلو کش) ÷ تعداد برش + مزد هر جین ÷ ۱۲. این محاسبه فقط نمایشی است و قیمت واقعی کالا، موجودی، حسابداری یا قوانین تولید را تغییر نمی‌دهد.</div>
+    </div>
+  </div>
+</div>
+
+<div class="calc104-note mb-4">هر ردیف اصلی پایین یک کد است و مقادیرش میانگین ساده سایزهای فعال همان کد است. روی کد بزن تا ریز هر سایز باز شود. قیمت‌ها از قیمت فعال امروز، بهای تمام‌شده از منبع جاری و کارمزد از موتور واقعی دیجی‌کالا خوانده می‌شود.</div>
+
+{% for section in profitability_sections %}
+<div class="card mb-4" data-profitability-brand="{{ section.brand }}">
+  <div class="card-header calc104-section-head">
+    <div><h3 class="card-title mb-1">سوددهی جاری {{ section.brand }}</h3><div class="text-secondary small">خلاصه کدها؛ ریز سایزها فقط با کلیک باز می‌شود.</div></div>
+    <div class="calc104-count">{{ section.code_count|groupnum }} کد · {{ section.size_count|groupnum }} سایز فعال</div>
+  </div>
+  <div class="mobile-scroll-note">برای دیدن همه ستون‌ها جدول را بکش</div>
+  <div class="table-responsive">
+    <table class="table table-vcenter mb-0 calc105-table">
+      <thead>
+        <tr>
+          <th>کد</th>
+          <th>تعداد سایز</th>
+          <th>میانگین قیمت فروش</th>
+          <th>میانگین بهای تمام‌شده پک</th>
+          <th>میانگین کارمزد دیجی‌کالا</th>
+          <th>میانگین سود خالص</th>
+          <th>میانگین حاشیه سود / فروش</th>
+          <th>میانگین سود / بهای تمام‌شده</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for code in section.codes %}
+        <tr class="calc105-summary-row" data-profitability-product="{{ code.product_id }}">
+          <td><button type="button" class="calc105-code-toggle" data-target="profit-detail-{{ code.product_id }}">{{ code.code }} ▾</button></td>
+          <td class="num-center">{{ code.size_count|groupnum }}</td>
+          <td class="calc105-money">{{ code.avg_sale_price|groupnum }}</td>
+          <td class="calc105-money">{{ code.avg_finished_cost|groupnum }}</td>
+          <td class="calc105-money">{{ code.avg_fee|groupnum }}</td>
+          <td class="calc105-money calc105-profit {% if code.avg_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ code.avg_profit|groupnum }}</td>
+          <td class="num {% if code.avg_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ code.avg_margin_on_sale|pct1 }}٪</td>
+          <td class="num {% if code.avg_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ code.avg_profit_on_cost|pct1 }}٪</td>
+        </tr>
+        <tr id="profit-detail-{{ code.product_id }}" class="calc105-detail-row d-none">
+          <td colspan="8">
+            <div class="calc105-detail-wrap">
+              <div class="table-responsive">
+                <table class="table table-sm table-vcenter mb-0 calc105-detail-table">
+                  <thead>
+                    <tr>
+                      <th>سایز</th>
+                      <th>تعداد در پک</th>
+                      <th>قیمت فروش</th>
+                      <th>بهای تمام‌شده پک</th>
+                      <th>کارمزد دیجی‌کالا</th>
+                      <th>سود خالص</th>
+                      <th>حاشیه سود / فروش</th>
+                      <th>سود / بهای تمام‌شده</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  {% for row in code.sizes %}
+                    <tr data-profitability-ps="{{ row.ps_id }}">
+                      <td class="fw-bold">{{ row.size }}</td>
+                      <td class="num-center">{{ row.pack_qty|groupnum }}</td>
+                      <td class="calc105-money">{{ row.sale_price|groupnum }}</td>
+                      <td class="calc105-money">{{ row.finished_cost|groupnum }}</td>
+                      <td class="calc105-money">{{ row.fee|groupnum }}</td>
+                      <td class="calc105-money calc105-profit {% if row.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.profit|groupnum }}</td>
+                      <td class="num {% if row.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.margin_on_sale|pct1 }}٪</td>
+                      <td class="num {% if row.profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.profit_on_cost|pct1 }}٪</td>
+                    </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="empty-state">کد فعال قابل محاسبه‌ای برای {{ section.brand }} وجود ندارد.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+(function(){
+  const fields=['pcFabricPrice','pcFabricWeight','pcCutCount','pcElasticWeight','pcElasticPrice','pcDozenWage'];
+  const byId=id=>document.getElementById(id);
+  const money=value=>Math.round(value).toLocaleString('en-US');
+  function render(){
+    const values=fields.map(id=>byId(id).value.trim());
+    const out=['pcUnitTotal','pcUnitFabric','pcUnitElastic','pcUnitWage','pcRollTotal'];
+    const invalid=values.some((v,i)=>!v || !Number.isFinite(Number(v)) || Number(v)<0 || ((i===1||i===2)&&Number(v)<=0));
+    if(invalid){
+      out.forEach(id=>byId(id).textContent='—');
+      byId('pcUnitError').textContent='برای محاسبه، قیمت پارچه و کش را وارد کن؛ وزن طاقه و تعداد برش باید بیشتر از صفر باشند.';
+      return;
+    }
+    const [fabricPrice,fabricWeight,cutCount,elasticWeight,elasticPrice,dozenWage]=values.map(Number);
+    const fabricTotal=fabricPrice*fabricWeight;
+    const elasticTotal=elasticPrice*elasticWeight;
+    const wageUnit=dozenWage/12;
+    const rollCost=fabricTotal+elasticTotal+wageUnit*cutCount;
+    const results=[rollCost/cutCount,fabricTotal/cutCount,elasticTotal/cutCount,wageUnit,rollCost];
+    if(results.some(x=>!Number.isFinite(x))){
+      out.forEach(id=>byId(id).textContent='—');
+      byId('pcUnitError').textContent='اعداد واردشده خارج از محدوده محاسبه هستند.';
+      return;
+    }
+    out.forEach((id,i)=>byId(id).textContent=money(results[i]));
+    byId('pcUnitError').textContent='';
+  }
+  fields.forEach(id=>byId(id).addEventListener('input',render));
+  render();
+})();
+document.querySelectorAll('.calc105-code-toggle').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var row=document.getElementById(btn.dataset.target);
+    if(!row)return;
+    var opening=row.classList.contains('d-none');
+    row.classList.toggle('d-none');
+    var label=(btn.textContent||'').replace(/[▾▴]/g,'').trim();
+    btn.textContent=label+(opening?' ▴':' ▾');
+  });
+});
+</script>
+{% endblock %}

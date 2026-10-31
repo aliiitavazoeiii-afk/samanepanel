@@ -1,0 +1,21 @@
+{% load jalali %}
+{% if pricing_monitor %}
+<div class="card glass-card mt-4 mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div><h3 class="card-title mb-1">پایش قیمت‌گذاری دارما</h3><div class="text-secondary small">{{ pricing_monitor.as_of_j }} در برابر {{ pricing_monitor.previous_day_j }} · ۸ ردیف اول پرفروش‌های ماه قبل</div></div>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'pricing_monitor' %}">مشاهده گزارش کامل</a>
+  </div>
+  {% if pricing_monitor.is_partial_day %}<div class="px-3 pt-3 text-warning small">امروز در حال تکمیل است؛ اعداد خام نمایش داده می‌شوند و درصد روزانه تا پایان روز قضاوت نمی‌شود.</div>{% endif %}
+  <div class="table-responsive"><table class="table table-vcenter table-nowrap mb-0">
+    <thead><tr><th>کد / سایز</th><th>پک امروز</th><th>همان روز قبل</th><th>فروش امروز</th><th>فروش قبل</th><th>سود امروز</th><th>سود قبل</th><th>میانگین فی</th></tr></thead>
+    <tbody>{% for row in pricing_monitor.rows %}<tr>
+      <td><strong>{{ row.code }}</strong> · {{ row.size }} <span class="text-secondary">(پک {{ row.pack_qty }})</span></td>
+      <td>{{ row.current.packs|groupnum }}</td><td>{{ row.previous.packs|groupnum }}</td>
+      <td class="money">{{ row.current.gross|groupnum }}</td><td class="money">{{ row.previous.gross|groupnum }}</td>
+      <td class="money {% if row.current.profit >= row.previous.profit %}text-success{% else %}text-danger{% endif %}">{{ row.current.profit|groupnum }}</td>
+      <td class="money">{{ row.previous.profit|groupnum }}</td>
+      <td class="money">{{ row.current.avg_pack_price|groupnum }} <span class="text-secondary">/ {{ row.previous.avg_pack_price|groupnum }}</span></td>
+    </tr>{% empty %}<tr><td colspan="8" class="text-center text-secondary py-4">داده‌ای برای مقایسه پیدا نشد.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% endif %}

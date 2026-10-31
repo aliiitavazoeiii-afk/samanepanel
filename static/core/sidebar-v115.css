@@ -1,0 +1,16 @@
+/* V115: stable compact icon rail; no width/transform tween on full-page navigation. */
+@media(min-width:992px){
+ .erp-sidebar,.erp-main{transition:none!important}
+ body.sidebar-collapsed .erp-sidebar{width:72px!important;transform:none!important}
+ body.sidebar-collapsed .erp-main{margin-right:72px!important}
+ body:not(.sidebar-collapsed) .erp-sidebar{width:246px!important;transform:none!important}
+ body:not(.sidebar-collapsed) .erp-main{margin-right:246px!important}
+}
+.nav115-logout{padding:0 2px!important;margin:14px 0 0!important}
+.nav115-logout-btn{width:100%;min-height:46px;display:flex;justify-content:flex-start;align-items:center;gap:12px;padding:6px 10px;border-radius:12px;background:rgba(239,93,93,.08);border:1px solid rgba(239,93,93,.20);color:#ffd5d5;font:700 .86rem Vazirmatn,Tahoma,sans-serif;cursor:pointer;white-space:nowrap}
+.nav115-power{width:34px;height:34px;min-width:34px;border-radius:10px;display:grid;place-items:center;font:900 1.65rem Arial,sans-serif;color:#ffb2a7;line-height:1}
+.nav115-logout-label{white-space:nowrap}
+.nav115-logout-btn:hover{background:rgba(239,93,93,.18);color:#fff}
+@media(min-width:992px){body.sidebar-collapsed .nav115-logout-btn{justify-content:center;padding:5px}body.sidebar-collapsed .nav115-logout-label{display:none!important}}
+@media(max-width:991.98px){.nav115-logout{margin-bottom:15px!important}.nav115-logout-label{display:inline}}
+@media(prefers-reduced-motion:reduce){.erp-sidebar,.erp-main,.nav114-label{transition:none!important}}

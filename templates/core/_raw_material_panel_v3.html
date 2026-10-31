@@ -1,0 +1,53 @@
+{% load jalali %}
+<style>.raw-location-choices{grid-template-columns:repeat(3,minmax(150px,1fr))}@media(max-width:575.98px){.raw-location-choices{grid-template-columns:1fr 1fr}.raw-location-choices .raw-depot-choice{grid-column:1/-1}}</style>
+<div class="raw-materials-wrap mb-4" id="raw-materials">
+  <div class="raw-materials-head">
+    <div>
+      <div class="page-kicker">موجودی مواد اولیه</div>
+      <h2 class="mb-1">پارچه و کش</h2>
+      <div class="text-secondary small">اول نوع ماده را انتخاب کن، بعد محل موجودی. فقط همان بخش نمایش داده می‌شود.</div>
+    </div>
+    <div class="raw-materials-kpis">
+      <div class="raw-mini-kpi"><span>جمع پارچه</span><strong class="money">{{ fabric_total|groupnum }}</strong></div>
+      <div class="raw-mini-kpi"><span>جمع کش</span><strong class="money">{{ elastic_total|groupnum }}</strong></div>
+      <div class="raw-mini-kpi"><span>کل مواد اولیه</span><strong class="money text-success">{{ materials_total|groupnum }}</strong></div>
+    </div>
+  </div>
+
+  <div class="raw-picker-shell">
+    <div class="raw-picker-title">۱. نوع ماده اولیه</div>
+    <div class="raw-kind-picker">
+      <button type="button" class="raw-choice" data-raw-kind="fabric"><span class="raw-choice-icon">▰</span><strong>پارچه</strong><small>{{ fabric_total|groupnum }} تومان</small></button>
+      <button type="button" class="raw-choice" data-raw-kind="elastic"><span class="raw-choice-icon">≋</span><strong>کش</strong><small>{{ elastic_total|groupnum }} تومان</small></button>
+    </div>
+
+    <div class="raw-location-picker d-none" id="rawLocationPicker">
+      <div class="raw-picker-title mt-3">۲. محل موجودی</div>
+      <div class="raw-kind-picker raw-location-choices">
+        <button type="button" class="raw-choice raw-location-choice" data-raw-location="warehouse"><span class="raw-choice-icon">⌂</span><strong>انبار</strong><small>موجودی داخل انبار</small></button>
+        <button type="button" class="raw-choice raw-location-choice" data-raw-location="tailor"><span class="raw-choice-icon">✂</span><strong>نزد خیاط</strong><small>مواد تحویل‌شده برای تولید</small></button>
+        <button type="button" class="raw-choice raw-location-choice raw-depot-choice" data-raw-location="depot" data-fabric-only="1"><span class="raw-choice-icon">▣</span><strong>دپو</strong><small>پارچه ذخیره؛ خارج از گردش روزانه</small></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="raw-pane-wrap">
+    <div class="raw-pane d-none" data-pane="fabric-warehouse">
+      {% include 'core/_raw_fabric_table.html' with rows=fabric_warehouse mode='warehouse' panel_title='پارچه — انبار' panel_subtitle='هر طاق را با وزن و فی خودش ثبت کن.' section_total=fabric_warehouse_total transfer_sources=fabric_warehouse %}
+    </div>
+    <div class="raw-pane d-none" data-pane="fabric-tailor">
+      {% include 'core/_raw_fabric_tailor_grouped.html' with rows=fabric_tailor_groups panel_title='پارچه — نزد خیاط' panel_subtitle='هر رنگ/مدل یک ردیف ثابت دارد؛ جزئیات طاق‌های منبع جداگانه برای حسابرسی حفظ می‌شوند.' section_total=fabric_tailor_total transfer_sources=fabric_warehouse %}
+    </div>
+    <div class="raw-pane d-none" data-pane="fabric-depot">
+      {% include 'core/_raw_fabric_table.html' with rows=fabric_depot mode='depot' panel_title='پارچه — دپو' panel_subtitle='پارچه‌های ذخیره‌ای که وارد گردش تولید روزانه نمی‌شوند.' section_total=fabric_depot_total %}
+    </div>
+    <div class="raw-pane d-none" data-pane="elastic-warehouse">
+      {% include 'core/_raw_elastic_table.html' with rows=elastic_warehouse mode='warehouse' panel_title='کش — انبار' panel_subtitle='هر رنگ یک ردیف؛ کش 16 و 25 کنار هم.' section_total=elastic_warehouse_total %}
+    </div>
+    <div class="raw-pane d-none" data-pane="elastic-tailor">
+      {% include 'core/_raw_elastic_table.html' with rows=elastic_tailor mode='tailor' panel_title='کش — نزد خیاط' panel_subtitle='انتقال از انبار، همزمان موجودی انبار را کم می‌کند.' section_total=elastic_tailor_total %}
+    </div>
+  </div>
+
+  <div class="inventory-auto-note mx-3 mb-3">وقتی در «گزارش مواد اولیه» تحویل نهایی ثبت شود، مصرف پارچه و کش فقط از موجودی <strong>نزد خیاط</strong> کم می‌شود؛ دپو دست‌نخورده می‌ماند.</div>
+</div>

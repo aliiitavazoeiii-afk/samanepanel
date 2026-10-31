@@ -1,0 +1,101 @@
+{% load jalali %}
+<style>
+.raw-fabric-fixed-table{min-width:780px}
+.raw-fabric-source-details{margin:0}
+.raw-fabric-source-details>summary{cursor:pointer;list-style:none;white-space:nowrap}
+.raw-fabric-source-details>summary::-webkit-details-marker{display:none}
+.raw-fabric-source-box{margin-top:8px;padding:9px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.025);min-width:420px}
+.raw-fabric-source-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(100px,.8fr) minmax(160px,1.3fr) auto;gap:7px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.raw-fabric-source-row:last-child{border-bottom:0}
+.raw-fabric-source-edit{grid-column:1/-1;padding-top:6px}
+@media(max-width:767.98px){.raw-fabric-source-row{grid-template-columns:1fr 1fr}.raw-fabric-source-edit{grid-column:1/-1}}
+</style>
+<div class="raw-location-card">
+  <div class="raw-location-head">
+    <div>
+      <strong>{{ panel_title }}</strong>
+      <div class="text-secondary small">{{ panel_subtitle }}</div>
+    </div>
+    <div class="raw-location-total"><span>ارزش</span><strong class="money">{{ section_total|groupnum }}</strong><small>تومان</small></div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-vcenter raw-stock-table raw-fabric-fixed-table mb-0">
+      <thead>
+        <tr>
+          <th>رنگ / مدل پارچه</th>
+          <th>موجودی نزد خیاط</th>
+          <th>فی میانگین</th>
+          <th>ارزش کل</th>
+          <th>جزئیات منبع</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for group in rows %}
+        <tr>
+          <td class="fw-bold">{{ group.title }}</td>
+          <td class="num-center fw-bold">{{ group.quantity|qtynum }} کیلو</td>
+          <td class="money-center">{{ group.unit_price|groupnum }}</td>
+          <td class="money-center fw-bold">{{ group.total_value|groupnum }}</td>
+          <td>
+            <details class="raw-fabric-source-details">
+              <summary class="btn btn-sm btn-outline-light">جزئیات {{ group.row_count }} ردیف</summary>
+              <div class="raw-fabric-source-box">
+                {% for row in group.rows %}
+                <div class="raw-fabric-source-row">
+                  <div><span class="text-secondary small">وزن</span><div class="fw-bold">{{ row.quantity|qtynum }} کیلو</div></div>
+                  <div><span class="text-secondary small">فی</span><div class="money">{{ row.unit_price|groupnum }}</div></div>
+                  <div><span class="text-secondary small">منبع</span><div class="small">{{ row.note|default:'—' }}</div></div>
+                  <div>
+                    <form method="post" action="{% url 'manual_report_action' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="fabric_delete">
+                      <input type="hidden" name="id" value="{{ row.id }}">
+                      <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('این بخش از موجودی خیاط حذف و به انبار برگردد؟')">×</button>
+                    </form>
+                  </div>
+                  <div class="raw-fabric-source-edit">
+                    <form method="post" action="{% url 'manual_report_action' %}" class="d-flex flex-wrap gap-2 align-items-end">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="fabric_update">
+                      <input type="hidden" name="id" value="{{ row.id }}">
+                      <div><label class="form-label mb-1">وزن</label><input class="form-control form-control-sm" name="quantity" inputmode="decimal" value="{{ row.quantity|qtynum }}" required></div>
+                      <div><label class="form-label mb-1">فی</label><input class="form-control form-control-sm money-input" name="unit_price" inputmode="numeric" value="{{ row.unit_price }}"></div>
+                      <div class="flex-grow-1"><label class="form-label mb-1">توضیح</label><input class="form-control form-control-sm" name="note" value="{{ row.note }}"></div>
+                      <button class="btn btn-sm btn-primary" type="submit">ذخیره اصلاح</button>
+                    </form>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </details>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="empty-state py-4">هنوز پارچه‌ای نزد خیاط نیست.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="raw-add-row">
+    <form method="post" action="{% url 'manual_report_action' %}" class="raw-transfer-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="fabric_transfer">
+      <div>
+        <label class="form-label">طاق از انبار</label>
+        <select class="form-select" name="source_id" required>
+          <option value="">انتخاب طاق</option>
+          {% for src in transfer_sources %}
+            {% if src.quantity > 0 %}
+              <option value="{{ src.id }}">{{ src.title }} — {{ src.quantity|qtynum }} کیلو — فی {{ src.unit_price|groupnum }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div><label class="form-label">وزن تحویل به خیاط</label><input class="form-control" name="quantity" inputmode="decimal" placeholder="مثلاً 25.5" required></div>
+      <div class="raw-add-button"><button class="btn btn-primary w-100" type="submit">⇄ انتقال به خیاط</button></div>
+    </form>
+    <div class="text-secondary small mt-2">هر رنگ فقط یک ردیف اصلی نشان داده می‌شود. جزئیات بچ/طاق‌های منبع برای برگشت و حسابرسی حفظ شده‌اند.</div>
+  </div>
+</div>

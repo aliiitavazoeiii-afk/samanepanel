@@ -1,0 +1,110 @@
+{% extends 'base.html' %}{% load jalali %}{% block title %}موجودی آزاد دیجی‌کالا | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3 mobile-page-head">
+  <div>
+    <div class="page-kicker">انبار دیجی‌کالا · Read Only</div>
+    <h1 class="page-title mb-1">موجودی آزاد و فروش‌نرفته</h1>
+    <div class="page-muted">کالای سالم داخل انبار دیجی‌کالا که هنوز برای سفارش مصرف/رزرو نشده است.</div>
+  </div>
+  <div class="mobile-page-actions d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-light" href="{% url 'digikala_warehouse' %}?refresh=1">بروزرسانی موجودی</a>
+    <a class="btn btn-outline-light" href="{% url 'digikala' %}">مرکز دیجی‌کالا</a>
+    <a class="btn btn-primary" href="{% url 'dashboard' %}">داشبورد اصلی</a>
+  </div>
+</div>
+{% include 'core/_digikala_nav_v43.html' with dk_section='warehouse' %}
+
+{% if digikala_error %}<div class="alert alert-danger glass-card mb-4">{{ digikala_error }}</div>{% endif %}
+{% if warehouse.reserve_over_stock_total %}<div class="alert alert-warning glass-card mb-4">در بعضی Variantها رزرو لحظه‌ای از موجودی قابل‌فروش فعلی بیشتر است. برای موجودی آزاد، محاسبه به‌صورت ردیفی و حداقل صفر انجام شده؛ مجموع کسری لحظه‌ای: <strong class="num">{{ warehouse.reserve_over_stock_total|groupnum }}</strong>.</div>{% endif %}
+
+<div class="row g-2 g-md-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">آزاد قابل فروش</div><div class="kpi num mt-2 text-success">{{ warehouse.free_total|default:0|groupnum }}</div><div class="text-secondary small">هنوز فروش نرفته / رزرو نشده</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">موجودی سالم دیجی</div><div class="kpi num mt-2">{{ warehouse.sellable_total|default:0|groupnum }}</div><div class="text-secondary small">قبل از کسر رزروهای انبار</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">رزرو شده از موجودی دیجی</div><div class="kpi num mt-2 text-warning">{{ warehouse.reserved_total|default:0|groupnum }}</div><div class="text-secondary small">بخشی از موجودی فعلی که سفارش گرفته</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">تنوع دارای موجودی آزاد</div><div class="kpi num mt-2">{{ warehouse.free_variant_count|default:0|groupnum }}</div><div class="text-secondary small">از {{ warehouse.variant_count|default:0|groupnum }} Variant حاضر در انبار</div></div></div></div>
+</div>
+
+<div class="card glass-card mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <h3 class="card-title mb-1">ریز موجودی انبار دیجی‌کالا</h3>
+      <div class="text-secondary small">آزاد: {{ warehouse.free_variant_count|default:0|groupnum }} Variant · صفر آزاد/نیاز شارژ: {{ warehouse.zero_variant_count|default:0|groupnum }} Variant</div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="btn-group" role="group" aria-label="فیلتر موجودی">
+        <button type="button" class="btn btn-sm btn-primary dk-stock-filter active" data-filter="free">دارای موجودی آزاد</button>
+        <button type="button" class="btn btn-sm btn-outline-light dk-stock-filter" data-filter="zero">صفر آزاد</button>
+        <button type="button" class="btn btn-sm btn-outline-light dk-stock-filter" data-filter="all">همه</button>
+      </div>
+      <input id="dkWarehouseSearch" class="form-control" style="max-width:280px" type="search" placeholder="جستجو کد، مدل، سایز…">
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" id="dkWarehouseTable">
+        <thead><tr><th>کد / Variant</th><th>سایز</th><th>محصول</th><th class="text-center">موجودی سالم</th><th class="text-center">رزرو دیجی</th><th class="text-center">آزاد</th></tr></thead>
+        <tbody>
+          {% for row in warehouse.rows %}
+          <tr data-status="{{ row.status }}" data-search="{{ row.supplier_code }} {{ row.size }} {{ row.title }} {{ row.variant_id }}">
+            <td><strong class="ltr">{{ row.supplier_code }}</strong><small class="d-block text-secondary ltr">V{{ row.variant_id }}</small></td>
+            <td><span class="badge badge-soft-orange">{{ row.size }}</span></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                {% if row.product_image %}<img src="{{ row.product_image }}" alt="" loading="lazy" width="42" height="42" style="object-fit:cover;border-radius:10px">{% endif %}
+                <div>
+                  <div>{{ row.title }}</div>
+                  <div class="small text-secondary">تعهد ارسال من: <span class="num">{{ row.seller_commitment|groupnum }}</span>{% if row.reserve_over_stock %} · کسری رزرو لحظه‌ای: <span class="num text-warning">{{ row.reserve_over_stock|groupnum }}</span>{% endif %}</div>
+                  {% if row.product_link %}<a class="small" href="{{ row.product_link }}" target="_blank" rel="noopener">مشاهده در دیجی‌کالا</a>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="text-center"><span class="num fs-5">{{ row.sellable_stock|groupnum }}</span></td>
+            <td class="text-center"><span class="num fs-5 text-warning">{{ row.reserved_stock|groupnum }}</span></td>
+            <td class="text-center"><strong class="num fs-4 {% if row.free_stock %}text-success{% else %}text-danger{% endif %}">{{ row.free_stock|groupnum }}</strong>{% if not row.free_stock %}<small class="d-block text-danger">نیاز شارژ</small>{% endif %}</td>
+          </tr>
+          {% empty %}<tr><td colspan="6"><div class="empty-state py-5">موجودی قابل‌فروشی از API دریافت نشد.</div></td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card glass-card">
+  <div class="card-body text-secondary small">
+    این بخش فقط از API دیجی‌کالا می‌خواند. موجودی مرجوعی/Dead Stock در «آزاد قابل فروش» حساب نمی‌شود و هیچ SaleLine، موجودی داخلی، حساب دیجی‌کالا یا سرمایه‌ای تغییر نمی‌کند. داده‌ها ۶۰ ثانیه Cache می‌شوند؛ دکمه «بروزرسانی موجودی» Cache را نادیده می‌گیرد.
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script>
+(function(){
+  const input=document.getElementById('dkWarehouseSearch');
+  const table=document.getElementById('dkWarehouseTable');
+  const buttons=[...document.querySelectorAll('.dk-stock-filter')];
+  if(!table) return;
+  let filter='free';
+
+  function apply(){
+    const q=(input&&input.value||'').trim().toLowerCase();
+    table.querySelectorAll('tbody tr[data-status]').forEach(row=>{
+      const status=row.dataset.status||'';
+      const matchesFilter=filter==='all'||status===filter;
+      const matchesSearch=!q||String(row.dataset.search||'').toLowerCase().includes(q);
+      row.style.display=matchesFilter&&matchesSearch?'':'none';
+    });
+  }
+
+  buttons.forEach(btn=>btn.addEventListener('click',function(){
+    filter=this.dataset.filter||'free';
+    buttons.forEach(x=>{
+      x.classList.remove('active','btn-primary');
+      x.classList.add('btn-outline-light');
+    });
+    this.classList.add('active','btn-primary');
+    this.classList.remove('btn-outline-light');
+    apply();
+  }));
+
+  if(input) input.addEventListener('input',apply);
+  apply();
+})();
+</script>{% endblock %}

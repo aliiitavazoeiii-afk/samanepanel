@@ -1,0 +1,327 @@
+{% extends 'base.html' %}{% load static jalali %}
+{% block title %}فروش عمده نوانی | DARMA{% endblock %}
+{% block content %}
+<style>
+.wh119{max-width:1480px;margin:auto;direction:rtl}.wh119 *{box-sizing:border-box}
+.wh119-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.wh119 h1{font-size:1.5rem;font-weight:900;margin:0}.wh119 h2{font-size:1.04rem;font-weight:900;margin:0 0 13px}
+.wh119-panel,.wh119-invoice{border:1px solid rgba(255,255,255,.12);background:linear-gradient(145deg,#13263c,#0b1a2b);border-radius:17px;padding:18px;min-width:0}
+.wh119-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:20px;align-items:start}
+.wh119-invoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.wh119-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wh119-field label{font-weight:750;color:#aebfd2;font-size:.75rem;margin-bottom:5px;display:block}
+.wh119 input,.wh119 select{width:100%;min-height:40px;background:#0b1a2a;color:#f5f8fc;border:1px solid #3b4c60;border-radius:10px;padding:8px}
+.wh119 small,.wh119-muted{color:#a6b7c9;font-size:.79rem}.wh119-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.wh119-btn{background:#fb721e;color:#111827;border:0;border-radius:10px;padding:10px 17px;font-weight:850;cursor:pointer}
+.wh119-btn-alt{background:#1e3952;color:#e9f5ff;border:1px solid #43617a}
+.wh119-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wh119-person{color:#e4edf7;text-decoration:none;border:1px solid #344a63;border-radius:11px;padding:11px;background:#12283f}
+.wh119-person.active{border-color:#ff8e47;background:#342817}.wh119-person b,.wh119-person span{display:block}
+.wh119-person span{color:#a4b7ca;font-size:.78rem;margin-top:4px}
+.wh119-ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.wh119-ledger div{background:#10283e;border-radius:9px;padding:9px}
+.wh119-ledger span{font-size:.73rem;color:#9eb3c8;display:block}.wh119-ledger b{font-size:.95rem}
+.wh119-line{display:grid;grid-template-columns:1.2fr .8fr .7fr 1fr auto;gap:8px;align-items:end;margin:8px 0;border:1px solid #294158;padding:9px;border-radius:12px}
+.wh119-line small{grid-column:1/-1}.wh119-line .wh119-field label{margin:0 0 4px}
+.wh119-delete{height:40px;border-radius:10px;border:1px solid #995357;background:#39202a;color:#ffd9df;padding:0 12px}
+.wh119-overview{margin:12px 0;padding:12px;border-radius:12px;background:#21334a;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.wh119-invoice{padding:0;overflow:hidden;align-self:start}
+.wh119-invoice summary{padding:14px 17px;cursor:pointer;list-style:none}.wh119-invoice summary::-webkit-details-marker{display:none}
+.wh119-invoice summary:hover{background:#26394c}.wh119-summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.wh119-invoice .wh119-body{padding:13px;border-top:1px solid #32445a}
+.wh119-table-scroll{width:100%;overflow-x:auto}.wh119-table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.81rem}
+.wh119-table th,.wh119-table td{padding:9px;border-bottom:1px solid #2b4157;text-align:right}.wh119-table th{color:#b4c9dc}
+/* V120: color-first Novani wholesale quantity matrix; old sale cards/sidebar untouched. */
+.wh120-color-picker{display:grid;grid-template-columns:1fr;gap:9px;align-items:end}
+.wh120-color-picker .wh119-btn{min-height:40px}
+.wh120-color-cards{display:grid;grid-template-columns:1fr;gap:12px}
+.wh120-color-card{border:1px solid #3b5874;background:rgba(13,33,52,.86);border-radius:14px;padding:13px;min-width:0}
+.wh120-color-card-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:13px}
+.wh120-color-name{font-size:.98rem;font-weight:900;display:block}
+.wh120-color-price{flex:1;max-width:218px;min-width:154px}
+.wh120-color-price label{display:block;color:#aebfd2;font-size:.73rem;font-weight:750;margin-bottom:4px}
+.wh120-color-remove{border-radius:9px;background:#37212a;border:1px solid #95535a;color:#ffd3d9;padding:8px 10px;min-height:38px}
+.wh120-size-scroller{width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.wh120-matrix{width:100%;min-width:530px;table-layout:fixed;border-collapse:separate;border-spacing:5px}
+.wh120-matrix th,.wh120-matrix td{text-align:center;padding:5px 2px;vertical-align:middle}
+.wh120-matrix th{color:#d7e5f2;font-size:.80rem;font-weight:850}
+.wh120-matrix input{width:100%;text-align:center;min-width:0;padding:7px 4px;border-radius:9px;font-variant-numeric:tabular-nums}
+.wh120-matrix td small{display:block;font-size:.66rem;white-space:nowrap;margin-top:5px}
+.wh120-matrix td.wh120-shortage input{border-color:#f98b8b;background:#33202b}
+.wh120-color-footer{display:flex;justify-content:space-between;gap:7px;flex-wrap:wrap;padding-top:10px;margin-top:7px;border-top:1px solid #2f4962;font-size:.82rem;color:#c8d9e8}
+.wh120-color-footer strong{color:#fff}
+.wh120-color-note{margin-top:10px}
+@media(max-width:520px){.wh120-color-picker{grid-template-columns:1fr}.wh120-color-price{max-width:none}.wh120-color-card-head{align-items:flex-end}}
+.wh119-section-title{display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px;gap:9px;flex-wrap:wrap}
+@media(max-width:1050px){.wh119-panels,.wh119-invoices{grid-template-columns:1fr}.wh119-line{grid-template-columns:1fr 1fr}.wh119-delete{grid-column:1/-1}}
+@media(max-width:520px){.wh119-people,.wh119-ledger,.wh119-form-grid{grid-template-columns:1fr}.wh119-line{grid-template-columns:1fr 1fr}.wh119-panel{padding:13px}}
+</style>
+<div class="wh119" data-wholesale="v119">
+  <div class="wh119-header">
+    <div><h1>فروش عمده نوانی</h1><div class="wh119-muted">صورت‌های فروش، خریداران و حساب هر شخص</div></div>
+    <a class="btn btn-outline-light" href="{% url 'wholesale_export' %}{% if selected_customer %}?customer={{ selected_customer.pk }}{% endif %}">خروجی اکسل {% if selected_customer %}این خریدار{% else %}تمام فروش‌ها{% endif %}</a>
+  </div>
+  <div class="wh119-panels">
+    <section class="wh119-panel">
+      <h2>تعریف خریدار</h2>
+      <form action="{% url 'wholesale_customer_add' %}" method="post">{% csrf_token %}
+        <div class="wh119-form-grid">
+          <div class="wh119-field"><label>نام شخص</label><input name="name" maxlength="140" required placeholder="نام خریدار"></div>
+          <div class="wh119-field"><label>تلفن (اختیاری)</label><input name="phone" maxlength="40" placeholder="شماره تماس"></div>
+        </div>
+        <div class="wh119-field mt-2"><label>یادداشت (اختیاری)</label><input name="note" maxlength="250" placeholder="توضیح حساب شخص"></div>
+        <div class="wh119-actions"><button class="wh119-btn" type="submit">ثبت خریدار</button></div>
+      </form>
+      <hr class="my-3" style="border-color:#3b4d63">
+      <h2>حساب خریداران</h2>
+      <div class="wh119-people">
+        {% for buyer in wholesale_customers %}
+          <a class="wh119-person {% if selected_customer.pk == buyer.pk %}active{% endif %}" href="?customer={{ buyer.pk }}">
+            <b>{{ buyer.name }}{% if buyer.is_pedram %} · خیاط{% endif %}</b>
+            <span>صورت: {{ buyer.ledger.count }} | {% if buyer.is_pedram %}مانده خالص خیاط{% else %}مانده طلب{% endif %}: {{ buyer.ledger.balance|groupnum }} تومان</span>
+          </a>
+        {% empty %}<div class="wh119-muted">هنوز خریدار تعریف نشده است.</div>{% endfor %}
+      </div>
+    </section>
+    <section class="wh119-panel">
+      <h2>ثبت صورت فروش</h2>
+      {% if selected_customer %}
+        <div class="wh119-muted">خریدار: <b>{{ selected_customer.name }}</b> {% if selected_customer.is_pedram %}— فروش به طلب شما اضافه می‌شود؛ بدهی قبلی را کاهش می‌دهد و با مزد تحویل‌های بعدی تسویه می‌شود. مانده خالص حساب خیاط: {{ wholesale_tailor_balance|groupnum }} تومان{% endif %}</div>
+        <div class="wh119-ledger">
+          <div><span>کل فروش</span><b>{{ selected_customer.ledger.gross|groupnum }}</b></div>
+          <div><span>دریافت / تسویه نقدی</span><b>{{ selected_customer.ledger.offset|add:selected_customer.ledger.received|groupnum }}</b></div>
+          <div><span>{% if selected_customer.is_pedram %}مانده خالص حساب خیاط{% else %}طلب باز{% endif %}</span><b>{{ selected_customer.ledger.balance|groupnum }}</b></div>
+        </div>
+        <form action="{% url 'wholesale_invoice_add' %}" method="post" id="whInvoiceForm">{% csrf_token %}
+          <input type="hidden" name="customer_id" value="{{ selected_customer.pk }}">
+          <input type="hidden" name="request_token" value="{{ invoice_token }}">
+          <div class="wh119-form-grid">
+            <div class="wh119-field"><label>تاریخ صورت (شمسی)</label><input name="date" value="{{ today_j }}" inputmode="numeric" required placeholder="۱۴۰۵/۰۷/۲۲"></div>
+            <div class="wh119-field"><label>توضیح</label><input name="note" maxlength="250" placeholder="اختیاری"></div>
+          </div>
+          <div class="wh120-color-picker mt-3">
+            <div class="wh119-field">
+              <label for="whColorPicker">انتخاب رنگ / مدل نوانی</label>
+              <select id="whColorPicker">
+                <option value="">انتخاب رنگ ← جدول سایزها خودکار باز می‌شود</option>
+                {% for color in wholesale_colors %}<option value="{{ color.pk }}">{{ color.name }}</option>{% endfor %}
+              </select>
+            </div>
+
+          </div>
+          <div id="whInvoiceLines" class="wh120-color-cards mt-3" aria-live="polite"></div>
+          <div id="whInvoiceHidden" hidden></div>
+          <div class="wh119-overview"><span>تعداد کل <b id="whPieces">۰</b></span><span>جمع فاکتور <b id="whTotal">۰</b> تومان</span></div>
+          <div class="wh119-actions"><button class="wh119-btn" type="submit" {% if not wholesale_colors or not wholesale_sizes %}disabled{% endif %}>ثبت قطعی و کسر از موجودی نوانی</button></div>
+          <small>برای هر رنگ فقط یک فی واحد وارد کن. تعداد سایزهای بدون فروش را خالی یا صفر بگذار؛ تمام رنگ‌ها با هم در یک صورت ثبت می‌شوند. قیمت و موجودی در سرور دوباره بررسی می‌شود.</small>
+        </form>
+        {% if not selected_customer.is_pedram %}
+        <hr class="my-3" style="border-color:#3b4d63">
+        <h2>ثبت دریافت از {{ selected_customer.name }}</h2>
+        <form method="post" action="{% url 'wholesale_receipt_add' %}">{% csrf_token %}
+          <input type="hidden" name="customer_id" value="{{ selected_customer.pk }}">
+          <input type="hidden" name="request_token" value="{{ receipt_token }}">
+          <div class="wh119-form-grid">
+            <div class="wh119-field"><label>تاریخ دریافت (شمسی)</label><input name="date" value="{{ today_j }}" required></div>
+            <div class="wh119-field"><label>مبلغ دریافتی (تومان)</label><input name="amount" inputmode="numeric" type="text" required></div>
+          </div>
+          <div class="wh119-field mt-2"><label>توضیح</label><input name="note" maxlength="250"></div>
+          <div class="wh119-actions"><button type="submit" class="wh119-btn wh119-btn-alt">دریافت و واریز به ملت</button></div>
+        </form>
+        {% if wholesale_receipts %}
+          <div class="mt-3">
+            <h2>دریافت‌های ثبت‌شده</h2>
+            <div class="wh119-table-scroll"><table class="wh119-table">
+              <thead><tr><th>تاریخ</th><th>مبلغ (تومان)</th><th>توضیح</th></tr></thead>
+              <tbody>{% for receipt in wholesale_receipts %}
+                <tr><td>{{ receipt.jalali_date }}</td><td>{{ receipt.amount|groupnum }}</td><td>{{ receipt.note }}</td></tr>
+              {% endfor %}</tbody>
+            </table></div>
+          </div>
+        {% endif %}
+        {% endif %}
+      {% else %}<p class="wh119-muted">برای ثبت صورت، اول یک خریدار را از کارت‌های سمت راست انتخاب کن.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="wh119-section-title"><h2>صورت‌های فروش عمده</h2><span class="wh119-muted">کارت‌های جمع‌وجور، دو کارت در هر ردیف</span></div>
+  <div class="wh119-invoices">
+    {% for invoice in wholesale_invoices %}
+      <details class="wh119-invoice" id="invoice-{{ invoice.pk }}">
+        <summary><div class="wh119-summary">
+          <div><b>صورت #{{ invoice.pk }} · {{ invoice.customer.name }}</b><div class="wh119-muted">{{ invoice.jalali_date }} · {{ invoice.quantity_total }} عدد</div></div>
+          <div style="text-align:left"><b>{{ invoice.total_amount|groupnum }} تومان</b><div class="wh119-muted">نمایش جزئیات <span aria-hidden="true">⌄</span></div></div>
+        </div></summary>
+        <div class="wh119-body">
+          <div class="wh119-table-scroll"><table class="wh119-table">
+          <thead><tr><th>مدل / رنگ</th><th>سایز</th><th>تعداد</th><th>فی واحد</th><th>مجموع</th></tr></thead>
+          <tbody>{% for line in invoice.lines.all %}<tr><td>{{ line.color.name }}</td><td>{{ line.size.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price|groupnum }}</td><td>{{ line.amount|groupnum }}</td></tr>{% endfor %}</tbody>
+          </table></div>
+          {% if invoice.tailor_deducted_amount %}<small>تهاتر با حساب خیاط: {{ invoice.tailor_deducted_amount|groupnum }} تومان</small>{% endif %}
+          {% if invoice.note %}<div class="wh119-muted mt-2">{{ invoice.note }}</div>{% endif %}
+        </div>
+      </details>
+    {% empty %}<div class="wh119-panel wh119-muted">هنوز صورت فروش عمده ثبت نشده است.</div>{% endfor %}
+  </div>
+</div>
+{% if selected_customer %}
+<template id="whColorCardTemplate">
+  <section class="wh120-color-card" data-color-id="">
+    <div class="wh120-color-card-head">
+      <div><strong class="wh120-color-name" data-color-title></strong><small>تعداد را برای هر سایز وارد کن</small></div>
+      <div class="wh120-color-price"><label>قیمت واحد این رنگ (تومان)</label><input type="text" data-color-price inputmode="numeric" placeholder="مثلاً ۸۵۰۰۰"></div>
+      <button type="button" class="wh120-color-remove" data-remove-color aria-label="حذف رنگ">حذف رنگ</button>
+    </div>
+    <div class="wh120-size-scroller">
+      <table class="wh120-matrix" aria-label="تعداد فروش به تفکیک سایز">
+        <thead><tr>{% for size in wholesale_sizes %}<th scope="col">{{ size.name }}</th>{% endfor %}</tr></thead>
+        <tbody><tr>{% for size in wholesale_sizes %}
+          <td data-size-cell>
+            <input data-size-qty="{{ size.pk }}" type="text" inputmode="numeric" placeholder="۰" aria-label="تعداد سایز {{ size.name }}">
+            <small data-size-available>موجودی —</small>
+          </td>
+        {% endfor %}</tr></tbody>
+      </table>
+    </div>
+    <div class="wh120-color-footer">
+      <span>تعداد این رنگ: <strong data-color-count>۰</strong></span>
+      <span>جمع این رنگ: <strong data-color-total>۰</strong> تومان</span>
+    </div>
+  </section>
+</template>
+{{ wholesale_stock|json_script:"wh-stock-data" }}
+{{ wholesale_prices|json_script:"wh-price-data" }}
+<script>
+(function(){
+  'use strict';
+  const form=document.getElementById('whInvoiceForm');
+  const holder=document.getElementById('whInvoiceLines');
+  const picker=document.getElementById('whColorPicker');
+  const template=document.getElementById('whColorCardTemplate');
+  const hidden=document.getElementById('whInvoiceHidden');
+  if(!form||!holder||!picker||!template||!hidden)return;
+  const stock=JSON.parse(document.getElementById('wh-stock-data').textContent);
+  const previousPrices=JSON.parse(document.getElementById('wh-price-data').textContent);
+  const money=new Intl.NumberFormat('fa-IR');
+  const toAscii=value=>String(value??'')
+    .replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776))
+    .replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))
+    .replace(/[٬,\s]/g,'');
+  const asNumber=value=>{
+    const stripped=toAscii(value);
+    return /^\d+$/.test(stripped)?Number(stripped):NaN;
+  };
+  const validCount=value=>String(value).trim()===''||
+    (Number.isSafeInteger(asNumber(value))&&asNumber(value)>=0);
+  function groupInput(input){
+    const raw=toAscii(input.value);
+    if(raw===''){input.value='';return;}
+    if(!/^\d+$/.test(raw))return;
+    const grouped=raw.replace(/\B(?=(\d{3})+(?!\d))/g,'٬');
+    if(input.value!==grouped)input.value=grouped;
+  }
+  const cards=()=>Array.from(holder.querySelectorAll('[data-color-id]'));
+  const entriesFor=card=>Array.from(card.querySelectorAll('[data-size-qty]')).map(input=>{
+    const color=card.dataset.colorId;
+    const size=input.dataset.sizeQty;
+    const available=Math.max(0,Number(stock[color+':'+size]||0));
+    return {color,size,input,cell:input.closest('[data-size-cell]'),available,quantity:input.value===''?0:asNumber(input.value)};
+  });
+  function recalc(){
+    let count=0,amount=0;
+    cards().forEach(card=>{
+      const price=asNumber(card.querySelector('[data-color-price]').value)||0;
+      let local=0;
+      entriesFor(card).forEach(entry=>{
+        const ok=validCount(entry.input.value);
+        const shortage=!ok||entry.quantity>entry.available;
+        entry.cell.classList.toggle('wh120-shortage',shortage);
+        entry.cell.querySelector('[data-size-available]').textContent='موجودی '+money.format(entry.available);
+        entry.input.max=String(entry.available);
+        if(ok&&entry.quantity>0)local+=entry.quantity;
+      });
+      card.querySelector('[data-color-count]').textContent=money.format(local);
+      card.querySelector('[data-color-total]').textContent=money.format(local*price);
+      count+=local;amount+=local*price;
+    });
+    document.getElementById('whPieces').textContent=money.format(count);
+    document.getElementById('whTotal').textContent=money.format(amount);
+  }
+  function addColor(){
+    const id=picker.value;
+    if(!id){picker.focus();return}
+    const existing=cards().find(card=>card.dataset.colorId===id);
+    if(existing){existing.querySelector('[data-color-price]').focus();return}
+    const card=template.content.firstElementChild.cloneNode(true);
+    card.dataset.colorId=id;
+    card.querySelector('[data-color-title]').textContent=picker.selectedOptions[0].textContent.trim();
+    const price=Object.entries(previousPrices).find(([key])=>key.startsWith(id+':'));
+    if(price){card.querySelector('[data-color-price]').value=String(price[1]);groupInput(card.querySelector('[data-color-price]'));}
+    holder.appendChild(card);
+    picker.value='';
+    recalc();
+    card.querySelector('[data-size-qty]')?.focus();
+  }
+  function appendField(name,value){
+    const input=document.createElement('input');
+    input.type='hidden';input.name=name;input.value=String(value);
+    hidden.appendChild(input);
+  }
+  picker.addEventListener('change',()=>{if(picker.value)addColor()});
+  holder.addEventListener('input',event=>{
+    if(event.target.matches('[data-size-qty],[data-color-price]'))groupInput(event.target);
+    recalc();
+  });
+  holder.addEventListener('click',event=>{
+    const button=event.target.closest('[data-remove-color]');
+    if(!button)return;
+    button.closest('[data-color-id]').remove();
+    recalc();
+  });
+  const receiptAmount=document.querySelector('form[action*="receipts/add"] input[name="amount"]');
+  if(receiptAmount)receiptAmount.addEventListener('input',()=>groupInput(receiptAmount));
+  form.addEventListener('submit',event=>{
+    hidden.replaceChildren();
+    let count=0;
+    const fail=(message,input)=>{
+      event.preventDefault();
+      alert(message);
+      if(input)input.focus();
+    };
+    for(const card of cards()){
+      const priceField=card.querySelector('[data-color-price]');
+      const price=asNumber(priceField.value);
+      const items=entriesFor(card);
+      for(const item of items){
+        if(!validCount(item.input.value)){
+          fail('تعداد هر سایز باید عدد صحیح و نامنفی باشد.',item.input);return;
+        }
+        if(item.quantity>item.available){
+          fail('تعداد انتخابی از موجودی نوانی بیشتر است.',item.input);return;
+        }
+      }
+      const nonzero=items.filter(item=>item.quantity>0);
+      if(!nonzero.length)continue;
+      if(!Number.isSafeInteger(price)||price<=0){
+        fail('قیمت واحد رنگ '+card.querySelector('[data-color-title]').textContent+' را وارد کن.',priceField);
+        return;
+      }
+      nonzero.forEach(item=>{
+        appendField('color_id',item.color);
+        appendField('size_id',item.size);
+        appendField('quantity',item.quantity);
+        appendField('unit_price',price);
+        count+=item.quantity;
+      });
+    }
+    if(count===0){fail('حداقل تعداد یک سایز از یک رنگ را وارد کن.');return}
+    const button=form.querySelector('button[type=submit]');
+    button.disabled=true;button.textContent='در حال ثبت صورت...';
+  });
+  if(location.hash.startsWith('#invoice-')){
+    document.querySelector(location.hash)?.setAttribute('open','');
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

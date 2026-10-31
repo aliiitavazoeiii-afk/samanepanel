@@ -1,0 +1,30 @@
+{% extends 'core/settings_product_form.html' %}{% load static %}
+{% block scripts %}
+{{ block.super }}
+<script>
+(function(){
+  const brand=document.getElementById('brandSelect');
+  const head=document.querySelector('.product-price-head');
+  if(!brand||!head)return;
+  const managed=new Set(['دارما','تکوین']);
+  const box=document.createElement('div');
+  box.id='salePriceDateV60';
+  box.style.cssText='display:none;min-width:190px;';
+  box.innerHTML='<label class="form-label mb-1">قیمت فروش از تاریخ</label><input class="form-control jalali-date ltr" name="sale_price_effective_from" value="{{ sale_price_effective_j }}" required><div class="text-secondary small mt-1">مثلاً برای قیمت فردا، تاریخ فردا را بزن.</div>';
+  head.appendChild(box);
+  const headerCells=[...document.querySelectorAll('.product-size-table thead th')];
+  const saleHead=headerCells.find(el=>el.textContent.includes('قیمت فروش'));
+  function sync(){
+    const name=brand.options[brand.selectedIndex]?.textContent.trim()||'';
+    const on=managed.has(name);
+    box.style.display=on?'block':'none';
+    const input=box.querySelector('input');
+    input.disabled=!on;
+    if(saleHead)saleHead.textContent=on?'قیمت فروش از تاریخ انتخابی':'قیمت فروش پیش‌فرض';
+  }
+  brand.addEventListener('change',sync);
+  sync();
+})();
+</script>
+<script src="{% static 'core/jalali_picker.js' %}"></script>
+{% endblock %}

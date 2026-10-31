@@ -1,0 +1,11 @@
+{% load jalali %}
+{% if pricing_monitor %}
+<style>.pm-mini-scroll{overflow-x:auto}.pm-mini-table{min-width:1080px;width:100%}.pm-mini-table th,.pm-mini-table td{white-space:nowrap;text-align:center;vertical-align:middle}.pm-mini-table th:first-child,.pm-mini-table td:first-child{text-align:right}</style>
+<div class="card glass-card mt-4 mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h3 class="card-title mb-1">پایش قیمت‌گذاری دارما</h3><div class="text-secondary small">{% if pricing_monitor.is_working_day %}روز کاری {{ pricing_monitor.workday_number }} · مقایسه با {{ pricing_monitor.previous_day_j }}{% else %}{{ pricing_monitor.as_of_j }} · بدون مقایسه روزانه{% endif %}</div></div><a class="btn btn-sm btn-outline-primary" href="{% url 'pricing_monitor' %}">مشاهده گزارش کامل</a></div>
+  {% if not pricing_monitor.is_working_day %}<div class="card-body text-secondary">{{ pricing_monitor.comparison_message }}</div>{% else %}
+  {% if pricing_monitor.is_partial_day %}<div class="px-3 pt-3 text-warning small">امروز هنوز کامل نشده؛ درصدهای تغییر روزانه تا پایان روز موقت هستند.</div>{% endif %}
+  <div class="pm-mini-scroll"><table class="table table-vcenter table-nowrap mb-0 pm-mini-table"><thead><tr><th>کد / سایز</th><th>پک فعلی</th><th>پک ماه قبل</th><th>فروش فعلی</th><th>فروش قبل</th><th>سود فعلی</th><th>سود قبل</th><th>میانگین فی پک</th></tr></thead><tbody>{% for row in pricing_monitor.rows %}<tr><td><strong>{{ row.code }}</strong> · {{ row.size }} <span class="text-secondary">(پک {{ row.pack_qty }})</span></td><td>{{ row.current.packs|groupnum }}</td><td>{{ row.previous.packs|groupnum }}</td><td class="money">{{ row.current.gross|groupnum }}</td><td class="money">{{ row.previous.gross|groupnum }}</td><td class="money">{{ row.current.profit|groupnum }}</td><td class="money">{{ row.previous.profit|groupnum }}</td><td class="money">{{ row.current.avg_pack_price|groupnum }} / {{ row.previous.avg_pack_price|groupnum }}</td></tr>{% empty %}<tr><td colspan="8" class="text-center text-secondary py-4">روز کاری متناظر برای مقایسه پیدا نشد.</td></tr>{% endfor %}</tbody></table></div>
+  {% endif %}
+</div>
+{% endif %}

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% load jalali %}{% block title %}محصولات دیجی‌کالا | DARMA{% endblock %}{% block content %}{% include 'core/_mobile_shell.html' %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3 mobile-page-head">
+  <div><div class="page-kicker">Digikala Center</div><h1 class="page-title mb-1">محصولات</h1><div class="page-muted">فهرست محصولات فعلی از Inventory API؛ مستقل از زمان ساخت محصول و شامل محصولات قدیمی.</div></div>
+  <a class="btn btn-outline-light" href="{% url 'digikala_products' %}?refresh=1">بروزرسانی</a>
+</div>
+{% include 'core/_digikala_nav_v43.html' with dk_section='products' %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card glass-card"><div class="card-body"><div class="subheader">DKP</div><div class="kpi num mt-2">{{ products.product_count|groupnum }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card glass-card"><div class="card-body"><div class="subheader">DKPC / تنوع</div><div class="kpi num mt-2">{{ products.variant_count|groupnum }}</div></div></div></div>
+</div>
+<div class="card glass-card">
+  <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center"><h3 class="card-title mb-0">محصولات موجود در حساب</h3><input id="dkProductSearch" class="form-control" style="max-width:280px" type="search" placeholder="جستجو عنوان، DKP، DKPC، کد…"></div>
+  <div class="card-body p-0"><div class="table-responsive"><table class="table align-middle mb-0" id="dkProductTable"><thead><tr><th>محصول</th><th>DKP</th><th class="text-center">تنوع</th><th class="text-center">موجودی انبار دیجی</th><th>جزئیات</th></tr></thead><tbody>
+  {% for p in products.rows %}<tr data-search="{{ p.name }} {{ p.product_id }} {% for v in p.variants %}{{ v.variant_id }} {{ v.supplier_code }} {{ v.size }} {% endfor %}"><td><div class="d-flex align-items-center gap-2">{% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy" width="46" height="46" style="object-fit:cover;border-radius:10px">{% endif %}<div>{{ p.name }}{% if p.link %}<a class="d-block small" href="{{ p.link }}" target="_blank" rel="noopener">دیجی‌کالا</a>{% endif %}</div></div></td><td class="ltr fw-bold">{{ p.product_id|default:'—' }}</td><td class="text-center num">{{ p.variants|length }}</td><td class="text-center num">{{ p.warehouse_total|groupnum }}</td><td><details><summary class="btn btn-sm btn-outline-light">DKPCها</summary><div class="mt-2">{% for v in p.variants %}<div class="small py-1 border-bottom border-secondary-subtle"><span class="badge badge-soft-orange">{{ v.size }}</span> <span class="ltr">DKPC {{ v.variant_id }}</span> · <span class="ltr">{{ v.supplier_code }}</span> · انبار دیجی: <strong class="num">{{ v.warehouse_stock|groupnum }}</strong></div>{% endfor %}</div></details></td></tr>{% empty %}<tr><td colspan="5"><div class="empty-state py-5">محصولی از Inventory API دریافت نشد.</div></td></tr>{% endfor %}
+  </tbody></table></div></div>
+</div>
+{% endblock %}
+{% block scripts %}<script>(function(){const i=document.getElementById('dkProductSearch'),t=document.getElementById('dkProductTable');if(!i||!t)return;i.addEventListener('input',function(){const q=this.value.trim().toLowerCase();t.querySelectorAll('tbody tr[data-search]').forEach(r=>r.style.display=!q||String(r.dataset.search||'').toLowerCase().includes(q)?'':'none');});})();</script>{% endblock %}

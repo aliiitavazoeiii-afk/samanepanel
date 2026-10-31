@@ -1,0 +1,39 @@
+{% extends 'base.html' %}{% load jalali static %}
+{% block title %}محصولات و کدها | DARMA ERP{% endblock %}
+{% block content %}{% include 'core/_mobile_shell.html' %}
+<style>
+.product-center-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.product-center-card{display:flex;flex-direction:column;justify-content:center;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:17px;background:linear-gradient(135deg,rgba(18,43,72,.42),rgba(5,19,34,.26));padding:22px;min-height:132px;transition:.15s ease}.product-center-card:hover,.product-center-card.active{color:inherit;border-color:rgba(251,101,20,.52);background:linear-gradient(135deg,rgba(27,57,90,.50),rgba(8,25,43,.32));transform:translateY(-2px)}.product-center-card h3{margin:0;font-size:1.42rem;font-weight:850;line-height:1.5}.pc-summary{margin-top:10px;color:#dce8f5;font-size:.78rem}.pc-panel{margin-top:18px}.pc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}.pc-section-title{font-size:1.48rem;font-weight:850;margin:0}.brand-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:800px}.brand-choice{display:flex;align-items:center;justify-content:center;min-height:70px;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;background:rgba(255,255,255,.025)}.brand-choice:hover,.brand-choice.active{color:inherit;border-color:rgba(18,183,106,.42);background:rgba(18,183,106,.06)}.brand-choice strong{display:block;font-size:1.16rem;font-weight:850}.pricing-scroll{overflow-x:auto}.pricing-table{display:grid;gap:0;min-width:max-content}.pricing-grid-head,.pricing-row{display:grid;gap:10px;align-items:center;padding:10px 12px}.pricing-grid-head{font-size:.73rem;color:#aebdcd;font-weight:700;border-bottom:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.025);position:sticky;top:0;z-index:1}.pricing-row{border-bottom:1px solid rgba(255,255,255,.07);min-height:66px}.pricing-row:last-child{border-bottom:0}.pricing-grid-head.darma,.pricing-row.darma{grid-template-columns:145px 78px 152px repeat(6,118px) 120px}.pricing-grid-head.takvin,.pricing-row.takvin{grid-template-columns:145px 78px 152px repeat(4,125px) 120px}.pricing-row.bulk-darma,.pricing-grid-head.bulk-darma{grid-template-columns:145px 152px repeat(6,118px) 125px}.pricing-row.bulk-takvin,.pricing-grid-head.bulk-takvin{grid-template-columns:145px 152px repeat(4,125px) 125px}.pricing-row .form-control{height:40px;min-height:40px;margin:0}.pricing-row .btn{height:40px;display:flex;align-items:center;justify-content:center}.price-code{font-family:inherit!important;font-size:1rem;font-weight:800;direction:ltr;text-align:right}.price-pack{text-align:center;font-weight:700}.price-empty{height:40px;border:1px solid rgba(255,255,255,.10);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#71869a}.price-cell input{text-align:center!important}.mixed-price::placeholder{color:#fdbb76;opacity:1}.section-subcard{border:1px solid rgba(255,255,255,.10);border-radius:14px;background:rgba(255,255,255,.018);overflow:hidden}.section-subcard-head{padding:14px 15px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.section-subcard-head .fw-bold{font-size:1.03rem}.section-subcard-body{padding:0 15px 14px}.current-chip{display:inline-flex;padding:5px 9px;border-radius:999px;background:rgba(18,183,106,.12);border:1px solid rgba(18,183,106,.28);font-size:.75rem}.rules-table{min-width:720px}.brand-cost-grid{display:grid;grid-template-columns:170px minmax(180px,1fr) 150px;gap:10px;align-items:end}.takvin-cost-grid{display:grid;grid-template-columns:170px repeat(4,minmax(120px,1fr)) 150px;gap:10px;align-items:end}.history-table{min-width:760px}.brand-history-table{min-width:520px}.colors-table{min-width:850px}
+@media(max-width:900px){.product-center-grid{grid-template-columns:1fr 1fr}.brand-choice-grid{grid-template-columns:1fr}.takvin-cost-wrap,.brand-cost-wrap{overflow-x:auto}.takvin-cost-grid{min-width:900px}.brand-cost-grid{min-width:620px}}
+@media(max-width:520px){.product-center-grid{grid-template-columns:1fr}}</style>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 mobile-page-head">
+  <div><h2 class="page-title mb-0">محصولات و کدها</h2></div>
+  <div class="d-flex gap-2 mobile-page-actions"><a href="{% url 'settings_home' %}" class="btn btn-outline-light">بازگشت</a><a href="{% url 'settings_product_new' %}" class="btn btn-primary">+ تعریف محصول</a></div>
+</div>
+
+<div class="product-center-grid">
+  <a class="product-center-card {% if section == 'rules' %}active{% endif %}" href="?section=rules">
+    <h3>قوانین و قیمت‌های پایه</h3>
+    <div class="pc-summary">دارما {{ darma_current|groupnum }} · Novani {{ novani_current|groupnum }} تومان</div>
+  </a>
+  <a class="product-center-card {% if section == 'pricing' %}active{% endif %}" href="?section=pricing">
+    <h3>قیمت‌گذاری‌ها</h3>
+    <div class="pc-summary">{{ darma_product_count|groupnum }} کد دارما · {{ takvin_product_count|groupnum }} کد تکوین</div>
+  </a>
+  <a class="product-center-card" href="{% url 'settings_product_new' %}" data-product-definition-card="v111">
+    <h3>تعریف محصول</h3>
+    <div class="pc-summary">کد، عنوان، تعداد پک، سایزها و ترکیب رنگ — ثبت مستقیم در رنگ‌بندی‌ها و فروش روزانه</div>
+  </a>
+  <a class="product-center-card {% if section == 'colors' %}active{% endif %}" href="?section=colors">
+    <h3>رنگ‌بندی‌ها</h3>
+    <div class="pc-summary">{{ active_product_count|groupnum }} کد فعال</div>
+  </a>
+</div>
+
+{% if section == 'rules' %}<div class="pc-panel" id="rules-panel">{% include 'core/_product_center_rules_v93.html' %}</div>{% endif %}
+{% if section == 'pricing' %}<div class="pc-panel" id="pricing-panel">{% include 'core/_product_center_pricing_v93.html' %}</div>{% endif %}
+{% if section == 'colors' %}<div class="pc-panel" id="colors-panel">{% include 'core/_product_center_colors_v93.html' %}</div>{% endif %}
+{% if not section %}<div class="text-secondary text-center py-5">یکی از بخش‌های بالا را انتخاب کن یا از «تعریف محصول» یک کد تازه بساز.</div>{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'core/jalali_picker.js' %}"></script><script src="{% static 'core/number_format.js' %}"></script>{% endblock %}

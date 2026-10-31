@@ -1,0 +1,49 @@
+{% load jalali %}{% material_color_choices as live_material_colors %}
+<div class="raw-location-card">
+  <div class="raw-location-head">
+    <div><strong>{{ panel_title }}</strong><div class="text-secondary small">{{ panel_subtitle }}</div></div>
+    <div class="raw-location-total"><span>ارزش</span><strong class="money">{{ section_total|groupnum }}</strong><small>تومان</small></div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-vcenter raw-stock-table raw-fabric-table mb-0">
+      <thead><tr><th>رنگ / مدل پارچه</th><th>وزن (کیلو)</th><th>فی هر کیلو</th><th>مبلغ کل</th><th>توضیح</th><th class="raw-actions-col">عملیات</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr class="raw-display-row" data-row-id="fabric-{{ row.id }}">
+          <td class="fw-bold">{{ row.title }}</td>
+          <td class="num-center">{{ row.quantity|qtynum }}</td>
+          <td class="money-center">{{ row.unit_price|groupnum }}</td>
+          <td class="money-center fw-bold">{{ row.total_value|groupnum }}</td>
+          <td class="text-secondary">{{ row.note|default:'—' }}</td>
+          <td><div class="raw-row-actions"><button type="button" class="btn btn-sm btn-outline-light raw-edit-toggle" data-edit-target="fabric-edit-{{ row.id }}" title="اصلاح">✎</button><form method="post" action="{% url 'manual_report_action' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="fabric_delete"><input type="hidden" name="id" value="{{ row.id }}"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('این ردیف حذف شود؟{% if mode == 'tailor' %} مقدار آن به انبار برمی‌گردد.{% endif %}')" title="حذف">×</button></form></div></td>
+        </tr>
+        <tr class="raw-edit-row d-none" id="fabric-edit-{{ row.id }}"><td colspan="6"><form method="post" action="{% url 'manual_report_action' %}" class="raw-inline-edit raw-calc-row">{% csrf_token %}<input type="hidden" name="action" value="fabric_update"><input type="hidden" name="id" value="{{ row.id }}"><div><label>وزن (کیلو)</label><input class="form-control raw-quantity" name="quantity" inputmode="decimal" value="{{ row.quantity|qtynum }}" required></div><div><label>فی هر کیلو</label><input class="form-control raw-unit-price money-input" name="unit_price" inputmode="numeric" value="{{ row.unit_price }}"></div><div><label>ارزش</label><div class="raw-preview-total raw-line-total">{{ row.total_value|groupnum }}</div></div><div><label>توضیح</label><input class="form-control" name="note" value="{{ row.note }}"></div><div class="raw-inline-buttons"><button class="btn btn-primary" type="submit">ذخیره اصلاح</button><button class="btn btn-outline-light raw-edit-cancel" type="button" data-edit-target="fabric-edit-{{ row.id }}">انصراف</button></div></form></td></tr>
+      {% empty %}<tr><td colspan="6" class="empty-state py-4">هنوز پارچه‌ای ثبت نشده.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if mode == 'warehouse' or mode == 'depot' %}
+  <div class="raw-add-row">
+    <form method="post" action="{% url 'manual_report_action' %}" class="raw-add-form raw-calc-row">{% csrf_token %}
+      <input type="hidden" name="action" value="fabric_add"><input type="hidden" name="location" value="{{ mode }}">
+      <div><label class="form-label">رنگ / مدل پارچه</label><select class="form-select" name="material_key" required><option value="">انتخاب</option>{% for key,label in live_material_colors %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="form-label">وزن (کیلو)</label><input class="form-control raw-quantity" name="quantity" inputmode="decimal" placeholder="مثلاً 98.52" required></div>
+      <div><label class="form-label">فی هر کیلو</label><input class="form-control raw-unit-price money-input" name="unit_price" inputmode="numeric" placeholder="0" required></div>
+      <div><label class="form-label">مبلغ کل</label><div class="raw-preview-total raw-line-total">0</div></div>
+      <div><label class="form-label">توضیح</label><input class="form-control" name="note" placeholder="اختیاری"></div>
+      <div class="raw-add-button"><button class="btn btn-primary w-100" type="submit">＋ {% if mode == 'depot' %}ثبت در دپو{% else %}ثبت پارچه{% endif %}</button></div>
+    </form>
+  </div>
+  {% else %}
+  <div class="raw-add-row">
+    <form method="post" action="{% url 'manual_report_action' %}" class="raw-transfer-form">{% csrf_token %}
+      <input type="hidden" name="action" value="fabric_transfer">
+      <div><label class="form-label">طاق از انبار</label><select class="form-select" name="source_id" required><option value="">انتخاب طاق</option>{% for src in transfer_sources %}{% if src.quantity > 0 %}<option value="{{ src.id }}">{{ src.title }} — {{ src.quantity|qtynum }} کیلو — فی {{ src.unit_price|groupnum }}</option>{% endif %}{% endfor %}</select></div>
+      <div><label class="form-label">وزن تحویل به خیاط</label><input class="form-control" name="quantity" inputmode="decimal" placeholder="مثلاً 25.5" required></div>
+      <div class="raw-add-button"><button class="btn btn-primary w-100" type="submit">⇄ انتقال به خیاط</button></div>
+    </form>
+    <div class="text-secondary small mt-2">انتقال از انبار کم می‌کند. اصلاح یا حذف ردیف نزد خیاط، اختلاف را به‌صورت معکوس روی انبار اعمال می‌کند.</div>
+  </div>
+  {% endif %}
+</div>

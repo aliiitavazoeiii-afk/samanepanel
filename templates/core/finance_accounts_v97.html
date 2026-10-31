@@ -1,0 +1,21 @@
+{% extends 'base.html' %}{% load jalali %}
+{% block title %}حساب‌ها | DARMA{% endblock %}
+{% block content %}
+{% include 'core/_mobile_shell.html' %}
+<style>
+.fa97-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.fa97-card{border:1px solid rgba(255,255,255,.11);border-radius:16px;background:rgba(255,255,255,.035);padding:16px;min-height:142px}.fa97-card>span{display:block;color:#9fb0c4;font-size:.74rem;font-weight:750}.fa97-display-card{display:flex;flex-direction:column;justify-content:space-between}.fa97-value-wrap{margin-top:18px}.fa97-value{direction:ltr;unicode-bidi:isolate;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:clamp(1.45rem,2vw,2rem);line-height:1.15;font-weight:950;letter-spacing:-.035em;color:#fff}.fa97-value.positive{color:#55dfa0}.fa97-unit{margin-top:6px;color:#8fa2b7;font-size:.72rem}.fa97-form{margin-top:12px}.fa97-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.fa97-note{font-size:.72rem;color:#8fa2b7;margin-top:8px;line-height:1.7}@media(max-width:991.98px){.fa97-summary{grid-template-columns:1fr 1fr}.fa97-grid{grid-template-columns:1fr}}@media(max-width:575.98px){.fa97-summary{grid-template-columns:1fr}.fa97-card{min-height:auto}.fa97-value{font-size:1.65rem}}
+</style>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 mobile-page-head"><div><div class="text-secondary">مالی و ابزار</div><h1 class="page-title mb-1">حساب‌ها</h1><div class="page-muted">همان حساب‌های گزارش جامع، منتقل‌شده به مرکز مالی</div></div><a class="btn btn-outline-light" href="{% url 'finance' %}">مالی و ابزار</a></div>
+
+<div class="fa97-summary">
+  <div class="fa97-card fa97-display-card" data-account-summary="accounts"><span>حساب بانک و اشخاص</span><div class="fa97-value-wrap"><div class="fa97-value money">{{ accounts_total|groupnum }}</div><div class="fa97-unit">تومان</div></div></div>
+  <div class="fa97-card fa97-display-card" data-account-summary="dia"><span>طلب Dia Gallery</span><div class="fa97-value-wrap"><div class="fa97-value positive money">{{ dia_gallery_receivable|groupnum }}</div><div class="fa97-unit">تومان · خودکار از فروش‌های Dia Gallery</div></div></div>
+  <div class="fa97-card"><span>طلب دیجی‌کالا</span><form method="post" action="{% url 'finance_accounts_action' %}" class="fa97-form">{% csrf_token %}<input type="hidden" name="action" value="setting"><input type="hidden" name="key" value="digikala_receivable"><div class="input-group"><input class="form-control money" name="value" value="{% if digikala_receivable %}{{ digikala_receivable }}{% endif %}" placeholder="مبلغ"><button class="btn btn-primary">ذخیره</button></div></form><div class="fa97-note">پایه {{ digikala_base_receivable|groupnum }} + گردش {{ digikala_ledger_total|groupnum }}</div></div>
+  <div class="fa97-card"><span>بدهی تکوین</span><form method="post" action="{% url 'finance_accounts_action' %}" class="fa97-form">{% csrf_token %}<input type="hidden" name="action" value="setting"><input type="hidden" name="key" value="takvin_debt"><div class="input-group"><input class="form-control money" name="value" value="{% if takvin_debt %}{{ takvin_debt }}{% endif %}" placeholder="مبلغ"><button class="btn btn-primary">ذخیره</button></div></form></div>
+</div>
+
+<div class="fa97-grid">
+  {% include 'core/_finance_manual_table_v97.html' with rows=accounts_rows section='accounts' title='ریز حساب‌ها' subtitle='مانده بانک، مفید، ارز و حساب‌های عملیاتی' %}
+  {% include 'core/_finance_manual_table_v97.html' with rows=person_rows section='persons' title='حساب اشخاص' subtitle='طلب و بدهی اشخاص مرتبط با کار' %}
+</div>
+{% endblock %}

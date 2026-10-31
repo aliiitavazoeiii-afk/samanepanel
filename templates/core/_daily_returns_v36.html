@@ -1,0 +1,53 @@
+{% load jalali %}
+<style>
+.return-box{overflow:hidden}.return-box>summary{list-style:none;cursor:pointer;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}.return-box>summary::-webkit-details-marker{display:none}.return-box[open]>summary{background:rgba(255,255,255,.025)}.return-title{font-weight:900;font-size:1rem}.return-meta{color:#91a4ba;font-size:.75rem;margin-top:3px}.return-brand-tabs,.return-size-tabs{display:flex;gap:7px;flex-wrap:wrap}.return-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.035);color:#dce7f5;border-radius:999px;padding:7px 13px;font-weight:800;font-size:.8rem}.return-tab.active{background:rgba(255,153,51,.16);border-color:rgba(255,153,51,.68);color:#fff}.return-panel{display:none}.return-panel.active{display:block}.return-section-title{font-size:.82rem;font-weight:900;margin:15px 0 8px}.return-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.return-item{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.028);border-radius:12px;padding:9px}.return-item strong{display:block;font-size:.8rem;margin-bottom:6px}.return-item small{display:block;color:#8295ab;font-size:.67rem;margin-top:5px}.return-item input{height:37px}.return-disabled{opacity:.45}.return-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}.return-today{font-size:.75rem;color:#9fb0c4}.return-today b{color:#fff}.return-note{font-size:.72rem;color:#8ca0b7;margin-top:8px}@media(max-width:991px){.return-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:575.98px){.return-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.return-box>summary{padding:14px}.return-footer{display:grid;grid-template-columns:1fr}.return-footer .btn{width:100%}}
+</style>
+<details class="card mb-4 return-box" id="daily-returns-box">
+  <summary>
+    <div><div class="return-title">مرجوعی</div><div class="return-meta">شورت تکی یا پک کامل؛ فقط موجودی خانه زیاد می‌شود.</div></div>
+    <span class="badge badge-soft-success">امروز {{ return_today_shorts|default:0|groupnum }} شورت</span>
+  </summary>
+  <div class="card-body">
+    <div class="return-brand-tabs mb-3">
+      {% for brand in return_catalog %}<button type="button" class="return-tab{% if forloop.first %} active{% endif %}" data-return-brand-btn="{{ brand.id }}">{{ brand.name }}</button>{% endfor %}
+    </div>
+    {% for brand in return_catalog %}
+      <div class="return-brand-panel{% if forloop.first %} active{% endif %}" data-return-brand-panel="{{ brand.id }}" {% if not forloop.first %}style="display:none"{% endif %}>
+        <div class="return-size-tabs mb-3">
+          {% for size in brand.sizes %}<button type="button" class="return-tab{% if forloop.first %} active{% endif %}" data-return-size-btn="{{ brand.id }}:{{ size.id }}">{{ size.name }}</button>{% endfor %}
+        </div>
+        {% for size in brand.sizes %}
+          <form method="post" action="{% url 'daily_return_add' day.id %}" class="return-panel{% if forloop.first %} active{% endif %}" data-return-panel="{{ brand.id }}:{{ size.id }}">
+            {% csrf_token %}<input type="hidden" name="brand_id" value="{{ brand.id }}"><input type="hidden" name="size_id" value="{{ size.id }}">
+            <div class="return-section-title">۱) شورت تکی / رنگ</div>
+            <div class="return-grid">
+              {% for color in brand.colors %}<label class="return-item"><strong>{{ color.name }}</strong><input class="form-control" name="return_loose_{{ color.id }}" inputmode="numeric" placeholder="0"><small>تعداد شورت</small></label>{% endfor %}
+            </div>
+            <div class="return-section-title">۲) پک کامل / کد</div>
+            <div class="return-grid">
+              {% for ps in size.products %}
+                <label class="return-item{% if not ps.has_composition %} return-disabled{% endif %}"><strong>{{ ps.code }}</strong><input class="form-control" name="return_pack_{{ ps.id }}" inputmode="numeric" placeholder="0" {% if not ps.has_composition %}disabled{% endif %}><small>{% if ps.has_composition %}هر پک {{ ps.pack_qty }} شورت{% else %}رنگ متغیر؛ از بخش رنگ وارد کن{% endif %}</small></label>
+              {% empty %}<div class="text-secondary small">کد فعالی برای این سایز وجود ندارد.</div>{% endfor %}
+            </div>
+            <div class="return-footer"><div><div class="return-today">تمام این ورودی‌ها مستقیم به <b>خانه {{ brand.name }}</b> اضافه می‌شوند.</div><div class="return-note">این بخش SaleLine نمی‌سازد، هزینه دیجی ندارد و طلب دیجی را تغییر نمی‌دهد.</div></div><button class="btn btn-success px-4" onclick="return confirm('مرجوعی‌های واردشده مستقیم به موجودی خانه اضافه شوند؟')">ثبت مرجوعی</button></div>
+          </form>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</details>
+<script>
+(function(){
+  const box=document.getElementById('daily-returns-box'); if(!box) return;
+  box.querySelectorAll('[data-return-brand-btn]').forEach(btn=>btn.addEventListener('click',()=>{
+    const id=btn.dataset.returnBrandBtn;
+    box.querySelectorAll('[data-return-brand-btn]').forEach(x=>x.classList.toggle('active',x===btn));
+    box.querySelectorAll('[data-return-brand-panel]').forEach(p=>p.style.display=p.dataset.returnBrandPanel===id?'block':'none');
+  }));
+  box.querySelectorAll('[data-return-size-btn]').forEach(btn=>btn.addEventListener('click',()=>{
+    const key=btn.dataset.returnSizeBtn, brand=key.split(':')[0];
+    box.querySelectorAll(`[data-return-size-btn^="${brand}:"]`).forEach(x=>x.classList.toggle('active',x===btn));
+    box.querySelectorAll(`[data-return-panel^="${brand}:"]`).forEach(p=>p.classList.toggle('active',p.dataset.returnPanel===key));
+  }));
+})();
+</script>

@@ -1,0 +1,53 @@
+{% extends 'core/payments_v60.html' %}{% load static jalali %}
+{% block scripts %}
+{{ block.super }}
+{% if section == 'payments' %}
+<template id="selfPaymentPanelV61">
+  <div class="card mb-4" id="self-payment-v61">
+    <div class="card-header">
+      <div>
+        <div class="page-kicker">برداشت شخصی</div>
+        <h3 class="card-title mb-1">خودم</h3>
+        <div class="text-secondary small">اختلاف بین مانده ثبت‌شده ملت و موجودی واقعی را اینجا ثبت کن تا خرج شخصی‌ات جدا قابل پیگیری باشد.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row g-3 mb-3">
+        <div class="col-md-4"><div class="cash-top-kpi"><div class="subheader">مانده فعلی ملت</div><div class="kpi money">{{ mellat_balance|groupnum }}</div></div></div>
+        <div class="col-md-4"><div class="cash-top-kpi"><div class="subheader">خرج خودم این ماه</div><div class="kpi money text-danger">{{ self_month_total|groupnum }}</div><div class="small text-secondary">ماه {{ month_label }}</div></div></div>
+        <div class="col-md-4"><div class="cash-top-kpi"><div class="subheader">جمع کل خرج خودم</div><div class="kpi money text-danger">{{ self_total|groupnum }}</div></div></div>
+      </div>
+      <form method="post" action="{% url 'payment_add' %}" class="row g-3 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="payee" value="self">
+        <div class="col-md-2">
+          <label class="form-label">تاریخ</label>
+          <input class="form-control ltr" name="date" value="{{ today_j }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">مبلغ اختلاف / خرج شخصی</label>
+          <input class="form-control money-input" name="amount" inputmode="numeric" placeholder="مثلاً 20,000,000" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">توضیح</label>
+          <input class="form-control" name="note" placeholder="مثلاً برداشت شخصی / هزینه خانه">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-danger w-100">ثبت خرج خودم</button>
+        </div>
+      </form>
+      <div class="payment-help mt-3 mb-0">مثال: اگر سیستم برای ملت ۵۰۰ میلیون نشان می‌دهد ولی موجودی واقعی بانک ۴۸۰ میلیون است، اینجا ۲۰ میلیون ثبت کن. مانده ملت ۲۰ میلیون کم می‌شود، سرمایه کل هم به همان اندازه کم می‌شود و این مبلغ در سابقه «خودم» می‌ماند. هیچ موجودی کالا، مواد اولیه، بدهی تکوین یا طلب دیجی‌کالا تغییر نمی‌کند.</div>
+    </div>
+  </div>
+</template>
+<script>
+(function(){
+  const tpl=document.getElementById('selfPaymentPanelV61');
+  const anchor=document.querySelector('.payment-help');
+  if(!tpl||!anchor)return;
+  const node=tpl.content.firstElementChild.cloneNode(true);
+  anchor.insertAdjacentElement('afterend',node);
+})();
+</script>
+{% endif %}
+{% endblock %}

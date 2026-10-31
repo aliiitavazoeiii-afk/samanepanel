@@ -1,0 +1,75 @@
+{% load jalali %}
+<div class="pc-panel-head"><h3 class="pc-section-title">قیمت‌گذاری‌ها</h3></div>
+
+<div class="brand-choice-grid mb-4">
+  <a class="brand-choice {% if pricing_brand == 'darma' %}active{% endif %}" href="?section=pricing&brand=darma#pricing-panel"><strong>دارما</strong></a>
+  <a class="brand-choice {% if pricing_brand == 'takvin' %}active{% endif %}" href="?section=pricing&brand=takvin#pricing-panel"><strong>تکوین</strong></a>
+</div>
+
+{% if pricing_brand == 'darma' %}
+<div class="card mb-4">
+  <div class="card-header"><div class="fw-bold">ویرایش گروهی قیمت فروش دارما</div></div>
+  <div class="card-body p-0"><div class="pricing-scroll"><div class="pricing-table">
+    <div class="pricing-grid-head bulk-darma"><div>پک</div><div>از تاریخ</div>{% for size in pricing_sizes_darma %}<div class="text-center">{{ size }}</div>{% endfor %}<div></div></div>
+    {% for row in darma_bulk_rows %}
+    <form method="post" class="pricing-row bulk-darma">{% csrf_token %}<input type="hidden" name="action" value="bulk_darma_prices"><input type="hidden" name="pack_qty" value="{{ row.pack_qty }}">
+      <div class="price-code">پک {{ row.pack_qty }} تایی</div>
+      <div><input class="form-control jalali-date ltr" name="effective_from" value="{{ row.effective_j }}" required></div>
+      {% for cell in row.prices %}<div class="price-cell"><input class="form-control money-input" name="price_{{ cell.size }}" value="{{ cell.value }}" inputmode="numeric" required></div>{% endfor %}
+      <div><button class="btn btn-primary w-100">اعمال</button></div>
+    </form>
+    {% endfor %}
+  </div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="fw-bold">قیمت مستقل هر کد دارما</div></div>
+  <div class="card-body p-0"><div class="pricing-scroll"><div class="pricing-table">
+    <div class="pricing-grid-head darma"><div>کد</div><div class="text-center">پک</div><div>از تاریخ</div>{% for size in pricing_sizes_darma %}<div class="text-center">{{ size }}</div>{% endfor %}<div></div></div>
+    {% for row in darma_price_rows %}
+    <form method="post" class="pricing-row darma">{% csrf_token %}<input type="hidden" name="action" value="product_sale_prices"><input type="hidden" name="product_id" value="{{ row.product.id }}">
+      <div class="price-code">{{ row.product.code }}</div>
+      <div class="price-pack">{{ row.product.pack_qty }}</div>
+      <div><input class="form-control jalali-date ltr" name="effective_from" value="{{ row.effective_j }}" required></div>
+      {% for cell in row.cells %}<div class="price-cell">{% if cell.active %}<input class="form-control money-input" name="price_{{ cell.ps_id }}" value="{{ cell.value }}" inputmode="numeric" required>{% else %}<div class="price-empty">—</div>{% endif %}</div>{% endfor %}
+      <div><button class="btn btn-outline-primary w-100">ثبت</button></div>
+    </form>
+    {% empty %}<div class="empty-state">کد فعال دارما پیدا نشد.</div>{% endfor %}
+  </div></div></div>
+</div>
+{% endif %}
+
+{% if pricing_brand == 'takvin' %}
+<div class="card mb-4">
+  <div class="card-header"><div class="fw-bold">ویرایش گروهی قیمت فروش تکوین</div></div>
+  <div class="card-body p-0"><div class="pricing-scroll"><div class="pricing-table">
+    <div class="pricing-grid-head bulk-takvin"><div>پک</div><div>از تاریخ</div>{% for size in pricing_sizes_takvin %}<div class="text-center">{{ size }}</div>{% endfor %}<div></div></div>
+    {% for row in takvin_bulk_rows %}
+    <form method="post" class="pricing-row bulk-takvin">{% csrf_token %}<input type="hidden" name="action" value="bulk_takvin_prices"><input type="hidden" name="pack_qty" value="{{ row.pack_qty }}">
+      <div class="price-code">پک {{ row.pack_qty }} تایی</div>
+      <div><input class="form-control jalali-date ltr" name="effective_from" value="{{ row.effective_j }}" {% if row.has_products %}required{% else %}disabled{% endif %}></div>
+      {% for cell in row.cells %}<div class="price-cell">{% if cell.active %}<input class="form-control money-input {% if cell.mixed %}mixed-price{% endif %}" name="price_{{ cell.size }}" value="{{ cell.value }}" inputmode="numeric" {% if cell.mixed %}placeholder="مختلط"{% endif %} required>{% else %}<div class="price-empty">—</div>{% endif %}</div>{% endfor %}
+      <div><button class="btn btn-primary w-100" {% if not row.has_products %}disabled{% endif %}>اعمال</button></div>
+    </form>
+    {% endfor %}
+  </div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="fw-bold">قیمت مستقل هر کد تکوین</div></div>
+  <div class="card-body p-0"><div class="pricing-scroll"><div class="pricing-table">
+    <div class="pricing-grid-head takvin"><div>کد</div><div class="text-center">پک</div><div>از تاریخ</div>{% for size in pricing_sizes_takvin %}<div class="text-center">{{ size }}</div>{% endfor %}<div></div></div>
+    {% for row in takvin_price_rows %}
+    <form method="post" class="pricing-row takvin">{% csrf_token %}<input type="hidden" name="action" value="product_sale_prices"><input type="hidden" name="product_id" value="{{ row.product.id }}">
+      <div class="price-code">{{ row.product.code }}</div>
+      <div class="price-pack">{{ row.product.pack_qty }}</div>
+      <div><input class="form-control jalali-date ltr" name="effective_from" value="{{ row.effective_j }}" required></div>
+      {% for cell in row.cells %}<div class="price-cell">{% if cell.active %}<input class="form-control money-input" name="price_{{ cell.ps_id }}" value="{{ cell.value }}" inputmode="numeric" required>{% else %}<div class="price-empty">—</div>{% endif %}</div>{% endfor %}
+      <div><button class="btn btn-outline-primary w-100">ثبت</button></div>
+    </form>
+    {% empty %}<div class="empty-state">کد فعال تکوین پیدا نشد.</div>{% endfor %}
+  </div></div></div>
+</div>
+{% endif %}
+
+{% if not pricing_brand %}<div class="card"><div class="empty-state">دارما یا تکوین را انتخاب کن.</div></div>{% endif %}
