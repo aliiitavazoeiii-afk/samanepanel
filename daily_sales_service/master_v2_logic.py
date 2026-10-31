@@ -69,6 +69,8 @@ def ensure_v2(conn):
                       AND (code LIKE 'BG-PA-%' OR title LIKE '%پادار%')""")
     from .effective_costs import ensure_cost_history
     ensure_cost_history(conn)
+    from .platform_catalog import ensure_platforms
+    ensure_platforms(conn)
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
