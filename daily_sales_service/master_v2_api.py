@@ -293,27 +293,48 @@ def pricing(conn=Depends(conn_dep)):
     return page_with_style("قیمت‌گذاری",'<h1>قیمت‌گذاری</h1><p class="m2-hint">قیمت از تعریف محصول جدا شده است.</p>'+_price_tiles())
 
 @router.get(ROOT+"/pricing/cost")
-def cost_prices(conn=Depends(conn_dep)):
-    cost_rows={ (r["category"],r["subtype"],r["size"]):r["cost_toman"] for r in conn.execute("SELECT * FROM master_cost_rules")}
-    body='<h1>بهای تمام‌شده</h1><p class="m2-hint">هزینه تولید مرکزی هر گروه؛ بدون وابستگی به رنگ. تغییر هزینه، فروش‌های تاریخی را بازنویسی نمی‌کند.</p>'
-    body+=_price_tiles()+'<div class="m2-cards" style="margin-top:20px">'
+def cost_prices(as_of:str="",conn=Depends(conn_dep)):
+    from datetime import date,timedelta
+    from .effective_costs import today,dated_cost,valid_date
+    today_key=today()
+    proposed=(date.fromisoformat(today_key)+timedelta(days=1)).isoformat()
+    shown=valid_date(as_of) if as_of else today_key
+    rules={(r["category"],r["subtype"],r["size"]):r["cost_toman"]
+           for r in conn.execute("""SELECT h.category,h.subtype,h.size,h.cost_toman
+              FROM master_cost_history h WHERE h.effective_date=(
+                SELECT MAX(y.effective_date) FROM master_cost_history y
+                WHERE y.category=h.category AND y.subtype=h.subtype AND y.size=h.size AND y.effective_date<=?)""",(shown,))}
+    body='<h1>بهای تمام‌شده</h1><p class="m2-hint">برای هر دسته، بهای تمام‌شده جدید و تاریخ اجرای آن را مشخص کن. از همان تاریخ، ارزش موجودی و بهای فروش‌های جدید با نرخ تازه محاسبه می‌شود. فروش‌های ثبت‌شده قبلی تغییر نمی‌کنند.</p>'
+    body+=_price_tiles()
+    body+=f'<form action="{ROOT}/pricing/cost" method="get" class="m2-filters" style="margin-top:18px"><label>مشاهده نرخ‌های مؤثر در تاریخ</label><div class="m2-fields"><input name="as_of" type="date" value="{e(shown)}"><button type="submit" class="m2-btn">نمایش</button></div></form>'
+    body+='<div class="m2-cost-stack">'
     for category in CATEGORIES:
         variants=[("اسلیپ","*"),("پادار","*")] if category=="بادیگارد" else ([("",s) for s in SIZES["قالب"]] if category=="قالب" else [("","*")])
-        body+=f'<div class="m2-card"><h3>{e(category)}</h3>'
+        body+=f'<section class="m2-card m2-cost-row"><h3>{e(category)}</h3>'
         for subtype,size in variants:
-            current=cost_rows.get((category,subtype,size))
+            current=rules.get((category,subtype,size))
             name=subtype or (size if size!="*" else "همه محصولات این دسته")
-            body+=f'<form method="post" action="{ROOT}/pricing/cost/save" class="m2-fields" style="margin-bottom:14px">'
+            latest=conn.execute("""SELECT effective_date,cost_toman FROM master_cost_history
+                WHERE category=? AND subtype=? AND size=? AND effective_date>? ORDER BY effective_date ASC LIMIT 3""",
+                (category,subtype,size,today_key)).fetchall()
+            body+=f'<form method="post" action="{ROOT}/pricing/cost/save" class="m2-cost-line">'
             body+=f'<input type="hidden" name="category" value="{e(category)}"><input type="hidden" name="subtype" value="{e(subtype)}"><input type="hidden" name="size" value="{e(size)}">'
-            body+=f'<div><label>{e(name)} — بهای تمام‌شده هر عدد (تومان)</label><input name="cost" type="number" min="0" value="{e(current if current is not None else "")}" placeholder="هنوز مشخص نشده" required></div>'
-            body+='<div><button class="m2-btn" type="submit">ذخیره</button></div></form>'
-        body+='</div>'
+            body+=f'<div class="m2-cost-caption"><strong>{e(name)}</strong><span>قیمت مؤثر در {e(shown)}: {fmt(current) if current is not None else "تعریف‌نشده"} تومان</span></div>'
+            body+=f'<div><label>بهای تمام‌شده جدید (تومان)</label><input type="number" name="cost" min="0" required placeholder="مبلغ جدید"></div>'
+            body+=f'<div><label>تاریخ شروع اجرا</label><input type="date" name="effective_date" min="{today_key}" value="{proposed}" required></div>'
+            body+='<div><button type="submit" class="m2-btn">ثبت نرخ جدید</button></div></form>'
+            if latest:
+                body+='<div class="m2-hint">نرخ‌های برنامه‌ریزی‌شده: '+ ' · '.join(f'{e(v["effective_date"])}: {fmt(v["cost_toman"])} تومان' for v in latest)+'</div>'
+        body+='</section>'
     body+='</div>'
+    body+=f'<p style="margin-top:20px"><a href="{ROOT}/capital-report">مشاهده گزارش جامع سرمایه بر اساس نرخ امروز</a></p>'
     return page_with_style("بهای تمام‌شده",body)
 
 @router.post(ROOT+"/pricing/cost/save")
-def save_cost(category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),cost:str=Form(...),conn=Depends(conn_dep)):
-    try:set_cost_rule(conn,category,subtype,size,cost)
+def save_cost(category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),
+              cost:str=Form(...),effective_date:str=Form(...),conn=Depends(conn_dep)):
+    from .effective_costs import schedule_cost
+    try:schedule_cost(conn,category,subtype,size,cost,effective_date)
     except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
     return RedirectResponse(ROOT+"/pricing/cost",status_code=303)
 
