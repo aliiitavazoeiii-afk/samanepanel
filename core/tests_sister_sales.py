@@ -95,6 +95,34 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(html.count("<html "), 1)
         self.assertEqual(html.count("</html>"), 1)
 
+    def test_master_css_survives_embedded_proxy_and_extra_title_is_removed(self):
+        request = RequestFactory().get("/inventory/stock/")
+        request.user = SimpleNamespace(is_authenticated=True)
+        upstream = (
+            '<!doctype html><html><head>'
+            '<style>body{background:red}</style>'
+            '<style>.m2-shell{max-width:1500px}.m2-filters form{display:grid}'
+            '.m2-table-scroll{overflow:auto}.m2-table th{position:sticky}</style>'
+            '</head><body><header>OLD HEADER</header><main>'
+            '<div class="hero"><div><h1>موجودی کالا</h1><p></p></div></div>'
+            '<div class="m2-shell"><h1>موجودی کالا</h1>'
+            '<div class="m2-filters"><form method="get"></form></div>'
+            '<div class="m2-table-scroll"><table class="m2-table">'
+            '<thead><tr><th>رنگ / مدل</th><th>L</th></tr></thead>'
+            '<tbody><tr><th>مشکی</th><td>10</td></tr></tbody></table></div></div>'
+            '</main><footer>OLD FOOTER</footer></body></html>'
+        )
+        response = sister_sales.embedded_response(request, upstream, "master/stock")
+        html = response.content.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="sister-product-layout-v2"', html)
+        self.assertIn('.m2-filters form{display:grid}', html)
+        self.assertIn('.m2-table-scroll{overflow:auto}', html)
+        self.assertNotIn('body{background:red}', html)
+        self.assertEqual(html.count("<h1>موجودی کالا</h1>"), 1)
+        self.assertIn('class="erp-sidebar"', html)
+        self.assertIn('class="m2-table"', html)
+
     def test_canonical_get_redirects_but_not_post_endpoints(self):
         self.assertEqual(
             sister_sales.public_redirect_location("/daily-sales/master?category=%D9%82%D8%A7%D9%84%D8%A8"),
