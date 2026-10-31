@@ -92,7 +92,7 @@ def dashboard(request:Request,start:str|None=None,end:str|None=None,conn=Depends
 @app.get(ROOT+'/import',response_class=HTMLResponse)
 def import_page(_=Depends(authorize)):
  body=notice('ابتدا پیش‌نمایش می‌گیری؛ تا تأیید نهایی هیچ موجودی کم نمی‌شود. تکرار فایل برای همان تاریخ و مبدأ جایگزین فروش قبلی می‌شود، نه فروش جدید.')
- body+=f'''<div class="panel"><h3>بارگذاری فایل‌های فروش روزانه</h3><form method="post" action="{ROOT}/preview" enctype="multipart/form-data"><div class="forms"><div><label>تاریخ فروش (میلادی)</label><input required type="date" name="sale_date" value="{date.today().isoformat()}"></div><div><label>کسر از کدام موجودی؟</label><select name="source"><option value="seller">موجودی نزد فروشنده</option><option value="digikala">موجودی نزد دیجی‌کالا</option></select></div><div><label>فایل XLSX (امکان انتخاب چند فایل)</label><input name="files" type="file" required multiple accept=".xlsx"></div><button type="submit">نمایش پیش‌نمایش</button></div></form></div>'''
+ body+=f'''<div class="panel"><h3>بارگذاری فایل‌های فروش روزانه</h3><form method="post" action="{ROOT}/preview" enctype="multipart/form-data"><div class="forms"><div><label>تاریخ فروش (میلادی)</label><input required type="date" name="sale_date" value="{date.today().isoformat()}"></div><div><label>کسر از کدام انبار؟</label><select name="source"><option value="seller">خانه</option><option value="khorshid">خورشید</option></select></div><div><label>فایل XLSX (امکان انتخاب چند فایل)</label><input name="files" type="file" required multiple accept=".xlsx"></div><button type="submit">نمایش پیش‌نمایش</button></div></form></div>'''
  body+=notice('فایل مرجع موجودی با گزارش فروش روزانه فرق دارد. گزارش فروش باید «عنوان یا کد تنوع» و «تعداد ارسالی» داشته باشد. اگر قیمت معامله در فایل نباشد، قیمت فروش ثبت‌شده در کاتالوگ مبنا می‌شود؛ آن را قبل از تأیید کنترل کن.')
  return page('بارگذاری فروش روزانه',body,'پیش‌نمایش، کنترل موجودی و ثبت اتمیک')
 
@@ -214,5 +214,5 @@ def report_csv(conn=Depends(conn_dep)):
  return StreamingResponse(iter(['\ufeff'+output.getvalue()]),media_type='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename="daily-sales.csv"'})
 
 # Defined after page/auth helpers to allow master UI reuse without circular imports.
-from .master_api import router as master_router
+from .master_v2_api import router as master_router
 app.include_router(master_router)
