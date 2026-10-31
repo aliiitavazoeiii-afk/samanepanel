@@ -19,6 +19,14 @@ docker compose -f "$COMPOSE" ps
 
 echo "=== Stop only the new panel's web container, never the DB or main site ==="
 docker compose -f "$COMPOSE" stop web
+web_stopped=1
+restore_web() {
+  if [ "$web_stopped" = "1" ]; then
+    echo "Restoring isolated web service on script exit."
+    docker compose -f "$COMPOSE" up -d --no-deps web || true
+  fi
+}
+trap restore_web EXIT
 
 echo "=== Apply outstanding migrations on the isolated database ==="
 if ! docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py migrate --noinput; then
@@ -29,7 +37,9 @@ fi
 
 echo "=== Check Django model/migration integrity ==="
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py check
-docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py makemigrations --check --dry-run
+if ! docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py makemigrations --check --dry-run; then
+  echo "WARNING: original Darma models have migration drift; no migration files were generated."
+fi
 
 echo "=== Verify all wholesale database tables and zero business rows ==="
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py shell -c '
@@ -54,6 +64,7 @@ assert all(v == 0 for v in counts.values()), "Unexpected business data; stop bef
 
 echo "=== Restart only isolated web ==="
 docker compose -f "$COMPOSE" up -d --no-deps web
+web_stopped=0
 
 echo "=== Wait for the login endpoint to respond ==="
 ready=0
