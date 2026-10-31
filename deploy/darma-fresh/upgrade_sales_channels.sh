@@ -41,7 +41,10 @@ echo "Django system checks — no changes to DB"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py check
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py test core.tests_sister_sales -v 2
 
-echo "Original DigiKala engine tests and fresh-stock test"
+echo "Python compile checks (entire sister engine, including new UI)"
+docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -m compileall -q daily_sales_service tests
+
+echo "Legacy, fresh-stock and unified SKU master tests"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint env sister-digikala -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
 
 echo "Start the sister sales service and isolated Django web"
@@ -61,6 +64,9 @@ fi
 
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); n=c.execute("SELECT count(*) FROM products").fetchone()[0]; print("SISTER_VARIANTS",n); assert n==538; print("CURRENT_STOCK_SELLER_AND_DIGIKALA",tuple(c.execute("SELECT sum(seller_stock),sum(digikala_stock) FROM products").fetchone())); c.close()'
 
+echo "Checking canonical master without altering data"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); c.execute("SELECT COUNT(*) FROM master_products"); count=c.execute("SELECT COUNT(*) FROM master_products").fetchone()[0]; unmapped=c.execute("SELECT COUNT(*) FROM products WHERE master_id IS NULL").fetchone()[0]; print("SISTER_MASTER_SKUS",count,"UNMAPPED_DIGIKALA",unmapped); c.close()'
+
 code=""
 for _ in $(seq 1 50); do
   code="$(curl --max-time 4 --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18081/sales/ || true)"
@@ -73,6 +79,6 @@ if [ "$code" != "302" ]; then
   exit 1
 fi
 echo
-echo "SISTER_SALES_CHANNELS_READY"
-echo "Existing SSH tunnel: open /sales/ ; DigiKala: /sales/digikala/"
+echo "SISTER_MASTER_CATALOG_READY"
+echo "Existing SSH tunnel: /settings/products/ ; /inventory/stock/ ; /sales/digikala/"
 docker compose -f compose.fresh.yml ps
