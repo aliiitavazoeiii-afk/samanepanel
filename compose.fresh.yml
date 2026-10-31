@@ -27,6 +27,11 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:18081:8000"
+    networks:
+      default:
+      forosh_edge:
+        aliases:
+          - forosh-web
 
   sister-digikala:
     build:
@@ -49,3 +54,8 @@ services:
 volumes:
   pgdata:
   sister_sales_data:
+
+networks:
+  forosh_edge:
+    external: true
+    name: forosh_edge
