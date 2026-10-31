@@ -74,6 +74,8 @@ def init_db(db_path, catalog_path=None):
  conn=dbconnect(db_path)
  try:
   conn.executescript(SCHEMA)
+  from .master_engine import ensure_schema
+  ensure_schema(conn)
   with conn:
    for key,value in DEFAULT_SETTINGS.items():
     conn.execute('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)',(key,value))
@@ -94,8 +96,8 @@ def init_db(db_path, catalog_path=None):
 def fee_unit(price_toman, category, settings):
  """Matches darma-general/core/finance.py fee formula, category-specific commission."""
  price=Decimal(price_toman)
- if 'قالب کفش' in category or 'مراقبت کفش' in category: rate='commission_shoe'
- elif 'مردانه' in category: rate='commission_men'
+ if category == 'قالب' or 'قالب کفش' in category or 'مراقبت کفش' in category: rate='commission_shoe'
+ elif category == 'زیرپوش دارما' or 'مردانه' in category: rate='commission_men'
  elif 'زنانه' in category: rate='commission_women'
  else: rate='commission_other'
  commission=price*Decimal(settings[rate])/100
@@ -178,6 +180,9 @@ def parse_sales_xlsx(data):
  return out,ignored
 
 def prepare_preview(conn,sale_date,source,files):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  from .master_engine import strict_preview
+  return strict_preview(conn,sale_date,source,files)
  try:date.fromisoformat(sale_date)
  except ValueError:raise ImportErrorDetail('تاریخ باید میلادی و به شکل YYYY-MM-DD باشد.')
  if source not in ('seller','digikala'):raise ImportErrorDetail('منبع موجودی نامعتبر است.')
@@ -238,6 +243,9 @@ def create_preview(conn,sale_date,source,files):
  return {**preview,'token':token}
 
 def commit_preview(conn,token):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  from .master_engine import strict_commit
+  return strict_commit(conn,token)
  """Replacement, atomic, inventory invariant. Confirm only fresh preview."""
  conn.execute('BEGIN IMMEDIATE')
  try:
