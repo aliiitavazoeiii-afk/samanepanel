@@ -50,12 +50,20 @@
 @media(max-width:767px){.sister-suite .grid{grid-template-columns:1fr 1fr}.sister-suite .panel{padding:15px}.sister-suite .hero h1{font-size:1.3rem}}
 @media(max-width:460px){.sister-suite .grid{grid-template-columns:1fr}.sister-suite .forms>div{flex:1 1 100%}}
 </style>
+{% if embedded_page_css %}
+<style id="sister-product-layout-v2">
+/* Scoped layout for the new product, pricing and two-warehouse inventory views.
+   Kept inside native Django page; legacy/global FastAPI stylesheet excluded. */
+{{ embedded_page_css|safe }}
+</style>
+{% endif %}
 <div class="sister-suite">
   <div class="page-kicker">تعاریف و فروش / مدیریت محصولات</div>
   <nav class="section-nav" aria-label="بخش‌های محصولات و فروش">
     <a href="{% url 'settings_products' %}">محصولات و کدها</a>
     <a href="{% url 'settings_product_new' %}" {% if section == 'master' %}class="active"{% endif %}>تعریف محصولات</a>
     <a href="{% url 'sister_product_digikala' %}" {% if section == 'catalog' %}class="active"{% endif %}>محصولات دیجی‌کالا</a>
+    <a href="{% url 'sister_product_pricing' %}" {% if section == 'pricing' %}class="active"{% endif %}>قیمت‌گذاری</a>
     <a href="{% url 'inventory_stock' %}" {% if section == 'stock' %}class="active"{% endif %}>موجودی کالا</a>
     <a href="{% url 'sale_start' %}">فروش روزانه</a>
   </nav>
