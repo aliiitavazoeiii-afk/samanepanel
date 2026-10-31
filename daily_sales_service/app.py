@@ -13,7 +13,7 @@ from .engine import (BASE, DEFAULT_SETTINGS, ImportErrorDetail, dbconnect, init_
 
 ROOT='/daily-sales'; DB=os.environ.get('SALES_DB_PATH','/data/sales.sqlite3')
 security=HTTPBasic(auto_error=False)
-app=FastAPI(title='سامانه فروش روزانه دیجی‌کالا',docs_url=None,redoc_url=None,openapi_url=None)
+app=FastAPI(title='سامانه فروش و انبار پنل خواهر',docs_url=None,redoc_url=None,openapi_url=None)
 
 @app.on_event('startup')
 def startup():
@@ -67,7 +67,7 @@ def notice(content,kind='notice'):return f'<div class="notice {kind}">{content}<
 def table(headers,body):return '<div class="scroll"><table><thead><tr>'+''.join(f'<th>{e(x)}</th>' for x in headers)+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 def tr(cells):return '<tr>'+''.join(f'<td class="{cls}">{cell}</td>' for cell,cls in cells)+'</tr>'
 def page(title,body,desc=''):
- nav=[('داشبورد',ROOT+'/'),('ورود فروش',ROOT+'/import'),('تعریف محصولات اصلی',ROOT+'/master'),('موجودی کالا',ROOT+'/master/stock'),('محصولات دیجی‌کالا',ROOT+'/catalog'),('تنظیمات مالی',ROOT+'/settings')]
+ nav=[('داشبورد',ROOT+'/'),('ورود فروش',ROOT+'/import'),('تعریف محصولات اصلی',ROOT+'/master'),('موجودی کالا',ROOT+'/master/stock'),('پلتفرم‌ها',ROOT+'/platforms'),('گزارش جامع سرمایه',ROOT+'/capital-report'),('تنظیمات مالی',ROOT+'/settings')]
  return HTMLResponse('''<!doctype html><html lang="fa"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'''+e(title)+''' | فروش روزانه</title><style>'''+STYLE+'''</style></head><body><header><b>فروش روزانه · پنل دوم دیجی‌کالا</b><nav>'''+''.join(f'<a href="{p}">{n}</a>' for n,p in nav)+'''</nav></header><main><div class="hero"><div><h1>'''+e(title)+'''</h1><p>'''+e(desc)+'''</p></div></div>'''+body+'''</main><footer>هزینه‌ها به تومان هستند • نرخ‌ها و بهای تمام‌شده در لحظه ثبت فروش فریز می‌شوند</footer></body></html>''')
 
 def fail(err):return page('خطای عملیات',notice(e(err),'error')+f'<a class="button" href="{ROOT}/import">بازگشت به ورود فروش</a>')
