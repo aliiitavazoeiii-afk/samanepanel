@@ -60,6 +60,20 @@ chmod 600 .env
 docker compose -f compose.fresh.yml config --quiet
 docker compose -f compose.fresh.yml up -d --build
 
+# Compose marks a web container started before its entrypoint finishes
+# Django migrations. Wait for Gunicorn /login/ before touching business tables.
+initial_ready=0
+for i in $(seq 1 60); do
+  code="$(curl --max-time 3 -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/login/ || true)"
+  if [ "$code" = "200" ]; then initial_ready=1; break; fi
+  sleep 2
+done
+if [ "$initial_ready" -ne 1 ]; then
+  echo "ERROR: Django startup/migrations did not complete." >&2
+  docker compose -f compose.fresh.yml logs --tail=100 web
+  exit 1
+fi
+
 # Verify migrations, then create only two generic location keys needed by
 # existing Darma inventory screens. No brand, account, stock or sale data.
 docker compose -f compose.fresh.yml exec -T web python manage.py check
