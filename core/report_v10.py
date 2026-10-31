@@ -15,6 +15,7 @@ from .finance_excel_v9 import digikala_ledger_total
 from .models import ExcelManualRow, ExcelManualSetting, SaleLine
 from .report_v5 import _raw_material_context, manual_report_action as legacy_manual_report_action
 from .self_spend_v62 import is_self_tracking_row
+from .sister_capital import current_sister_capital
 
 
 @login_required
@@ -140,10 +141,11 @@ def report(request):
         "digikala_ledger_total": digikala_ledger,
         "dia_gallery_receivable": dia_gallery_receivable,
         "dia_gallery": dia_gallery,
+        "sister_capital": current_sister_capital(),
     }
     context.update(raw)
     context.update(finance_kpis())
-    return render(request, "core/report_excel_v97.html", context)
+    return render(request, "core/report_excel_sister_v1.html", context)
 
 
 @login_required
