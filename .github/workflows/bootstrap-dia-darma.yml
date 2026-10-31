@@ -42,6 +42,11 @@ jobs:
           git checkout --detach FETCH_HEAD
           git checkout --orphan dia-darma-fresh
 
+          # The upstream repo contains its own GitHub Actions workflows.
+          # They are not needed by the Django runtime and this app token
+          # must not create workflow files on a new branch.
+          git rm -r --ignore-unmatch .github/workflows || true
+
           mkdir -p deploy docs
           cp -a "$RUNNER_TEMP/dia-fresh-overlay/darma-fresh" deploy/
           cp "$RUNNER_TEMP/dia-fresh-overlay/DARMA_FRESH_BOOTSTRAP.md" docs/
