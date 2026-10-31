@@ -48,7 +48,7 @@ echo "Legacy, fresh-stock and unified SKU master tests"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint env sister-digikala -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
 
 echo "Verify new product, pricing and stock routes"
-docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.app import app; from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
+docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.app import app; from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog"); from daily_sales_service.platform_api import router as platforms; from daily_sales_service.capital_api import router as capital; p.update(x.path for sub in (platforms,capital) for x in sub.routes if hasattr(x,"path")); required+=("/platforms","/platforms/{channel}","/platforms/{channel}/sales","/capital-report","/api/sister-capital.json"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
 
 echo "Start the sister sales service and isolated Django web"
 docker compose -f compose.fresh.yml up -d --no-deps sister-digikala web
@@ -66,6 +66,9 @@ if [ "$ready" != "1" ]; then
 fi
 
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); n=c.execute("SELECT count(*) FROM products").fetchone()[0]; print("SISTER_VARIANTS",n); assert n==538; print("CURRENT_STOCK_SELLER_AND_DIGIKALA",tuple(c.execute("SELECT sum(seller_stock),sum(digikala_stock) FROM products").fetchone())); c.close()'
+
+echo "Checking effective-dated costing and linked platform tables"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); names={x[0] for x in c.execute("SELECT name FROM sqlite_master WHERE type=\x27table\x27")}; required={"master_cost_history","platform_listings","platform_sales","master_products","master_stock_events"}; assert required.issubset(names),required-names; print("SISTER_COST_HISTORY_AND_PLATFORMS_OK"); c.close()'
 
 echo "Checking canonical master without altering data"
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); c.execute("SELECT COUNT(*) FROM master_products"); count=c.execute("SELECT COUNT(*) FROM master_products").fetchone()[0]; unmapped=c.execute("SELECT COUNT(*) FROM products WHERE master_id IS NULL").fetchone()[0]; print("SISTER_MASTER_SKUS",count,"UNMAPPED_DIGIKALA",unmapped); c.close()'
@@ -91,5 +94,6 @@ fi
 echo
 echo "SISTER_MASTER_CATALOG_READY"
 echo "BODY_XLSX_PRODUCT_DEFINITIONS_READY"
-echo "Existing SSH tunnel: /settings/products/ ; /inventory/stock/ ; /sales/digikala/"
+echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
+echo "Existing SSH tunnel: /settings/products/ ; /settings/products/platforms/ ; /settings/products/pricing/ ; /inventory/stock/ ; /report/sister-capital/ ; /sales/"
 docker compose -f compose.fresh.yml ps
