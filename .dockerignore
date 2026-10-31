@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.git
+backups/
+**/__pycache__/
+**/*.pyc
+*.sqlite3
+*.sql
+.venv/
