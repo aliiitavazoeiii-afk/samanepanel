@@ -1,9 +1,16 @@
 from types import SimpleNamespace
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from . import sister_sales
 
+# The production runtime runs collectstatic before serving requests, whereas
+# a standalone SimpleTestCase deliberately does not create a staticfiles manifest.
+# Use the non-manifest storage backend ONLY for test rendering so we verify
+# channel routes and HTML without depending on a built asset manifest.
+@override_settings(STORAGES={
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
 class SalesChannelRoutesTest(SimpleTestCase):
     def test_sales_path_is_channels_and_all_four_named(self):
         self.assertEqual(reverse("sale_start"), "/sales/")
