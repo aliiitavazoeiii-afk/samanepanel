@@ -58,6 +58,8 @@ def ensure_schema(conn):
     if "sale_price_toman" not in fields:
         conn.execute("ALTER TABLE products ADD COLUMN sale_price_toman INTEGER")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_dk_master_id ON products(master_id)")
+    from .master_v2_logic import ensure_v2
+    ensure_v2(conn)
 
 def add_master(conn, category, code, title, size="-", color="-", sale_price=0, cost=None):
     category = str(category or "").strip()
@@ -140,7 +142,7 @@ def map_variant(conn, variant_id, master_id, sale_price):
 def strict_preview(conn,sale_date,source,files):
     try: date.fromisoformat(sale_date)
     except ValueError: raise ImportErrorDetail("تاریخ باید YYYY-MM-DD باشد.")
-    if source not in ("seller","digikala"): raise ImportErrorDetail("مبدأ موجودی نامعتبر است.")
+    if source not in ("seller","digikala","khorshid"): raise ImportErrorDetail("مبدأ موجودی نامعتبر است.")
     variants={int(r["variant_id"]):r for r in conn.execute("SELECT * FROM products")}
     masters={int(r["id"]):r for r in conn.execute("SELECT * FROM master_products")}
     by_title=defaultdict(list)
@@ -182,13 +184,14 @@ def strict_preview(conn,sale_date,source,files):
         return {"errors":["یک کد تنوع با چند قیمت در فایل وارد شده است."],"rows":[],"ignored":ignored,"fallback_prices":fallback}
     existing={r["variant_id"]:r for r in conn.execute("SELECT * FROM sales WHERE sale_date=? AND source=?",(sale_date,source))}
     cfg=settings_for(conn);prepared=[]
+    from .master_v2_logic import cost_for
     for vid,items in sorted(by_variant.items()):
         price,qty=items[0];master=masters[int(variants[vid]["master_id"])]
         fee=fee_unit(price,master["category"],cfg)
         prepared.append({"variant_id":vid,"master_id":master["id"],
                          "title":master["title"]+" / "+master["color"]+" / "+master["size"],
                          "category":master["category"],"qty":qty,"price":price,
-                         "cost":master["cost_toman"],**fee})
+                         "cost":cost_for(conn,dict(master)),**fee})
     old_per=defaultdict(int);new_per=defaultdict(int)
     for vid,old in existing.items():
         variant=variants.get(vid)
@@ -197,7 +200,7 @@ def strict_preview(conn,sale_date,source,files):
             continue
         old_per[int(variant["master_id"])]+=int(old["qty"])
     for item in prepared:new_per[int(item["master_id"])]+=int(item["qty"])
-    col="seller_stock" if source=="seller" else "digikala_stock"
+    col={"seller":"seller_stock","khorshid":"khorshid_stock","digikala":"digikala_stock"}[source]
     changes=[]
     for mid in set(old_per)|set(new_per):
         master=masters.get(mid)
@@ -224,7 +227,7 @@ def strict_commit(conn,token):
         p=json.loads(found["payload"])
         if p.get("errors"):raise ImportErrorDetail("پیش‌نمایش معتبر نیست.")
         day,source=p["sale_date"],p["source"]
-        if source not in ("seller","digikala"):raise ImportErrorDetail("مبدأ نامعتبر است.")
+        if source not in ("seller","digikala","khorshid"):raise ImportErrorDetail("مبدأ نامعتبر است.")
         old={r["variant_id"]:r for r in conn.execute("SELECT * FROM sales WHERE sale_date=? AND source=?",(day,source))}
         new={r["variant_id"]:r for r in p["rows"]}
         old_per=defaultdict(int);new_per=defaultdict(int)
@@ -239,7 +242,7 @@ def strict_commit(conn,token):
                 raise ImportErrorDetail(f"اتصال محصول {vid} تغییر کرده؛ پیش‌نمایش جدید بگیر.")
             if vid in old:old_per[links[vid]]+=int(old[vid]["qty"])
             if vid in new:new_per[links[vid]]+=int(new[vid]["qty"])
-        col="seller_stock" if source=="seller" else "digikala_stock"
+        col={"seller":"seller_stock","khorshid":"khorshid_stock","digikala":"digikala_stock"}[source]
         adjustments={}
         for mid in set(old_per)|set(new_per):
             row=conn.execute(f"SELECT {col} FROM master_products WHERE id=?",(mid,)).fetchone()
