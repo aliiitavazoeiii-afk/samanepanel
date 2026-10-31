@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY deploy/darma-fresh/requirements.sister-sales.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY daily_sales_service/ /app/daily_sales_service/
+COPY tests/ /app/tests/
+EXPOSE 8018
+CMD ["uvicorn", "daily_sales_service.app:app", "--host", "0.0.0.0", "--port", "8018"]

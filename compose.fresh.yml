@@ -28,5 +28,24 @@ services:
     ports:
       - "127.0.0.1:18081:8000"
 
+  sister-digikala:
+    build:
+      context: .
+      dockerfile: deploy/darma-fresh/Dockerfile.sister-sales
+    restart: unless-stopped
+    environment:
+      SALES_DB_PATH: /data/sales.sqlite3
+      SALES_ADMIN_USER: bridge
+      SALES_ADMIN_PASSWORD: ${SALES_ADMIN_PASSWORD:?Set the unique sister sales password}
+      SALES_START_EMPTY_STOCK: "1"
+    volumes:
+      - sister_sales_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8018/daily-sales/healthz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata:
+  sister_sales_data:
