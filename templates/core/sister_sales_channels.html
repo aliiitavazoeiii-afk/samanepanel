@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block title %}کانال‌های فروش روزانه{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-<div><div class="page-kicker">مدیریت فروش</div><h1 class="page-title mb-0">فروش روزانه</h1><div class="text-secondary mt-2">انتخاب کانال فروش</div></div>
+<div><div class="page-kicker">مدیریت فروش</div><h1 class="page-title mb-0">فروش روزانه</h1><div class="text-secondary mt-2">انتخاب پلتفرم فروش</div></div>
 {% if selected %}<a class="btn btn-outline-light" href="{% url 'sale_start' %}">بازگشت</a>{% endif %}
 </div>
 {% if selected %}
@@ -15,14 +15,14 @@
 <h2 class="mt-4">فروش دیجی‌کالا</h2><p class="text-secondary">ورود اکسل، کارمزد، گزارش و موجودی</p><div style="color:#fdb022" class="mt-3">ورود به دیجی‌کالا ←</div></div></div></a></div>
 <div class="col-md-6"><a href="{% url 'sister_sales_site' %}" class="text-decoration-none text-reset"><div class="card quick-card h-100"><div class="card-body p-4" style="min-height:198px">
 <div class="d-flex justify-content-between"><span class="quick-icon">S</span><span class="badge badge-soft-orange">آماده‌سازی</span></div>
-<h2 class="mt-4">فروش سایت</h2><p class="text-secondary">فروش مستقیم فروشگاه اینترنتی</p><div style="color:#fdb022" class="mt-3">مشاهده ←</div></div></div></a></div>
+<h2 class="mt-4">فروش سایت</h2><p class="text-secondary">ثبت فروش مستقیم از کالاهای تعریف‌شده در پلتفرم سایت</p><div style="color:#fdb022" class="mt-3">مشاهده ←</div></div></div></a></div>
 <div class="col-md-6"><a href="{% url 'sister_sales_basalam' %}" class="text-decoration-none text-reset"><div class="card quick-card h-100"><div class="card-body p-4" style="min-height:198px">
 <div class="d-flex justify-content-between"><span class="quick-icon">B</span><span class="badge badge-soft-orange">آماده‌سازی</span></div>
 <h2 class="mt-4">فروش باسلام</h2><p class="text-secondary">صورت روزانه سفارش‌های باسلام</p><div style="color:#fdb022" class="mt-3">مشاهده ←</div></div></div></a></div>
 <div class="col-md-6"><a href="{% url 'sister_sales_ghaleb' %}" class="text-decoration-none text-reset"><div class="card quick-card h-100"><div class="card-body p-4" style="min-height:198px">
 <div class="d-flex justify-content-between"><span class="quick-icon">G</span><span class="badge badge-soft-orange">آماده‌سازی</span></div>
-<h2 class="mt-4">فروش قالب</h2><p class="text-secondary">ثبت قالب کفش با حساب مستقل</p><div style="color:#fdb022" class="mt-3">مشاهده ←</div></div></div></a></div>
+<h2 class="mt-4">فروش قالب</h2><p class="text-secondary">ثبت فروش قالب از موجودی اصلی و محصولات تعریف‌شده</p><div style="color:#fdb022" class="mt-3">مشاهده ←</div></div></div></a></div>
 </div>
-<div class="card mt-4"><div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3"><div><strong>تعریف محصولات اصلی و کدهای دیجی‌کالا</strong><div class="text-secondary small">ابتدا پنج دسته محصول را تعریف کن، بعد تنوع دیجی‌کالا را به هر کالای واقعی متصل کن و موجودی را وارد کن.</div></div><a class="btn btn-primary" href="{% url 'settings_products' %}">تعریف محصولات</a></div></div>
-<div class="text-secondary small mt-3">موجودی اصلی فقط از بخش «موجودی کالا» ثبت می‌شود. فروش دیجی‌کالا بدون اتصال کد تنوع به محصول اصلی ثبت نخواهد شد.</div>
+<div class="card mt-4"><div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3"><div><strong>تعریف محصولات اصلی و پلتفرم‌های فروش</strong><div class="text-secondary small">ابتدا کالا و رنگ و سایز را تعریف کن، سپس بسته‌های هر پلتفرم را به همان موجودی متصل کن.</div></div><a class="btn btn-primary" href="{% url 'settings_products' %}">تعریف محصولات</a></div></div>
+<div class="text-secondary small mt-3">تمام پلتفرم‌ها موجودی فیزیکی مشترک دارند. تعداد فروخته‌شده هر پک از خانه یا خورشید کسر می‌شود.</div>
 {% endif %}{% endblock %}
