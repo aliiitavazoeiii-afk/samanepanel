@@ -83,7 +83,7 @@ def master_add(category:str=Form(...),code:str=Form(...),title:str=Form(...),siz
 def master_edit(master_id:int=Form(...),title:str=Form(...),price:str=Form(...),cost:str=Form(""),active:str=Form(""),conn=Depends(conn_dep)):
     try:update_master(conn,master_id,title,price,cost,bool(active))
     except (ImportErrorDetail,ValueError) as ex:return fail(ex)
-    return RedirectResponse(ROOT+"/master?q="+str(master_id),status_code=303)
+    return RedirectResponse(ROOT+"/master",status_code=303)
 
 @router.get(ROOT+"/master/stock")
 def stock(category:str="",q:str="",page_no:int=1,conn=Depends(conn_dep)):
@@ -132,7 +132,7 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
     total=conn.execute("SELECT COUNT(*) FROM products p "+where,args).fetchone()[0]
     mapped=conn.execute("SELECT COUNT(*) FROM products WHERE master_id IS NOT NULL").fetchone()[0]
     rows=conn.execute("""SELECT p.*,m.code master_code,m.category master_category,
-       m.color master_color,m.size master_size,m.title master_title
+       m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price
        FROM products p LEFT JOIN master_products m ON m.id=p.master_id """+where+
        " ORDER BY p.master_id IS NULL DESC,p.category,p.title LIMIT 50 OFFSET ?",
        args+[(page_no-1)*50]).fetchall()
@@ -154,7 +154,7 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
         mapped_to=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+e(r["master_color"])+" / "+e(r["master_size"])) if r["master_id"] else '<span style="color:#ffa460">بدون اتصال</span>'
         catalog_rows+=tr([(f'<a href="{ROOT}/catalog?q={r["variant_id"]}">{r["variant_id"]}</a>',"num"),
                          (e(r["title"]),"title"),(e(r["category"]),""),
-                         (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else r["list_price_rial"]//10),"num"),
+                         (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else (r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)),"num"),
                          (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else '—',"")])
     body+='<div class="panel"><h3>فهرست کدهای دیجی‌کالا · '+fmt(total)+' ردیف</h3>'+table(
         ["کد تنوع","عنوان دیجی‌کالا","گروه ارسالی","اتصال به کالای اصلی","قیمت فعلی/پیش‌فرض (تومان)","موجودی"],catalog_rows)+'</div>'
