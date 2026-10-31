@@ -45,7 +45,7 @@ jobs:
           # The upstream repo contains its own GitHub Actions workflows.
           # They are not needed by the Django runtime and this app token
           # must not create workflow files on a new branch.
-          git rm -r --ignore-unmatch .github/workflows || true
+          git rm -rf --ignore-unmatch .github/workflows
 
           mkdir -p deploy docs
           cp -a "$RUNNER_TEMP/dia-fresh-overlay/darma-fresh" deploy/
