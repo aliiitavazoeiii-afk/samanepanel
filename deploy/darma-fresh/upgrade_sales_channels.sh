@@ -37,6 +37,7 @@ docker compose -f compose.fresh.yml config --quiet
 docker compose -f compose.fresh.yml build web sister-digikala
 echo "Django system checks — no changes to DB"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py check
+docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py test core.tests_sister_sales -v 2
 
 echo "Original DigiKala engine tests and fresh-stock test"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint env sister-digikala -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
