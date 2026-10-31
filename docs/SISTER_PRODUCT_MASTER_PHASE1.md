@@ -45,16 +45,46 @@ the dedicated sister SQLite volume. Site/Basalam/mold sales cards are placeholde
 and do not yet change stock; those channel flows should be implemented against
 this same SKU master next, never against a second inventory ledger.
 
-## Pending user input
-The five category Excel workbooks have not been supplied in this conversation.
-No user-specific products from those files have yet been populated. The 538
-DigiKala variants are pre-existing **external variant references**, not
-physical master SKUs and not current inventory.
+## body.xlsx definitions supplied 2026-10-31
+User uploaded `body.xlsx`, Sheet1 (used range A1:R47). Parsed and preserved
+normalized color/design labels from these ranges:
 
-Before bulk import, inspect actual Excel column names and identity structure,
-especially pack vs piece quantity and variant/color/size. Implement a
-preview/idempotent upsert based on exact incoming columns, then import into
-`master_products` with **zero opening stock** until reconciled.
+| Group | Source | Colors | Sizes | SKUs | Master category |
+| --- | --- | ---: | --- | ---: | --- |
+| Men's slip | E5:E22 | 18 | L,XL,2XL,3XL | 72 | بادیگارد |
+| Men's legged/padar | N5:N26 | 22 | L,XL,2XL,3XL | 88 | بادیگارد |
+| Undershirts | E30:E32 | 3 | M,L,XL | 9 | زیرپوش دارما |
+| Dia women's | E37:E40 | 4 | M,L,XL,XXL | 16 | شورت زنانه دیا |
+| Darma women's | E43:E47 | 5 | M,L,XL,XXL,3XL | 25 | شورت زنانه دارما |
+| Shoe molds | User conversation (not file) | — | کوچک,متوسط,بزرگ | 3 | قالب |
+| TOTAL | | | | **213** | |
+
+Source labels and provenance (including which size sets are inferred) are in
+`daily_sales_service/catalog_body_20261031.json` and checked in
+`tests/test_catalog_import.py`. **Women's Darma sizes were absent in the
+uploaded sheet:** five sizes were provisionally based on the owner's previously
+specified size range, and should be confirmed before relying on them. Molds
+were specified by owner verbally, not listed in the workbook.
+
+The source does not provide factory SKUs, prices, or opening stock:
+`catalog_import.py` generates stable **internal** codes BG-SL-01 etc.,
+uses zero prices, null cost and zero opening seller/DigiKala stock.
+Import is idempotent, also matches an existing exact design with an alternate
+manually chosen code, and never overwrites any existing price, cost, stock,
+or sale history. The 538 DigiKala variant references are separate and
+require manual mapping to one of these master SKUs.
+
+Deployment: obtain current
+`deploy/darma-fresh/upgrade_sales_channels.sh` after commit
+`78ca73788cf50291194990cb91fd4b5e4f36019b`, then run on isolated server.
+It backs up databases, runs tests, deploys only the isolated services and
+executes `python -m daily_sales_service.catalog_import --dry-run` followed by
+`--apply`. Success markers: `SISTER_BODY_CATALOG_213_IMPORTED`,
+`BODY_CATALOG_MATCHES 213 OF 213`,
+`BODY_XLSX_PRODUCT_DEFINITIONS_READY`.
+
+**Not deployed by the assistant** (no shell access to owner's VPS).
+The owner must run the script; check its output before claiming data is live.
 
 ## Financial caution
 Men's product commission 24.3%, molds/shoe category 22.5%.
