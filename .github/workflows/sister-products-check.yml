@@ -29,8 +29,10 @@ jobs:
           from daily_sales_service.master_v2_api import router
           paths = {r.path for r in router.routes if hasattr(r,"path")}
           for suffix in ('/master', '/master/stock', '/master/stock/operations',
-                         '/pricing', '/pricing/cost', '/pricing/sales', '/catalog',
-                         '/import', '/preview', '/commit'):
+                         '/pricing', '/pricing/cost', '/pricing/sales', '/catalog'):
               assert '/daily-sales' + suffix in paths, suffix
+          app_paths = {r.path for r in app.routes if hasattr(r,"path")}
+          for suffix in ('/import', '/preview', '/commit'):
+              assert '/daily-sales' + suffix in app_paths, suffix
           print('SISTER_PRODUCT_MASTER_ROUTES_OK')
           PY
