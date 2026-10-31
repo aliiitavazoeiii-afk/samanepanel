@@ -76,6 +76,9 @@ echo "Fetching isolated Samanepanel code"
 git fetch origin dia-darma-fresh
 git merge --ff-only origin/dia-darma-fresh
 git diff --quiet && git diff --cached --quiet || die "Unexpected tracked changes after fetch"
+# The current fresh Compose declares this pre-existing isolated external
+# network. Ensure it exists even when the user has not rerun the old upgrade.
+docker network inspect forosh_edge >/dev/null 2>&1 || docker network create --driver bridge forosh_edge >/dev/null
 docker compose -f "$COMPOSE" config --quiet
 
 umask 077
