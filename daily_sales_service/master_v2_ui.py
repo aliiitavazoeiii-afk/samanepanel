@@ -46,6 +46,7 @@ STYLE="""
 .m2-history th,.m2-history td{padding:10px;border-bottom:1px solid #2d4860;text-align:right;color:#e4effb;font-size:12px}
 .m2-msg{padding:13px 16px;background:#533c23;border:1px solid #916d45;border-radius:9px;margin:15px 0;color:#ffdfac}
 @media(max-width:700px){.m2-filters form{grid-template-columns:1fr}.m2-tabs{flex-wrap:nowrap;overflow:auto}.m2-tabs a{white-space:nowrap}.m2-card{padding:15px}.m2-table th,.m2-table td{padding:10px}.m2-hero h1{font-size:20px}}
+</style>
 """
 
 def with_style(page_response):
