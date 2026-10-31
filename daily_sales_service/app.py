@@ -67,7 +67,7 @@ def notice(content,kind='notice'):return f'<div class="notice {kind}">{content}<
 def table(headers,body):return '<div class="scroll"><table><thead><tr>'+''.join(f'<th>{e(x)}</th>' for x in headers)+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 def tr(cells):return '<tr>'+''.join(f'<td class="{cls}">{cell}</td>' for cell,cls in cells)+'</tr>'
 def page(title,body,desc=''):
- nav=[('داشبورد',ROOT+'/'),('ورود فروش',ROOT+'/import'),('موجودی و قیمت تمام‌شده',ROOT+'/inventory'),('تنظیمات مالی',ROOT+'/settings')]
+ nav=[('داشبورد',ROOT+'/'),('ورود فروش',ROOT+'/import'),('تعریف محصولات اصلی',ROOT+'/master'),('موجودی کالا',ROOT+'/master/stock'),('محصولات دیجی‌کالا',ROOT+'/catalog'),('تنظیمات مالی',ROOT+'/settings')]
  return HTMLResponse('''<!doctype html><html lang="fa"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'''+e(title)+''' | فروش روزانه</title><style>'''+STYLE+'''</style></head><body><header><b>فروش روزانه · پنل دوم دیجی‌کالا</b><nav>'''+''.join(f'<a href="{p}">{n}</a>' for n,p in nav)+'''</nav></header><main><div class="hero"><div><h1>'''+e(title)+'''</h1><p>'''+e(desc)+'''</p></div></div>'''+body+'''</main><footer>هزینه‌ها به تومان هستند • نرخ‌ها و بهای تمام‌شده در لحظه ثبت فروش فریز می‌شوند</footer></body></html>''')
 
 def fail(err):return page('خطای عملیات',notice(e(err),'error')+f'<a class="button" href="{ROOT}/import">بازگشت به ورود فروش</a>')
@@ -125,6 +125,8 @@ def commit(token:str=Form(...),conn=Depends(conn_dep)):
 
 @app.get(ROOT+'/inventory',response_class=HTMLResponse)
 def inventory(q:str='',conn=Depends(conn_dep)):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  return RedirectResponse(ROOT+'/catalog',status_code=302)
  rows=conn.execute('SELECT * FROM products WHERE title LIKE ? OR CAST(variant_id AS TEXT) LIKE ? ORDER BY category,title LIMIT 538',(f'%{q}%',f'%{q}%')).fetchall()
  body=f'''<div class="panel"><form method="get" class="forms"><div><label>نام یا کد تنوع</label><input name="q" value="{e(q)}" placeholder="جست‌وجو..." /></div><button type="submit">جست‌وجو</button></form></div>'''
  table_rows=''
@@ -137,12 +139,16 @@ def inventory(q:str='',conn=Depends(conn_dep)):
 
 @app.post(ROOT+'/cost')
 def cost(variant_id:int=Form(...),cost:str=Form(...),conn=Depends(conn_dep)):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  return fail('بهای تمام‌شده باید در تعریف کالای اصلی اصلاح شود، نه کد تنوع دیجی‌کالا.')
  try:set_cost(conn,variant_id,cost)
  except (ImportErrorDetail,ValueError) as ex:return fail(ex)
  return RedirectResponse(ROOT+'/inventory?q='+str(variant_id),status_code=303)
 
 @app.post(ROOT+'/costs/upload',response_class=HTMLResponse)
 async def costs_upload(file:UploadFile=File(...),conn=Depends(conn_dep)):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  return fail('بهای تمام‌شده در کالای اصلی ثبت می‌شود. از بخش تعریف محصولات استفاده کن.')
  try:
   if not file.filename.lower().endswith('.xlsx'):raise ImportErrorDetail('فایل باید XLSX باشد.')
   values=xlsx_rows(await file.read());header=next((i for i,row in enumerate(values[:10]) if any(normalize(v)=='کد تنوع' for v in row) and any('بهای تمام شده' in normalize(v).replace('‌',' ') or 'بهای تمام‌شده' in normalize(v) for v in row)),None)
@@ -167,6 +173,8 @@ async def costs_upload(file:UploadFile=File(...),conn=Depends(conn_dep)):
 
 @app.post(ROOT+'/stock/adjust',response_class=HTMLResponse)
 def stock_adjust(variant_id:int=Form(...),source:str=Form(...),stock:int=Form(...),reason:str=Form(...),conn=Depends(conn_dep)):
+ if os.getenv('SALES_MASTER_STRICT','1') != '0':
+  return fail('موجودی باید در بخش موجودی کالای اصلی وارد شود، نه در تنوع دیجی‌کالا.')
  try:
   if source not in ('seller','digikala') or stock<0 or not reason.strip():raise ImportErrorDetail('اطلاعات اصلاح موجودی نامعتبر است.')
   col='seller_stock' if source=='seller' else 'digikala_stock'
@@ -204,3 +212,7 @@ def report_csv(conn=Depends(conn_dep)):
  w.writerow(fields)
  for x in data:w.writerow([x.get(k) for k in fields])
  return StreamingResponse(iter(['\ufeff'+output.getvalue()]),media_type='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename="daily-sales.csv"'})
+
+# Defined after page/auth helpers to allow master UI reuse without circular imports.
+from .master_api import router as master_router
+app.include_router(master_router)
