@@ -67,6 +67,8 @@ def ensure_v2(conn):
     conn.execute("""UPDATE master_products SET subtype='پادار'
                     WHERE category='بادیگارد' AND subtype=''
                       AND (code LIKE 'BG-PA-%' OR title LIKE '%پادار%')""")
+    from .effective_costs import ensure_cost_history
+    ensure_cost_history(conn)
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
@@ -234,13 +236,10 @@ def set_cost_rule(conn,category,subtype,size,cost):
        (category,subtype,size,price,now()))
     return price
 
-def cost_for(conn,sku):
-    category,subtype,size=sku["category"],sku.get("subtype",""),sku["size"]
-    for sp in (size,"*"):
-        r=conn.execute("""SELECT cost_toman FROM master_cost_rules
-            WHERE category=? AND subtype=? AND size=?""",(category,subtype,sp)).fetchone()
-        if r is not None:return int(r[0])
-    return sku.get("cost_toman")
+def cost_for(conn,sku,as_of=None):
+    from .effective_costs import dated_cost
+    return dated_cost(conn,sku,as_of)
+
 
 def set_channel_prices(conn,channel,category,subtype,size,price,model_id=None):
     if channel not in CHANNELS:raise ImportErrorDetail("درگاه فروش نامعتبر است.")
