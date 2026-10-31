@@ -8,9 +8,13 @@ from .master_engine import now
 from .master_v2_logic import _warehouse_col
 
 def _last_event(conn,master_id,location):
-    return conn.execute("""SELECT id,reference,balance_after FROM master_stock_events
-        WHERE master_id=? AND source=? ORDER BY id DESC LIMIT 1""",
-        (master_id,location)).fetchone()
+    # Daily DigiKala home sales use source='seller'; both names are the
+    # same physical home balance, so either must block unsafe rewrites.
+    sources=("home","seller") if location=="home" else (location,)
+    placeholders=",".join("?" for _ in sources)
+    return conn.execute(f"""SELECT id,reference,balance_after FROM master_stock_events
+        WHERE master_id=? AND source IN ({placeholders}) ORDER BY id DESC LIMIT 1""",
+        (master_id,*sources)).fetchone()
 
 def undo_adjustment(conn,event_id):
     conn.execute("BEGIN IMMEDIATE")
