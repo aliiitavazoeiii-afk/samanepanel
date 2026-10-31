@@ -71,7 +71,7 @@ def canonical_page_links(body):
     for tail, target in sorted(_CANONICAL_PAGES.items(), key=lambda pair: -len(pair[0])):
         original = _ROOT + "/" + tail
         body = re.sub(
-            r'(?P<attribute>\\b(?:href|action)=")' + re.escape(original) + r'(?=[?"])',
+            r'(?P<attribute>\b(?:href|action)=")' + re.escape(original) + r'(?=[?"])',
             lambda match: match.group("attribute") + target,
             body,
         )
@@ -85,7 +85,7 @@ def embedded_response(request, upstream_html, tail, status=200):
     spacing, glass cards and mobile menu. Keep the upstream business forms
     and CSRF protection intact.
     """
-    match = re.search(r"<main(?:\\s[^>]*)?>(.*?)</main>", upstream_html, flags=re.I | re.S)
+    match = re.search(r"<main(?:\s[^>]*)?>(.*?)</main>", upstream_html, flags=re.I | re.S)
     if match is None:
         return HttpResponse("قالب محتوای سرویس فروش معتبر نیست.", status=502)
     body = canonical_page_links(add_csrf(request, match.group(1)))
@@ -168,19 +168,6 @@ def add_csrf(request, html):
             return tag + '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrf + '">'
         return tag
     return re.sub(r"<form\b[^>]*>", substitute, html, flags=re.I)
-
-
-_DARK_CSS = """</style><style>
-body{background:#06111f!important;color:#eef4fa!important}
-header{background:#0b1c33!important;border-color:#2e4860!important}
-header b,header nav a,h1,h2,h3{color:#fff!important}
-header nav a,.card,.panel{background:#102642!important;color:#eef4fa!important;border-color:#2b4864!important}
-p,label,.card small,footer,.faint{color:#b4c6d9!important}
-table th{background:#163655!important;color:#f0f6ff!important}
-table td{border-color:#24415d!important}
-input,select{background:#182f4b!important;color:white!important;border-color:#365774!important}
-.notice{background:#182d44!important;color:#ecf3fd!important;border-color:#b78a53!important}
-</style></head>"""
 
 
 @login_required
