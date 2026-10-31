@@ -1,0 +1,35 @@
+name: Sister product master checks
+on:
+  push:
+    branches: [dia-darma-fresh]
+  workflow_dispatch:
+
+jobs:
+  sister-sales-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v4
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install sister engine
+        run: pip install -r deploy/darma-fresh/requirements.sister-sales.txt
+      - name: Compile all sister modules
+        run: python -m compileall -q daily_sales_service tests
+      - name: Run legacy and master inventory regression tests
+        env:
+          SALES_MASTER_STRICT: '1'
+        run: env -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
+      - name: Verify FastAPI routes
+        run: |
+          python - <<'PY'
+          from daily_sales_service.app import app
+          paths = {r.path for r in app.routes}
+          for suffix in ('/master', '/master/stock', '/master/stock/operations',
+                         '/pricing', '/pricing/cost', '/pricing/sales', '/catalog',
+                         '/import', '/preview', '/commit'):
+              assert '/daily-sales' + suffix in paths, suffix
+          print('SISTER_PRODUCT_MASTER_ROUTES_OK')
+          PY
