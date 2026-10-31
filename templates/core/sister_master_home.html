@@ -1,0 +1,43 @@
+{% extends 'base.html' %}{% block title %}محصولات و کدها{% endblock %}
+{% block content %}
+<style>
+.master-head{margin-bottom:25px}.master-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.master-card{display:block;min-height:182px;padding:25px;border-radius:20px;color:#f8fafc;text-decoration:none;border:1px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(25,56,86,.45),rgba(6,22,39,.34));transition:.18s}
+.master-card:hover{color:white;transform:translateY(-3px);border-color:#f4a05c}
+.master-card h2{font-size:1.5rem;margin:18px 0 10px}.master-card p{color:#b1c2d3}
+.master-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:#c16b2126;color:#ffb475;font-size:1.5rem}
+.master-category-list{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+.master-category-list a{display:inline-flex;text-decoration:none;border:1px solid #466077;background:#152e49;color:#f6faff;border-radius:10px;padding:11px 15px}
+.master-category-list a:hover{border-color:#f5a663}
+@media(max-width:730px){.master-grid{grid-template-columns:1fr}}
+</style>
+<div class="master-head">
+<div class="page-kicker">تعاریف</div>
+<h1 class="page-title">محصولات و کدها</h1>
+<p class="text-secondary mt-2">مرجع اصلی کالاهای کسب‌وکار؛ ابتدا محصول، سپس موجودی، سپس ثبت فروش.</p>
+</div>
+<div class="master-grid">
+<a class="master-card" href="{% url 'settings_product_new' %}">
+<div class="master-icon">▦</div><h2>تعریف محصولات</h2>
+<p>کد، گروه، عنوان، رنگ، سایز، قیمت فروش و بهای تمام‌شده. مبنای موجودی و تمام کانال‌های فروش.</p>
+<span style="color:#fdb022">ورود به تعریف محصولات ←</span>
+</a>
+<a class="master-card" href="{% url 'sister_product_digikala' %}">
+<div class="master-icon">D</div><h2>محصولات دیجی‌کالا</h2>
+<p>فهرست ۵۳۸ کد تنوع موجود؛ اتصال هر تنوع به محصول اصلی و تعیین قیمت فروش دیجی‌کالا.</p>
+<span style="color:#fdb022">ورود به محصولات دیجی‌کالا ←</span>
+</a>
+</div>
+<div class="card mt-4"><div class="card-body p-4">
+<h3>دسته‌بندی محصولات اصلی</h3>
+<div class="master-category-list">
+<a href="{% url 'settings_product_new' %}?category=زیرپوش%20دارما">زیرپوش دارما</a>
+<a href="{% url 'settings_product_new' %}?category=شورت%20زنانه%20دارما">شورت زنانه دارما</a>
+<a href="{% url 'settings_product_new' %}?category=شورت%20زنانه%20دیا">شورت زنانه دیا</a>
+<a href="{% url 'settings_product_new' %}?category=بادیگارد">بادیگارد</a>
+<a href="{% url 'settings_product_new' %}?category=قالب">قالب</a>
+</div>
+<div class="mt-4"><a class="btn btn-primary" href="{% url 'inventory_stock' %}">ورود به موجودی کالا</a></div>
+<div class="text-secondary small mt-3">هر کالا تنها یک موجودی اصلی دارد؛ کدهای دیجی‌کالا به همان کالا متصل می‌شوند. کسر موجودی برای کدهای بدون اتصال مجاز نیست.</div>
+</div></div>
+{% endblock %}
