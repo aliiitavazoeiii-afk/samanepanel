@@ -139,7 +139,7 @@ def stock(category:str="",subtype:str="",q:str="",model_id:int|None=None,conn=De
     if legacy:
         body+=f'<div class="m2-msg">{fmt(legacy)} عدد موجودی قدیمیِ «نزد دیجی‌کالا» جداگانه محفوظ است؛ بدون تأیید تو به خورشید منتقل نمی‌شود.</div>'
     body+=category_tabs("/master/stock",category)
-    body+=_filter_form("/master/stock",category,subtype,q,models,model_id,with_model=True)
+    body+=_filter_form("/master/stock",category,subtype,q,models,model_id,with_model=False)
     body+=f'<div class="m2-hero"><h2>{e(category)}'+(f' — {e(subtype)}' if subtype else '')+'</h2>'
     ops_link=f'{ROOT}/master/stock/operations?category={quote(category)}'
     if subtype:ops_link+='&subtype='+quote(subtype)
@@ -191,7 +191,10 @@ def operations(category:str="",model_id:int|None=None,subtype:str="",size:str=""
         opts='<option value="">همه نوع‌ها</option>'+''.join(
             f'<option value="{e(x)}"'+(' selected' if subtype==x else '')+f'>{e(x)}</option>' for x in BODY_TYPES)
         body+='<div><label>نوع بادیگارد</label><select name="subtype">'+opts+'</select></div>'
-    body+='<div><label>مدل محصول</label><select name="model_id">'+group_options(models,model_id)+'</select></div>'
+    # The imported catalog uses a separate internal code for every color.
+    # Avoid exposing that technical choice as dozens of confusing model filters.
+    if model_id:
+        body+=f'<input type="hidden" name="model_id" value="{model_id}">'
     body+='<div><label>سایز</label><select name="size">'+''.join(f'<option value="{e(s)}"'+(' selected' if s==size else '')+'>'+e(s)+'</option>' for s in sizes)+'</select></div>'
     body+='<div><label>محل اصلاح</label><select name="location"><option value="home"'+(' selected' if location=="home" else '')+'>خانه</option><option value="khorshid"'+(' selected' if location=="khorshid" else '')+'>خورشید</option></select></div>'
     body+='<div><button type="submit">نمایش موجودی</button></div></form></div>'
