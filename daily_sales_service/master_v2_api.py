@@ -104,7 +104,7 @@ def master(category:str="",subtype:str="",q:str="",conn=Depends(conn_dep)):
                 intro+='<p class="m2-hint">رنگ‌ها به‌صورت یک مدل نمایش داده می‌شوند و شناسه‌های قبلیِ کالا بدون تغییر باقی مانده‌اند.</p>'
             intro+=f'<p><a class="m2-btn" href="{ROOT}/master/stock?category={quote(category)}'+(f'&subtype={quote(group_type)}' if group_type else '')+'">مشاهده موجودی</a></p></div>'
         intro+='</div>'
-    intro+=f'<p style="margin-top:24px"><a href="{ROOT}/catalog">محصولات دیجی‌کالا</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
+    intro+=f'<p style="margin-top:24px"><a href="{ROOT}/platforms">پلتفرم‌ها</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
     return page_with_style("تعریف محصولات",intro)
 
 @router.post(ROOT+"/master/add")
@@ -305,7 +305,7 @@ def cost_prices(as_of:str="",conn=Depends(conn_dep)):
                 SELECT MAX(y.effective_date) FROM master_cost_history y
                 WHERE y.category=h.category AND y.subtype=h.subtype AND y.size=h.size AND y.effective_date<=?)""",(shown,))}
     body='<h1>بهای تمام‌شده</h1><p class="m2-hint">برای هر دسته، بهای تمام‌شده جدید و تاریخ اجرای آن را مشخص کن. از همان تاریخ، ارزش موجودی و بهای فروش‌های جدید با نرخ تازه محاسبه می‌شود. فروش‌های ثبت‌شده قبلی تغییر نمی‌کنند.</p>'
-    body+=_price_tiles()
+    body+=f'<div class="m2-tabs"><a class="current" href="{ROOT}/pricing/cost">بهای تمام‌شده</a><a href="{ROOT}/pricing/sales">قیمت فروش</a></div>'
     body+=f'<form action="{ROOT}/pricing/cost" method="get" class="m2-filters" style="margin-top:18px"><label>مشاهده نرخ‌های مؤثر در تاریخ</label><div class="m2-fields"><input name="as_of" type="date" value="{e(shown)}"><button type="submit" class="m2-btn">نمایش</button></div></form>'
     body+='<div class="m2-cost-stack">'
     for category in CATEGORIES:
@@ -344,7 +344,7 @@ def sales_prices(channel:str="site",category:str="",conn=Depends(conn_dep)):
     category=category if category in CATEGORIES else ("قالب" if channel=="mold" else CATEGORIES[0])
     if channel=="mold":category="قالب"
     models=list_models(conn,category)
-    body='<h1>قیمت فروش</h1><p class="m2-hint">قیمت مستقل برای هر درگاه، قابل اعمال گروهی به مدل یا دسته و سایز. دیجی‌کالا فقط در «محصولات دیجی‌کالا» مدیریت می‌شود.</p>'
+    body='<h1>قیمت فروش</h1><p class="m2-hint">قیمت مستقل برای هر درگاه، قابل اعمال گروهی به مدل یا دسته و سایز. دیجی‌کالا فقط در «پلتفرم‌ها ← دیجی‌کالا» مدیریت می‌شود.</p>'
     body+=_price_tiles()
     body+='<div class="m2-tabs">'+''.join(f'<a href="{ROOT}/pricing/sales?channel={name}" class="{("current" if name==channel else "")}">{e(title)}</a>' for name,title in CHANNELS.items())+'</div>'
     body+=f'<div class="m2-card"><h3>ثبت گروهی قیمت — {e(CHANNELS[channel])}</h3><form method="post" action="{ROOT}/pricing/sales/save" class="m2-fields">'
