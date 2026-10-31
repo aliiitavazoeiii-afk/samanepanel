@@ -21,6 +21,22 @@ STYLE="""
 .m2-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 .m2-card{border:1px solid #2c4965;border-radius:16px;background:linear-gradient(135deg,#142e48,#0e2036);padding:19px;min-width:0}
 .m2-card h3{font-size:17px;color:#fff;margin:0 0 14px}.m2-card small,.m2-hint{color:#afc1d5}
+.m2-shell{direction:rtl;width:100%;min-width:0;padding-bottom:24px}
+.m2-shell>h1{font-size:1.6rem;font-weight:850;margin:0 0 8px}
+.m2-shell>p.m2-hint{margin-bottom:18px}
+.m2-shell .m2-hero{margin:0 0 14px}
+.m2-shell .m2-hero h2{font-size:1.15rem;font-weight:800;margin:0}
+.m2-filters form>div{min-width:0}
+.m2-filters form>div:last-child{display:flex;align-items:flex-end}
+.m2-filters form>div:last-child button{width:auto}
+.m2-section h3{display:flex;align-items:center;gap:8px}
+.m2-family-title{font-size:1.15rem;font-weight:800;margin:22px 0 8px;padding:12px 16px;border-radius:12px;border-right:3px solid #fb6514;background:rgba(24,50,79,.55)}
+.m2-hero .m2-btn{white-space:nowrap}
+.m2-list .m2-card{display:flex;flex-direction:column;gap:8px}
+.m2-list .m2-card .m2-tags{margin:0 0 7px}
+@media(min-width:900px){.m2-filters form{grid-template-columns:minmax(220px,1.3fr) repeat(2,minmax(160px,1fr)) auto}.m2-filters form>div:last-child{align-self:end}}
+@media(max-width:899px){.m2-filters form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 .m2-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
 .m2-fields label{font-size:12px;color:#cbd9e7;display:block}
 .m2-fields input,.m2-fields select{width:100%;min-width:0;background:#142d49!important;color:#fff!important;border:1px solid #365874!important;padding:10px;border-radius:9px}
@@ -68,6 +84,13 @@ def group_options(models,model_id=None):
       f'<option value="{m["representative"]}"'+(' selected' if str(model_id or '')==str(m["representative"]) else '')+'>'
       +e(m["title"]+(" · "+m["subtype"] if m["subtype"] else ""))+'</option>'
       for m in models)
+
+def family_title(sku):
+    """Only a display grouping: never merge or change underlying SKU identities."""
+    title=str(sku["title"])
+    color=str(sku["color"])
+    suffix=" - "+color
+    return title[:-len(suffix)] if color not in ("","-") and title.endswith(suffix) else title
 
 def inventory_grid(conn,skus,location,label):
     colors=sorted({s["color"] for s in skus})
