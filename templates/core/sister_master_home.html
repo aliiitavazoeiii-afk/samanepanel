@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block title %}محصولات و کدها{% endblock %}
 {% block content %}
 <style>
-.master-head{margin-bottom:25px}.master-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.master-head{margin-bottom:25px}.master-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .master-card{display:block;min-height:182px;padding:25px;border-radius:20px;color:#f8fafc;text-decoration:none;border:1px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(25,56,86,.45),rgba(6,22,39,.34));transition:.18s}
 .master-card:hover{color:white;transform:translateY(-3px);border-color:#f4a05c}
 .master-card h2{font-size:1.5rem;margin:18px 0 10px}.master-card p{color:#b1c2d3}
@@ -19,13 +19,18 @@
 <div class="master-grid">
 <a class="master-card" href="{% url 'settings_product_new' %}">
 <div class="master-icon">▦</div><h2>تعریف محصولات</h2>
-<p>کد، گروه، عنوان، رنگ، سایز، قیمت فروش و بهای تمام‌شده. مبنای موجودی و تمام کانال‌های فروش.</p>
+<p>ثبت عنوان مدل، دسته‌بندی، نوع، رنگ و سایزبندی؛ بدون کد دستی یا قیمت.</p>
 <span style="color:#fdb022">ورود به تعریف محصولات ←</span>
 </a>
 <a class="master-card" href="{% url 'sister_product_digikala' %}">
 <div class="master-icon">D</div><h2>محصولات دیجی‌کالا</h2>
 <p>فهرست ۵۳۸ کد تنوع موجود؛ اتصال هر تنوع به محصول اصلی و تعیین قیمت فروش دیجی‌کالا.</p>
 <span style="color:#fdb022">ورود به محصولات دیجی‌کالا ←</span>
+</a>
+<a class="master-card" href="{% url 'sister_product_pricing' %}">
+<div class="master-icon">◈</div><h2>قیمت‌گذاری</h2>
+<p>دو بخش مستقل: بهای تمام‌شده گروهی و قیمت فروشِ سایت، باسلام و قالب.</p>
+<span style="color:#fdb022">ورود به قیمت‌گذاری ←</span>
 </a>
 </div>
 <div class="card mt-4"><div class="card-body p-4">
@@ -38,6 +43,6 @@
 <a href="{% url 'settings_product_new' %}?category=قالب">قالب</a>
 </div>
 <div class="mt-4"><a class="btn btn-primary" href="{% url 'inventory_stock' %}">ورود به موجودی کالا</a></div>
-<div class="text-secondary small mt-3">هر کالا تنها یک موجودی اصلی دارد؛ کدهای دیجی‌کالا به همان کالا متصل می‌شوند. کسر موجودی برای کدهای بدون اتصال مجاز نیست.</div>
+<div class="text-secondary small mt-3">هر ترکیب رنگ و سایز در انبارهای خانه و خورشید موجودی مستقل دارد. کد تنوع دیجی‌کالا فقط برای اتصال به همین محصول استفاده می‌شود.</div>
 </div></div>
 {% endblock %}
