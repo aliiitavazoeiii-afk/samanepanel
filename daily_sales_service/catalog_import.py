@@ -110,10 +110,12 @@ def apply_catalog(conn, data_path=DATA_PATH, *, dry_run=True):
             for row in new:
                 conn.execute(
                     """INSERT INTO master_products(
-                        category,code,title,size,color,sale_price_toman,cost_toman,
+                        category,code,title,size,color,subtype,sale_price_toman,cost_toman,
                         seller_stock,digikala_stock,active,created_at,updated_at
-                       ) VALUES (?,?,?,?,?,0,NULL,0,0,1,?,?)""",
+                       ) VALUES (?,?,?,?,?,?,0,NULL,0,0,1,?,?)""",
                     (row["category"], row["code"], row["title"], row["size"], row["color"],
+                     "اسلیپ" if row["group"] == "mens_slip" else
+                     "پادار" if row["group"] == "mens_padar" else "",
                      timestamp,timestamp)
                 )
             conn.execute("COMMIT")
