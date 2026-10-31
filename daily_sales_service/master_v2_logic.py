@@ -232,6 +232,10 @@ def set_cost_rule(conn,category,subtype,size,cost):
     if category not in ("قالب","بادیگارد"):size="*"
     if category=="بادیگارد":size="*"  # per requested slip/padar cost
     price=money(cost)
+    # Compatibility with original v2 pricing callers/tests: their immediate
+    # changes become effective today; the dated UI uses schedule_cost itself.
+    from .effective_costs import schedule_cost,today
+    schedule_cost(conn,category,subtype,size,price,today())
     conn.execute("""INSERT INTO master_cost_rules(category,subtype,size,cost_toman,updated_at)
        VALUES(?,?,?,?,?) ON CONFLICT(category,subtype,size)
        DO UPDATE SET cost_toman=excluded.cost_toman,updated_at=excluded.updated_at""",
