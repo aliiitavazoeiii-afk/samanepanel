@@ -191,7 +191,7 @@ def strict_preview(conn,sale_date,source,files):
         prepared.append({"variant_id":vid,"master_id":master["id"],
                          "title":master["title"]+" / "+master["color"]+" / "+master["size"],
                          "category":master["category"],"qty":qty,"price":price,
-                         "cost":cost_for(conn,dict(master)),**fee})
+                         "cost":cost_for(conn,dict(master),sale_date),**fee})
     old_per=defaultdict(int);new_per=defaultdict(int)
     for vid,old in existing.items():
         variant=variants.get(vid)
