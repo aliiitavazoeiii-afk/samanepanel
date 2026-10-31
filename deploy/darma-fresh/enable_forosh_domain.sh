@@ -5,7 +5,6 @@ set -Eeuo pipefail
 
 DOMAIN=forosh.filmjadiid.ir
 FRESH=/opt/dia-darma-fresh
-DIA=/opt/dia-gallery
 COMPOSE=compose.fresh.yml
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
@@ -15,16 +14,39 @@ for bin in docker git python3 curl openssl; do
 done
 docker compose version >/dev/null || fail 'Docker Compose plugin missing'
 [ -f "$FRESH/.env" ] && [ -f "$FRESH/$COMPOSE" ] || fail 'Fresh panel installation not found'
-[ -f "$DIA/Caddyfile" ] || fail 'Dia Gallery Caddyfile not found: /opt/dia-gallery/Caddyfile'
-
-# Inspect the live Caddy container and require the exact known bind mount.
-CADDY_ID="$(docker ps -q --filter label=com.docker.compose.project=dia-gallery --filter label=com.docker.compose.service=caddy)"
-[ -n "$CADDY_ID" ] && [ "$(printf '%s\n' "$CADDY_ID" | wc -l)" -eq 1 ] || fail 'Expected exactly one running Dia Gallery Caddy service'
-MOUNT="$(docker inspect "$CADDY_ID" --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}')"
-[ -n "$MOUNT" ] && [ "$(readlink -f "$MOUNT")" = "$(readlink -f "$DIA/Caddyfile")" ] || fail "Live Caddyfile mount differs: $MOUNT"
+# Never infer Caddy's host checkout directory from the repository's README.
+# Inspect Docker's ACTUAL Caddyfile bind mount, and require the original site
+# hostname in that file before choosing any container or modifying anything.
+CADDY_IDS=()
+CADDY_FILES=()
+for candidate in $(docker ps -q); do
+  mount="$(docker inspect "$candidate" --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+  if [ -n "$mount" ] && [ -f "$mount" ] && grep -Fq 'samaneh.filmjadiid.ir' "$mount"; then
+    CADDY_IDS+=("$candidate")
+    CADDY_FILES+=("$mount")
+  fi
+done
+if [ "${#CADDY_IDS[@]}" -ne 1 ]; then
+  echo "CADDY_AUTODETECT_FAILED: found ${#CADDY_IDS[@]} running Caddyfile mount(s) serving samaneh.filmjadiid.ir" >&2
+  echo "Running containers (diagnostic only; no secrets):" >&2
+  docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' >&2 || true
+  echo "Ports 80/443 listeners (if available):" >&2
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | grep -E '(:80 |:443 )' >&2 || true
+  fi
+  fail "Cannot prove which reverse proxy serves the existing domain. No Caddy changes made; send diagnostics above."
+fi
+CADDY_ID="${CADDY_IDS[0]}"
+LIVE_CADDYFILE="${CADDY_FILES[0]}"
+[ -w "$LIVE_CADDYFILE" ] || fail "Discovered Caddyfile is not writable: $LIVE_CADDYFILE"
+echo "Existing site Caddy container: $(docker inspect "$CADDY_ID" --format '{{.Name}}')"
+echo "Verified live Caddyfile: $LIVE_CADDYFILE"
 docker exec "$CADDY_ID" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null || fail 'Existing Caddy config invalid'
-if grep -Fq "$DOMAIN" "$DIA/Caddyfile" && ! grep -Fq '# BEGIN FOROSH SAMANEPANEL MANAGED' "$DIA/Caddyfile"; then
+if grep -Fq "$DOMAIN" "$LIVE_CADDYFILE" && ! grep -Fq '# BEGIN FOROSH SAMANEPANEL MANAGED' "$LIVE_CADDYFILE"; then
   fail 'Domain already present in Caddyfile. Refusing to replace another site block.'
+fi
+if grep -Fq '# BEGIN FOROSH SAMANEPANEL MANAGED' "$LIVE_CADDYFILE" && ! grep -Fq 'reverse_proxy forosh-web:8000' "$LIVE_CADDYFILE"; then
+  fail 'Managed Caddy block has been modified; refusing to overwrite it.'
 fi
 
 cd "$FRESH"
@@ -40,7 +62,7 @@ umask 077
 mkdir -p "$FRESH/backups"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 cp -p "$FRESH/.env" "$FRESH/backups/forosh-env-$STAMP"
-cp -p "$DIA/Caddyfile" "$FRESH/backups/dia-Caddyfile-before-forosh-$STAMP"
+cp -p "$LIVE_CADDYFILE" "$FRESH/backups/dia-Caddyfile-before-forosh-$STAMP"
 
 python3 - "$FRESH/.env" <<'PY'
 import sys
@@ -91,9 +113,9 @@ for i in $(seq 1 30); do
 done
 [ "$READY" -eq 1 ] || fail 'Existing Caddy cannot reach new web. Dia config NOT modified.'
 
-if ! grep -Fq '# BEGIN FOROSH SAMANEPANEL MANAGED' "$DIA/Caddyfile"; then
+if ! grep -Fq '# BEGIN FOROSH SAMANEPANEL MANAGED' "$LIVE_CADDYFILE"; then
   # Must append in-place: Caddy uses a read-only bind mount of this file inode.
-  cat >> "$DIA/Caddyfile" <<'CADDY'
+  cat >> "$LIVE_CADDYFILE" <<'CADDY'
 
 # BEGIN FOROSH SAMANEPANEL MANAGED
 forosh.filmjadiid.ir {
@@ -103,12 +125,12 @@ forosh.filmjadiid.ir {
 # END FOROSH SAMANEPANEL MANAGED
 CADDY
 else
-  grep -Fq 'reverse_proxy forosh-web:8000' "$DIA/Caddyfile" || fail 'Managed Caddy block changed; inspect manually'
+  grep -Fq 'reverse_proxy forosh-web:8000' "$LIVE_CADDYFILE" || fail 'Managed Caddy block changed; inspect manually'
 fi
 
 restore_caddy() {
   echo 'Caddy failed validation/reload. Restoring previous configuration.' >&2
-  cat "$FRESH/backups/dia-Caddyfile-before-forosh-$STAMP" > "$DIA/Caddyfile"
+  cat "$FRESH/backups/dia-Caddyfile-before-forosh-$STAMP" > "$LIVE_CADDYFILE"
   docker exec "$CADDY_ID" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile || true
 }
 if ! docker exec "$CADDY_ID" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
