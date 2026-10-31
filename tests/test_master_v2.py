@@ -28,8 +28,8 @@ class MasterV2Test(unittest.TestCase):
 
  def test_clean_ui_and_all_new_routes(self):
   from daily_sales_service.app import app
-  from daily_sales_service.master_v2_api import master, stock, pricing, cost_prices, sales_prices
-  paths={route.path for route in app.routes}
+  from daily_sales_service.master_v2_api import router, master, stock, pricing, cost_prices, sales_prices
+  paths={route.path for route in router.routes if hasattr(route,"path")}
   for suffix in ("/master","/master/add","/master/stock",
                  "/master/stock/operations","/pricing","/pricing/cost",
                  "/pricing/sales","/catalog"):
