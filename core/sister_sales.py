@@ -50,6 +50,8 @@ _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/uploa
             "stock/adjust", "settings", "setting", "api/report.json", "api/report.csv",
             "master", "master/add", "master/rename", "master/edit", "master/stock", "master/stock/adjust",
             "master/stock/operations", "master/stock/bulk-adjust", "master/stock/transfer",
+         "master/stock/undo", "master/stock/transfer/revise",
+            "master/stock/undo", "master/stock/transfer/revise",
             "pricing", "pricing/cost", "pricing/sales", "pricing/cost/save", "pricing/sales/save",
             "catalog", "catalog/map"}
 _POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
