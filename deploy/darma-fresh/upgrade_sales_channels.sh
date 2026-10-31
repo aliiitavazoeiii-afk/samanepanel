@@ -67,6 +67,13 @@ docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sq
 echo "Checking canonical master without altering data"
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); c.execute("SELECT COUNT(*) FROM master_products"); count=c.execute("SELECT COUNT(*) FROM master_products").fetchone()[0]; unmapped=c.execute("SELECT COUNT(*) FROM products WHERE master_id IS NULL").fetchone()[0]; print("SISTER_MASTER_SKUS",count,"UNMAPPED_DIGIKALA",unmapped); c.close()'
 
+echo "Import body.xlsx product definitions with ZERO opening stocks and no price changes"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -m daily_sales_service.catalog_import --dry-run
+docker compose -f compose.fresh.yml exec -T sister-digikala python -m daily_sales_service.catalog_import --apply
+
+echo "Confirm new products are present in the isolated master catalogue"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'from daily_sales_service.engine import dbconnect; from daily_sales_service.catalog_import import entries; c=dbconnect("/data/sales.sqlite3"); items=entries(); n=sum(1 for x in items if c.execute("SELECT id FROM master_products WHERE category=? AND code=? AND size=? AND color=?",(x["category"],x["code"],x["size"],x["color"])).fetchone()); print("BODY_CATALOG_MATCHES",n,"OF",len(items)); assert n == 213; c.close()'
+
 code=""
 for _ in $(seq 1 50); do
   code="$(curl --max-time 4 --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18081/sales/ || true)"
@@ -80,5 +87,6 @@ if [ "$code" != "302" ]; then
 fi
 echo
 echo "SISTER_MASTER_CATALOG_READY"
+echo "BODY_XLSX_PRODUCT_DEFINITIONS_READY"
 echo "Existing SSH tunnel: /settings/products/ ; /inventory/stock/ ; /sales/digikala/"
 docker compose -f compose.fresh.yml ps
