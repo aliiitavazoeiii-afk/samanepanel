@@ -8,7 +8,7 @@ from .master_engine import CATEGORIES
 from .master_v2_logic import BODY_TYPES, SIZES, cost_for, list_models, sku_rows
 
 STYLE="""
-</style><style>
+<style>
 .m2-shell{max-width:1500px;margin:auto}.m2-hero{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .m2-tabs{display:flex;gap:9px;flex-wrap:wrap;margin:18px 0 22px}
 .m2-tabs a{border:1px solid #385773;border-radius:11px;padding:9px 15px;text-decoration:none;color:#dbe8f5;background:#112640}
@@ -50,7 +50,7 @@ STYLE="""
 
 def with_style(page_response):
     from fastapi.responses import HTMLResponse
-    html=page_response.body.decode("utf-8").replace("</style>",STYLE,1)
+    html=page_response.body.decode("utf-8").replace("</style>","</style>"+STYLE,1)
     return HTMLResponse(html)
 
 def category_tabs(endpoint,category):
