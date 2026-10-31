@@ -80,6 +80,18 @@ def dashboard(request:Request,start:str|None=None,end:str|None=None,conn=Depends
  stats=report(conn,start,end)
  cards=[('فروش ناخالص',fmt(stats['gross'])+' تومان'),('هزینه دیجی‌کالا',fmt(stats['fee'])+' تومان'),('دریافتی پس از دیجی‌کالا',fmt(stats['net_after_digikala'])+' تومان'),('سود پس از بهای تمام‌شده',fmt(stats['profit'])+' تومان' if stats['profit'] is not None else 'نامشخص'),('تعداد فروخته‌شده',fmt(stats['units'])),('ردیف فاقد بهای تمام‌شده',fmt(stats['unknown_cost_lines']))]
  body='<div class="grid">'+''.join(f'<div class="card"><small>{e(k)}</small><strong>{e(v)}</strong></div>' for k,v in cards)+'</div>'
+ from .platform_catalog import PLATFORMS,sale_summary
+ platform_stats=sale_summary(conn,start,end)
+ platform_rows=''
+ for channel in ('basalam','site','mold'):
+  st=platform_stats.get(channel,{})
+  platform_rows+=tr([(e(PLATFORMS[channel]),'title'),(fmt(st.get('orders',0)),'num'),
+      (fmt(st.get('units',0)),'num'),(fmt(st.get('gross',0)),'num'),
+      ('نامشخص؛ کارمزد هنوز تعریف نشده','title')])
+ body+='<div class="panel"><h3>فروش ثبت‌شده پلتفرم‌های دیگر</h3>'+table(
+  ['پلتفرم','سفارش','تعداد کالای فیزیکی','فروش ناخالص (تومان)','سود خالص'],
+  platform_rows)+'</div>'
+
  if stats['unknown_cost_lines']:body+=notice(f"محاسبه سود قطعی نیست: {stats['unknown_cost_lines']} ردیف فروش هنوز بهای تمام‌شده ندارد. «دریافتی پس از دیجی‌کالا» سود نیست.")
  body+=f'''<div class="panel"><form class="forms" method="get"><div><label>از تاریخ (میلادی)</label><input type="date" name="start" value="{e(start or '')}"></div><div><label>تا تاریخ (میلادی)</label><input type="date" name="end" value="{e(end or '')}"></div><button type="submit">نمایش گزارش</button></form></div>'''
  catrows=''.join(tr([(e(cat),'title'),(fmt(v['units']),'num'),(fmt(v['gross']),'num'),(fmt(v['fee']),'num'),(fmt(v['profit_known']) if not v['unknown_cost_lines'] else 'نامشخص','num')]) for cat,v in stats['categories'].items())
