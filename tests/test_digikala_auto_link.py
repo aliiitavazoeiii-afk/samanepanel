@@ -102,6 +102,34 @@ class DigiKalaAutoLinkTest(unittest.TestCase):
     commit_preview(self.conn,repeated["token"])
     self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()[0],5)
 
+ def test_catalog_page_shows_matched_parts_and_unmapped_reasons(self):
+    from daily_sales_service.master_api import catalog
+    before=catalog(conn=self.conn).body.decode()
+    self.assertIn("همگام‌سازی هوشمند",before)
+    apply_links(self.conn,dry_run=False)
+    after=catalog(conn=self.conn).body.decode()
+    self.assertIn("اتصال خودکار",after)
+    self.assertIn("ترکیب اتصال به موجودی واقعی",after)
+    self.assertIn("بدون اتصال",catalog(conn=self.conn,unmapped=1).body.decode())
+
+ def test_specific_darma_range_and_boy_bodyguard_xxl_and_ambiguous_gray(self):
+    masters=[dict(x) for x in self.conn.execute("SELECT * FROM master_products")]
+    matched=lambda like:[dict(x) for x in self.conn.execute(
+      "SELECT * FROM products WHERE title LIKE ? LIMIT 100",("%"+like+"%",))]
+    darma=[x for x in matched("شورت زنانه دارما مدل 664")
+           if "| 40-42 |" in x["title"] and "سرمه" in x["title"]]
+    self.assertTrue(darma)
+    self.assertEqual(proposed_match(darma[0],masters)["status"],"matched")
+    body=[x for x in matched("شورت اسلیپ مردانه کد") if "| XXL |" in x["title"]
+          and "مشکی" in x["title"]]
+    self.assertTrue(body)
+    res=proposed_match(body[0],masters)
+    self.assertEqual(res["status"],"matched",res)
+    self.assertEqual(res["size"],"2XL")
+    gray=[x for x in matched("شورت پادار مردانه مدل") if "| طوسی |" in x["title"]]
+    self.assertTrue(gray)
+    self.assertNotEqual(proposed_match(gray[0],masters)["status"],"matched")
+
  def test_manual_links_and_sale_history_are_unchanged(self):
     first=self.conn.execute("SELECT variant_id FROM products ORDER BY variant_id LIMIT 1").fetchone()[0]
     sku=self.conn.execute("SELECT id FROM master_products LIMIT 1").fetchone()[0]
