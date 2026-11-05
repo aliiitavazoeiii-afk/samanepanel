@@ -131,6 +131,29 @@ jobs:
                   with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
                       assert conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
                                           (sku["id"],)).fetchone()[0]==1
+                  # DigiKala manual 4-pack: the native UI shows 4 color
+                  # pickers and POST persists exactly four physical parts.
+                  from urllib.parse import urlencode
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      add_model(conn,"شورت زنانه دیا","شورت زنانه دیا","",
+                                "مشکی، سرمه ای، سفید","M")
+                      dia={r["color"]:r["id"] for r in sku_rows(conn,"شورت زنانه دیا")}
+                  listing=client.get("/daily-sales/catalog?status=unmapped&q=68434424",auth=auth)
+                  assert listing.status_code==200,listing.status_code
+                  assert listing.text.count('name="part_id"')==4
+                  slots=[dia["مشکی"],dia["سرمه ای"],dia["مشکی"],dia["سفید"]]
+                  payload=urlencode([("variant_id","68434424")]+
+                                    [("part_id",str(i)) for i in slots])
+                  attached=client.post("/daily-sales/catalog/parts/save",auth=auth,
+                      content=payload,headers={"content-type":"application/x-www-form-urlencoded"},
+                      follow_redirects=False)
+                  assert attached.status_code==303,attached.text[:300]
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      positions=[row["master_id"] for row in conn.execute(
+                          "SELECT master_id FROM dk_variant_parts WHERE variant_id=68434424 ORDER BY position")]
+                      assert positions==slots,(positions,slots)
+                      assert conn.execute("SELECT master_id FROM products WHERE variant_id=68434424").fetchone()[0]==slots[0]
+                  print("SISTER_HTTP_DIGIKALA_MANUAL_COLOR_SLOTS_OK")
           print("SISTER_HTTP_PLATFORM_PRICING_SALES_OK")
           PY
 
