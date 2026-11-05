@@ -203,7 +203,9 @@ def strict_preview(conn,sale_date,source,files):
                 cost=None
                 break
             cost+=part_cost*units_per_listing
-        fee=fee_unit(price,master["category"],cfg)
+        # DigiKala commission follows the original marketplace category,
+        # not the internal label «بادیگارد» (which omits «مردانه»).
+        fee=fee_unit(price,variants[vid]["category"],cfg)
         prepared.append({"variant_id":vid,"master_id":master["id"],
                          "parts_signature":signature(parts),
                          "title":variants[vid]["title"],
