@@ -112,6 +112,21 @@ class DigiKalaAutoLinkTest(unittest.TestCase):
     self.assertIn("اتصال خودکار",after)
     self.assertIn("ترکیب اتصال به موجودی واقعی",after)
     self.assertIn("بدون اتصال",catalog(conn=self.conn,unmapped=1).body.decode())
+    # Regression: the default page previously sorted every unlinked item
+    # to the top, making 321 successfully mapped variants LOOK unmapped.
+    table_start=after.index("فهرست کدهای دیجی‌کالا")
+    self.assertIn("خودکار",after[table_start:])
+    self.assertNotIn('<span style="color:#ffa460">بدون اتصال</span>',
+                     after[table_start:].split("</table>",1)[0])
+    connected=catalog(conn=self.conn,status="connected").body.decode()
+    self.assertIn("فقط متصل",connected)
+    self.assertIn("خودکار",connected[connected.index("فهرست کدهای دیجی‌کالا"):])
+    unlinked=catalog(conn=self.conn,status="unmapped").body.decode()
+    self.assertIn("فقط بدون اتصال",unlinked)
+    self.assertIn('<span style="color:#ffa460">بدون اتصال</span>',unlinked)
+    self.assertNotIn("خودکار</strong>",unlinked)
+    # Existing bookmarked ?unmapped=1 filters still work.
+    self.assertIn("فقط بدون اتصال",catalog(conn=self.conn,unmapped=1).body.decode())
 
  def test_specific_darma_range_and_boy_bodyguard_xxl_and_ambiguous_gray(self):
     masters=[dict(x) for x in self.conn.execute("SELECT * FROM master_products")]
