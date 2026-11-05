@@ -81,6 +81,19 @@ class SalesChannelRoutesTest(SimpleTestCase):
         response = self.client.get("/sales/digikala/")
         self.assertEqual(response.status_code,302)
 
+    def test_digikala_manual_pack_save_is_auth_only_and_csrf_scoped(self):
+        self.assertIn("catalog/parts/save",sister_sales._ALLOWED)
+        self.assertIn("catalog/parts/save",sister_sales._POST)
+        self.assertEqual(
+            self.client.post("/sales/digikala/catalog/parts/save").status_code,302
+        )
+        req=RequestFactory().get("/settings/products/platforms/digikala/")
+        req.user=SimpleNamespace(is_authenticated=True)
+        form='<form method="post" action="/sales/digikala/catalog/parts/save"><select name="part_id"></select></form>'
+        out=sister_sales.add_csrf(req,form)
+        self.assertIn('name="csrfmiddlewaretoken"',out)
+        self.assertIn('action="/sales/digikala/catalog/parts/save"',out)
+
     def test_post_form_has_csrf_token(self):
         request = RequestFactory().get("/sales/digikala/")
         html = sister_sales.add_csrf(request,'<form action="/x" method="post"><button>ok</button></form>')
