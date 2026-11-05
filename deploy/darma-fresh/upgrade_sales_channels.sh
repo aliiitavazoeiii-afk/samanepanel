@@ -80,6 +80,16 @@ docker compose -f compose.fresh.yml exec -T sister-digikala python -m daily_sale
 echo "Confirm new products are present in the isolated master catalogue"
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'from daily_sales_service.engine import dbconnect; from daily_sales_service.catalog_import import entries; c=dbconnect("/data/sales.sqlite3"); items=entries(); n=sum(1 for x in items if c.execute("SELECT id FROM master_products WHERE category=? AND code=? AND size=? AND color=?",(x["category"],x["code"],x["size"],x["color"])).fetchone()); print("BODY_CATALOG_MATCHES",n,"OF",len(items)); assert n == 213; c.close()'
 
+echo "Safe DigiKala auto-link preflight on 538 actual variant titles (read-only)"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -m daily_sales_service.digikala_auto_link --dry-run
+
+echo "Link only unambiguous DigiKala variants to exact physical SKU components"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -m daily_sales_service.digikala_auto_link --apply
+
+echo "Verify DigiKala auto mappings are deduplicated and never exceed source variants"
+docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'from daily_sales_service.engine import dbconnect; from daily_sales_service.digikala_auto_link import audit_totals; c=dbconnect("/data/sales.sqlite3"); x=audit_totals(c); print("DK_AUTOLINK_FINAL",x); assert x["total"]==538; assert 0<=x["automatic"]<=x["mapped"]<=538; c.close()'
+
+
 code=""
 for _ in $(seq 1 50); do
   code="$(curl --max-time 4 --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18081/sales/ || true)"
@@ -96,5 +106,6 @@ echo "SISTER_MASTER_CATALOG_READY"
 echo "BODY_XLSX_PRODUCT_DEFINITIONS_READY"
 echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
 echo "SISTER_PLATFORM_PACKS_SIZE_PRICING_READY"
+echo "DK_538_AUTO_LINK_AUDITED_READY"
 echo "Existing SSH tunnel: /settings/products/ ; /settings/products/platforms/ ; /settings/products/pricing/ ; /inventory/stock/ ; /report/sister-capital/ ; /sales/"
 docker compose -f compose.fresh.yml ps
