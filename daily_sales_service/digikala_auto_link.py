@@ -178,11 +178,17 @@ def scan(conn):
         row=dict(variant)
         if row["master_id"] is not None:
             automatic=conn.execute(
-               "SELECT 1 FROM dk_variant_parts WHERE variant_id=? LIMIT 1",
-               (row["variant_id"],)).fetchone()
-            report.append({"variant_id":row["variant_id"],
-                           "status":"auto_connected" if automatic else "already_linked",
-                           "reason":"اتصال خودکار محفوظ" if automatic else "اتصال قبلی دستی محفوظ",
+                "SELECT 1 FROM dk_variant_parts WHERE variant_id=? LIMIT 1",
+                (row["variant_id"],)).fetchone()
+            previous=conn.execute(
+                "SELECT status FROM dk_auto_match_audit WHERE variant_id=?",
+                (row["variant_id"],)).fetchone()
+            is_manual=previous is not None and previous["status"]=="manual_connected"
+            status="manual_connected" if is_manual else (
+                "auto_connected" if automatic else "already_linked")
+            report.append({"variant_id":row["variant_id"],"status":status,
+                           "reason":"اتصال دستی محفوظ" if is_manual else (
+                               "اتصال خودکار محفوظ" if automatic else "اتصال قبلی دستی محفوظ"),
                            "parts":[]})
         elif row["variant_id"] in existing_sold:
             report.append({"variant_id":row["variant_id"],"status":"sales_locked",
@@ -196,7 +202,10 @@ def scan(conn):
 def audit_totals(conn):
     total=conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     mapped=conn.execute("SELECT COUNT(*) FROM products WHERE master_id IS NOT NULL").fetchone()[0]
-    automatic=conn.execute("SELECT COUNT(DISTINCT variant_id) FROM dk_variant_parts").fetchone()[0]
+    automatic=conn.execute("""SELECT COUNT(*) FROM dk_auto_match_audit a
+        JOIN products p ON p.variant_id=a.variant_id
+        WHERE p.master_id IS NOT NULL AND a.status IN ('matched','auto_connected')
+        """).fetchone()[0]
     pending=conn.execute("""SELECT status,COUNT(*) qty FROM dk_auto_match_audit
         GROUP BY status ORDER BY status""").fetchall()
     return {"total":total,"mapped":mapped,"automatic":automatic,
