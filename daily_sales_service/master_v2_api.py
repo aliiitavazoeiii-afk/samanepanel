@@ -340,44 +340,29 @@ def save_cost(category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),
 
 @router.get(ROOT+"/pricing/sales")
 def sales_prices(channel:str="site",category:str="",conn=Depends(conn_dep)):
-    if channel not in CHANNELS:channel="site"
-    category=category if category in CATEGORIES else ("قالب" if channel=="mold" else CATEGORIES[0])
-    if channel=="mold":category="قالب"
-    models=list_models(conn,category)
-    body='<h1>قیمت فروش</h1><p class="m2-hint">قیمت مستقل برای هر درگاه، قابل اعمال گروهی به مدل یا دسته و سایز. دیجی‌کالا فقط در «پلتفرم‌ها ← دیجی‌کالا» مدیریت می‌شود.</p>'
-    body+=_price_tiles()
-    body+='<div class="m2-tabs">'+''.join(f'<a href="{ROOT}/pricing/sales?channel={name}" class="{("current" if name==channel else "")}">{e(title)}</a>' for name,title in CHANNELS.items())+'</div>'
-    body+=f'<div class="m2-card"><h3>ثبت گروهی قیمت — {e(CHANNELS[channel])}</h3><form method="post" action="{ROOT}/pricing/sales/save" class="m2-fields">'
-    body+=f'<input type="hidden" name="channel" value="{e(channel)}">'
-    if channel=="mold":
-        body+='<input type="hidden" name="category" value="قالب"><div><label>دسته</label><strong>قالب</strong></div>'
-    else:
-        body+='<div><label>دسته</label><select name="category" id="m2-cat" onchange="window.location.href=\''+ROOT+'/pricing/sales?channel='+quote(channel)+'&category=\'+encodeURIComponent(this.value)">'
-        body+=category_option(category)+'</select></div>'
-    if category=="بادیگارد":
-        body+='<div><label>نوع بادیگارد</label><select name="subtype">'+''.join(f'<option value="{e(t)}">{e(t)}</option>' for t in BODY_TYPES)+'</select></div>'
-    else:body+='<input type="hidden" name="subtype" value="">'
-    body+='<div><label>مدل موردنظر</label><select name="model_id">'+group_options(models)+'</select></div>'
-    body+='<div><label>سایز</label><select name="size"><option value="*">همه سایزها</option>'+''.join(f'<option value="{e(s)}">{e(s)}</option>' for s in SIZES[category])+'</select></div>'
-    body+='<div><label>قیمت فروش واحد (تومان)</label><input type="number" min="0" name="price" required></div>'
-    body+='<div><button class="m2-btn" type="submit">ثبت قیمت گروهی</button></div></form></div>'
-    rows=conn.execute("""SELECT m.title,m.size,m.color,m.subtype,cp.price_toman FROM master_channel_prices cp
-        JOIN master_products m ON m.id=cp.master_id
-        WHERE cp.channel=? AND m.category=?
-        ORDER BY m.title,m.size,m.color LIMIT 150""",(channel,category)).fetchall()
-    body+=f'<div class="m2-section"><h3>قیمت‌های ثبت‌شده — {e(category)}</h3><div class="m2-history"><table><thead><tr><th>محصول</th><th>نوع</th><th>رنگ</th><th>سایز</th><th>قیمت (تومان)</th></tr></thead><tbody>'
-    for row in rows:
-        body+=f'<tr><td>{e(row["title"])}</td><td>{e(row["subtype"] or "—")}</td><td>{e(row["color"])}</td><td>{e(row["size"])}</td><td>{fmt(row["price_toman"])}</td></tr>'
-    body+='</tbody></table></div></div>'
-    return page_with_style("قیمت فروش",body)
+    from .platform_packs_ui import price_page
+    return price_page(conn,channel)
+
+@router.post(ROOT+"/pricing/sales/variants/save")
+async def save_platform_variant_prices(request:Request,channel:str=Form(...),conn=Depends(conn_dep)):
+    from .platform_packs_v4 import save_variant_prices
+    try:
+        form=await request.form()
+        prices={}
+        for field,value in form.items():
+            if not field.startswith("price_") or value in ("",None):continue
+            identifier=field[6:]
+            if not identifier.isdigit():raise ImportErrorDetail("شناسه سایز نامعتبر است.")
+            prices[int(identifier)]=value
+        save_variant_prices(conn,channel,prices)
+    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
+    return RedirectResponse(ROOT+"/pricing/sales?channel="+quote(channel),status_code=303)
 
 @router.post(ROOT+"/pricing/sales/save")
-def save_sale_price(channel:str=Form(...),category:str=Form(...),subtype:str=Form(""),size:str=Form("*"),model_id:str=Form(""),price:str=Form(...),conn=Depends(conn_dep)):
-    try:
-        group_id=int(model_id) if model_id else None
-        set_channel_prices(conn,channel,category,subtype,size,price,group_id)
-    except (ImportErrorDetail,ValueError) as exc:return alert_error(exc)
-    return RedirectResponse(ROOT+"/pricing/sales?channel="+quote(channel)+"&category="+quote(category),status_code=303)
+def save_sale_price(channel:str=Form(...),conn=Depends(conn_dep)):
+    # Old generic SKU price setter is intentionally disabled from the UI.
+    # Existing per-SKU legacy channel prices are kept for historical sales.
+    return alert_error("ابتدا محصول را در پلتفرم تعریف کن؛ سپس در همین صفحه برای هر سایز بسته، قیمت جدا وارد کن.")
 
 # The existing 538 DigiKala external variants and their mapping remain intact.
 router.add_api_route(ROOT+"/catalog",digikala_catalog,methods=["GET"])
