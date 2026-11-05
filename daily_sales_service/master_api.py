@@ -123,6 +123,8 @@ def stock_adjust(master_id:int=Form(...),source:str=Form(...),stock:str=Form(...
 
 @router.get(ROOT+"/catalog")
 def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
+    from .digikala_auto_link import audit_totals,parts_for
+    audit=audit_totals(conn)
     page_no=max(1,min(page_no,10000))
     where="WHERE 1=1";args=[]
     if unmapped: where+=" AND p.master_id IS NULL"
@@ -132,15 +134,28 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
     total=conn.execute("SELECT COUNT(*) FROM products p "+where,args).fetchone()[0]
     mapped=conn.execute("SELECT COUNT(*) FROM products WHERE master_id IS NOT NULL").fetchone()[0]
     rows=conn.execute("""SELECT p.*,m.code master_code,m.category master_category,
-       m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price
-       FROM products p LEFT JOIN master_products m ON m.id=p.master_id """+where+
+       m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price,
+       a.status auto_status,a.reason auto_reason
+       FROM products p LEFT JOIN master_products m ON m.id=p.master_id
+       LEFT JOIN dk_auto_match_audit a ON a.variant_id=p.variant_id """+where+
        " ORDER BY p.master_id IS NULL DESC,p.category,p.title LIMIT 50 OFFSET ?",
        args+[(page_no-1)*50]).fetchall()
     all_masters=conn.execute("SELECT id,category,code,size,color FROM master_products WHERE active=1 ORDER BY category,code,size,color LIMIT 10000").fetchall()
     list_options='<option value="">انتخاب محصول اصلی</option>'+''.join(
         f'<option value="{m["id"]}">{e(m["category"])} · {e(m["code"])} · {e(m["color"])} · {e(m["size"])} (#{m["id"]})</option>'
         for m in all_masters)
-    body=notice(f'{mapped} کد از ۵۳۸ کد تنوع به محصولات اصلی متصل شده است. تا پیش از اتصال، فروش آن کد ثبت نمی‌شود. موجودی را فقط در «موجودی کالا» اصلاح کن.')
+    body=notice(
+        f'از {fmt(audit["total"])} تنوع دیجی‌کالا، {fmt(audit["mapped"])} کد متصل است؛ '
+        f'{fmt(audit["automatic"])} کد با تطبیق خودکار ترکیب واقعی کالا، '
+        f'{fmt(audit["unmapped"])} کد بدون اتصال مانده است. '
+        'سایزهای عددی ناقص، رنگ یا مدل مبهم و پک‌های نامشخص به‌صورت حدسی وصل نمی‌شوند. '
+        'موجودی و سابقه فروش دست‌نخورده می‌مانند.')
+    body+=f'<div class="panel"><h3>همگام‌سازی هوشمند با موجودی کالا</h3>'
+    body+='<p>تطبیق بر اساس دسته، رنگ، سایز و نوع انجام می‌شود. ترکیب پک‌های چندرنگ و تعداد هر جزء جداگانه ثبت می‌شود؛ لینک‌های قبلی حفظ می‌شوند.</p>'
+    body+=f'<p>وضعیت بررسی: {fmt(audit["statuses"].get("matched",0)+audit["statuses"].get("auto_connected",0))} اتصال خودکار تأییدشده · '
+    body+=f'{fmt(audit["statuses"].get("ambiguous",0))} عنوان چندگزینه‌ای · '
+    body+=f'{fmt(audit["statuses"].get("unknown",0))} بدون تطبیق قطعی</p>'
+    body+='</div>'
     body+=f'<div class="panel"><h3>اتصال کد تنوع به کالای اصلی و قیمت فروش آن در دیجی‌کالا</h3><form class="forms" action="{ROOT}/catalog/map" method="post">'
     body+='<div><label>کد تنوع دیجی‌کالا</label><input type="number" min="1" name="variant_id" required placeholder="کد تنوع"></div>'
     body+='<div><label>محصول اصلی (شامل دسته و رنگ و سایز)</label><select name="master_id" required>'+list_options+'</select></div>'
@@ -151,13 +166,27 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
     body+=f'<div><label>فقط بدون اتصال</label><input type="checkbox" name="unmapped" value="1"'+(' checked' if unmapped else '')+'></div><button>جست‌وجو</button></form></div>'
     catalog_rows=""
     for r in rows:
-        mapped_to=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+e(r["master_color"])+" / "+e(r["master_size"])) if r["master_id"] else '<span style="color:#ffa460">بدون اتصال</span>'
+        parts=conn.execute("""SELECT m.color,m.size,m.subtype,COUNT(*) AS qty
+            FROM dk_variant_parts p JOIN master_products m ON m.id=p.master_id
+            WHERE p.variant_id=? GROUP BY p.master_id ORDER BY MIN(p.position)""",
+            (r["variant_id"],)).fetchall()
+        if parts:
+            pieces=" + ".join((str(part["qty"])+"× "+e(part["color"])+" / "+e(part["size"])
+                              +( (" ("+e(part["subtype"])+")") if part["subtype"] else ""))
+                             for part in parts)
+            mapped_to='<strong>خودکار</strong> · '+pieces
+        elif r["master_id"]:
+            mapped_to=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+
+                       e(r["master_color"])+" / "+e(r["master_size"])+" · دستی")
+        else:
+            mapped_to='<span style="color:#ffa460">بدون اتصال</span>'
+            if r["auto_reason"]:mapped_to+='<small style="display:block">'+e(r["auto_reason"])+'</small>'
         catalog_rows+=tr([(f'<a href="{ROOT}/catalog?q={r["variant_id"]}">{r["variant_id"]}</a>',"num"),
                          (e(r["title"]),"title"),(e(r["category"]),""),
                          (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else (r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)),"num"),
                          (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else '—',"")])
     body+='<div class="panel"><h3>فهرست کدهای دیجی‌کالا · '+fmt(total)+' ردیف</h3>'+table(
-        ["کد تنوع","عنوان دیجی‌کالا","گروه ارسالی","اتصال به کالای اصلی","قیمت فعلی/پیش‌فرض (تومان)","موجودی"],catalog_rows)+'</div>'
+        ["کد تنوع","عنوان دیجی‌کالا","گروه ارسالی","ترکیب اتصال به موجودی واقعی","قیمت فعلی/پیش‌فرض (تومان)","موجودی"],catalog_rows)+'</div>'
     if total>page_no*50:body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&unmapped={unmapped}">صفحه بعد</a>'
     if page_no>1:body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&unmapped={unmapped}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
