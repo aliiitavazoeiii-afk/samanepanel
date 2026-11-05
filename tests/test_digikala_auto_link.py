@@ -31,6 +31,21 @@ class DigiKalaAutoLinkTest(unittest.TestCase):
     self.assertGreater(result["summary"].get("matched",0),100)
     self.assertGreater(result["summary"].get("unknown",0)+result["summary"].get("ambiguous",0),0)
     print("DK_538_AUDIT_BASELINE",result["summary"])
+    from collections import defaultdict,Counter
+    all_variants={v["variant_id"]:dict(v) for v in self.conn.execute("SELECT * FROM products")}
+    summaries=defaultdict(Counter)
+    examples=defaultdict(list)
+    for item in result["items"]:
+        origin=all_variants[item["variant_id"]]
+        summaries[origin["category"]][item["status"]]+=1
+        key=item["reason"] if item["status"]!="matched" else "MATCHED"
+        if len(examples[key])<3:
+            examples[key].append(origin["title"][:120])
+    print("DK_538_AUDIT_BY_GROUP",dict(summaries))
+    for reason,rows in sorted(examples.items(),key=lambda x:-sum(
+       1 for z in result["items"] if z["reason"]==x[0]))[:25]:
+       count=sum(1 for z in result["items"] if z["reason"]==reason)
+       print("DK_AUDIT_REASON",count,reason,rows)
 
  def test_single_numeric_size_is_not_guessed_and_unknown_colors_left_alone(self):
     samples=[dict(x) for x in self.conn.execute(
