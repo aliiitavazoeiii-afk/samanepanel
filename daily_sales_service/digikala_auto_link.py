@@ -53,6 +53,7 @@ def normal_color(text):
     aliases={
       "ابی فیروزه ای":"فیروزه ای",
       "سبز کله غازی":"کله غازی",
+      "قرمز اسلیپ":"قرمز",
       "سبز یشمی":"یشمی",
       "سبز مغز پسته ای":"مغزپسته",
       "مغز پسته ای":"مغزپسته",
@@ -148,6 +149,7 @@ def proposed_match(variant,masters):
     if len(exact)!=1:
         return {"status":"unknown","reason":"سایز نامشخص یا مبهم است (عدد تکی را تبدیل نمی‌کنیم)"}
     size=exact[0][1]
+    if category=="بادیگارد" and size=="XXL":size="2XL"
     # Guard accidental mismatches: the source color may contain numeric size
     # e.g. a single '38'. These are intentionally kept without a link.
     unparsed=[x for x,p in sizes if not p]
