@@ -103,6 +103,7 @@ class DigiKalaAutoLinkTest(unittest.TestCase):
     self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()[0],5)
 
  def test_catalog_page_shows_matched_parts_and_unmapped_reasons(self):
+    from daily_sales_service.app import app  # Load FastAPI router before importing legacy helper directly.
     from daily_sales_service.master_api import catalog
     before=catalog(conn=self.conn).body.decode()
     self.assertIn("همگام‌سازی هوشمند",before)
