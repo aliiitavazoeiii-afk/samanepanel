@@ -124,18 +124,25 @@ def stock_adjust(master_id:int=Form(...),source:str=Form(...),stock:str=Form(...
 @router.get(ROOT+"/catalog")
 def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(conn_dep)):
     from .digikala_auto_link import audit_totals
+    from .digikala_manual_pack import CATALOG_HIDDEN_VARIANT_IDS
+    from .digikala_manual_ui import STYLES,build_manual_form
     audit=audit_totals(conn)
+    hidden=tuple(sorted(CATALOG_HIDDEN_VARIANT_IDS))
+    placeholders=",".join("?" for _ in hidden)
     # Older ?unmapped=1 bookmarks keep working. Default view shows both
     # statuses, with CONNECTED variants first (not 50 unlinked items).
     status="unmapped" if unmapped else status if status in ("all","connected","unmapped") else "all"
     page_no=max(1,min(page_no,10000))
-    where="WHERE 1=1";args=[]
+    where="WHERE p.variant_id NOT IN ("+placeholders+")"
+    args=list(hidden)
     if status=="unmapped":where+=" AND p.master_id IS NULL"
     elif status=="connected":where+=" AND p.master_id IS NOT NULL"
     if q:
         where+=" AND (p.title LIKE ? OR CAST(p.variant_id AS TEXT) LIKE ? OR p.category LIKE ?)"
         args+=['%'+q+'%']*3
     total=conn.execute("SELECT COUNT(*) FROM products p "+where,args).fetchone()[0]
+    visible_connected=conn.execute("SELECT COUNT(*) FROM products p "+("WHERE p.variant_id NOT IN ("+placeholders+") AND p.master_id IS NOT NULL"),hidden).fetchone()[0]
+    visible_total=conn.execute("SELECT COUNT(*) FROM products p WHERE p.variant_id NOT IN ("+placeholders+")",hidden).fetchone()[0]
     page_no=min(page_no,max(1,(total+49)//50))
     rows=conn.execute("""SELECT p.*,m.code master_code,m.category master_category,
        m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price,
@@ -148,7 +155,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     list_options='<option value="">انتخاب محصول اصلی</option>'+''.join(
         f'<option value="{m["id"]}">{e(m["category"])} · {e(m["code"])} · {e(m["color"])} · {e(m["size"])} (#{m["id"]})</option>'
         for m in all_masters)
-    body=notice(
+    body=STYLES+notice(
         f'از {fmt(audit["total"])} تنوع دیجی‌کالا، {fmt(audit["mapped"])} کد متصل است؛ '
         f'{fmt(audit["automatic"])} کد با تطبیق خودکار ترکیب واقعی کالا، '
         f'{fmt(audit["unmapped"])} کد بدون اتصال مانده است. '
@@ -169,9 +176,9 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     body+='<p class="faint">در حالت «همه»، ابتدا تنوع‌های متصل نمایش داده می‌شوند؛ کدهای بدون اتصال در صفحه‌های بعدی هستند.</p>'
     body+='<nav aria-label="فیلتر اتصال دیجی‌کالا" style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
     for key,label,count in (
-        ("all","همه",audit["total"]),
-        ("connected","متصل",audit["mapped"]),
-        ("unmapped","بدون اتصال",audit["unmapped"]),
+        ("all","همه",visible_total),
+        ("connected","متصل",visible_connected),
+        ("unmapped","بدون اتصال",visible_total-visible_connected),
     ):
         href=f'{ROOT}/catalog?status={key}'+(f'&q={quote(q)}' if q else '')
         shade="#c4621c" if key==status else "#1b3b58"
@@ -182,6 +189,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     body+=f'<div><label>عنوان یا کد تنوع</label><input name="q" value="{e(q)}" placeholder="جست‌وجو در همین وضعیت"></div>'
     body+='<button>جست‌وجو</button></form></div>'
     catalog_rows=""
+    options_cache={}
     for r in rows:
         parts=conn.execute("""SELECT m.color,m.size,m.subtype,COUNT(*) AS qty
             FROM dk_variant_parts p JOIN master_products m ON m.id=p.master_id
@@ -190,14 +198,16 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
         if parts:
             pieces=" + ".join((str(part["qty"])+"× "+e(part["color"])+" / "+e(part["size"])
                               +( (" ("+e(part["subtype"])+")") if part["subtype"] else ""))
-                             for part in parts)
-            mapped_to='<strong>خودکار</strong> · '+pieces
+                              for part in parts)
+            label="دستی" if r["auto_status"]=="manual_connected" else "خودکار"
+            mapped_to='<strong>'+label+'</strong> · '+pieces
         elif r["master_id"]:
             mapped_to=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+
                        e(r["master_color"])+" / "+e(r["master_size"])+" · دستی")
         else:
-            mapped_to='<span style="color:#ffa460">بدون اتصال</span>'
-            if r["auto_reason"]:mapped_to+='<small style="display:block">'+e(r["auto_reason"])+'</small>'
+            mapped_to=build_manual_form(conn,r,options_cache)
+            if r["auto_reason"]:
+                mapped_to+='<small class="faint" style="display:block;margin-top:5px">'+e(r["auto_reason"])+'</small>'
         catalog_rows+=tr([(f'<a href="{ROOT}/catalog?q={r["variant_id"]}">{r["variant_id"]}</a>',"num"),
                          (e(r["title"]),"title"),(e(r["category"]),""),
                          (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else (r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)),"num"),
@@ -209,7 +219,18 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     if total>page_no*50:body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&status={status}">صفحه بعد</a>'
     if page_no>1:body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
-    return page('محصولات دیجی‌کالا',body,'۵۳۸ کد تنوع مرجع • نگاشت به محصول، رنگ، سایز و قیمت فروش')
+    return page('محصولات دیجی‌کالا',body,'اتصال دستی رنگ‌های هر پک به موجودی، بدون حذف سوابق')
+
+@router.post(ROOT+"/catalog/parts/save")
+async def save_digikala_pack(request:Request,conn=Depends(conn_dep)):
+    from .digikala_manual_pack import manual_link
+    try:
+        data=await request.form()
+        variant_id=int(data.get("variant_id") or 0)
+        manual_link(conn,variant_id,data.getlist("part_id"))
+    except (ImportErrorDetail,TypeError,ValueError) as ex:
+        return fail(ex)
+    return RedirectResponse(ROOT+"/catalog?status=all&q="+str(variant_id),status_code=303)
 
 @router.post(ROOT+"/catalog/map")
 def catalog_map(variant_id:int=Form(...),master_id:int=Form(...),sale_price:str=Form(""),conn=Depends(conn_dep)):
