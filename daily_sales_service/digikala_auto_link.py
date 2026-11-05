@@ -175,8 +175,13 @@ def scan(conn):
     for variant in conn.execute("SELECT * FROM products ORDER BY variant_id"):
         row=dict(variant)
         if row["master_id"] is not None:
-            report.append({"variant_id":row["variant_id"],"status":"already_linked",
-                           "reason":"اتصال قبلی حفظ شد","parts":[]})
+            automatic=conn.execute(
+               "SELECT 1 FROM dk_variant_parts WHERE variant_id=? LIMIT 1",
+               (row["variant_id"],)).fetchone()
+            report.append({"variant_id":row["variant_id"],
+                           "status":"auto_connected" if automatic else "already_linked",
+                           "reason":"اتصال خودکار محفوظ" if automatic else "اتصال قبلی دستی محفوظ",
+                           "parts":[]})
         elif row["variant_id"] in existing_sold:
             report.append({"variant_id":row["variant_id"],"status":"sales_locked",
                            "reason":"فروش تاریخی نیاز به تطبیق دارد","parts":[]})
@@ -185,6 +190,16 @@ def scan(conn):
             report.append({"variant_id":row["variant_id"],**item})
     summary=dict(Counter(r["status"] for r in report))
     return {"scanned":len(report),"summary":summary,"items":report}
+
+def audit_totals(conn):
+    total=conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+    mapped=conn.execute("SELECT COUNT(*) FROM products WHERE master_id IS NOT NULL").fetchone()[0]
+    automatic=conn.execute("SELECT COUNT(DISTINCT variant_id) FROM dk_variant_parts").fetchone()[0]
+    pending=conn.execute("""SELECT status,COUNT(*) qty FROM dk_auto_match_audit
+        GROUP BY status ORDER BY status""").fetchall()
+    return {"total":total,"mapped":mapped,"automatic":automatic,
+            "unmapped":total-mapped,
+            "statuses":{r["status"]:r["qty"] for r in pending}}
 
 def apply_links(conn,*,dry_run=True):
     # Live DB can contain user-created SKUs, sales and manual mappings.
