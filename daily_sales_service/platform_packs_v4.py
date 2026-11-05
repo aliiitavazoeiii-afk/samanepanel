@@ -94,10 +94,12 @@ def available_models(conn,category):
         label=family_title(sku)
         sub=sku.get("subtype","")
         key=model_key(category,sub,label)
-        entry=groups.setdefault(key,{"key":key,"title":label,"subtype":sub,"sizes":set(),"colors":set()})
+        entry=groups.setdefault(key,{"key":key,"title":label,"subtype":sub,"sizes":set(),"colors":set(),"pairs":set()})
         entry["sizes"].add(sku["size"])
         entry["colors"].add(sku["color"])
-    return [{**x,"sizes":sorted(x["sizes"]),"colors":sorted(x["colors"])}
+        entry["pairs"].add((sku["color"],sku["size"]))
+    return [{**x,"sizes":sorted(x["sizes"]),"colors":sorted(x["colors"]),
+             "pairs":[{"color":color,"size":size} for color,size in sorted(x["pairs"])]}
             for x in sorted(groups.values(),key=lambda v:(v["title"],v["subtype"]))]
 
 def _validate_input(conn,channel,category,key,pack_qty,colors,sizes,title):
