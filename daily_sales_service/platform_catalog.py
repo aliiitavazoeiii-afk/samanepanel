@@ -114,8 +114,12 @@ def book_sale(conn,channel,listing_id,packs,warehouse,sale_date,order_ref=""):
             WHERE l.id=? AND l.channel=?""",(lid,channel)).fetchone()
         if row is None or not row["active"] or not row["master_active"]:
             raise ImportErrorDetail("محصول پلتفرم پیدا نشد یا غیرفعال است.")
-        if order_ref and conn.execute("SELECT 1 FROM platform_sales WHERE channel=? AND external_ref=?",
-            (channel,order_ref)).fetchone():
+        if order_ref and (
+            conn.execute("SELECT 1 FROM platform_sales WHERE channel=? AND external_ref=?",
+                (channel,order_ref)).fetchone()
+            or conn.execute("SELECT 1 FROM platform_bundle_sales WHERE channel=? AND external_ref=?",
+                (channel,order_ref)).fetchone()
+        ):
             raise ImportErrorDetail("این شماره سفارش قبلاً ثبت شده است؛ موجودی دوباره کسر نشد.")
         unit_price=channel_price_for(conn,row["master_id"],channel)
         if unit_price is None or unit_price<=0:
