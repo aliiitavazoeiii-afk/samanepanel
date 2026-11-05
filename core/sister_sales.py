@@ -51,14 +51,14 @@ _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/uploa
             "master", "master/add", "master/rename", "master/edit", "master/stock", "master/stock/adjust",
             "master/stock/operations", "master/stock/bulk-adjust", "master/stock/transfer",
             "master/stock/undo", "master/stock/transfer/revise",
-            "pricing", "pricing/cost", "pricing/sales", "pricing/cost/save", "pricing/sales/save",
+            "pricing", "pricing/cost", "pricing/sales", "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save",
             "catalog", "catalog/map", "platforms", "capital-report", "api/sister-capital.json",
             "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add"}
 _POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
-         "pricing/cost/save", "pricing/sales/save", "catalog/map",
+         "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "catalog/map",
          "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
