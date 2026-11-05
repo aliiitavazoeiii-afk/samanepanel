@@ -36,7 +36,7 @@ def build_manual_form(conn,variant,cache=None):
     quantity=scope["pack_qty"]
     title=(f'انتخاب رنگ‌های پک {quantity} عددی' if quantity>1
            else 'انتخاب رنگ کالا')
-    html='<details class="dk-pick-form"><summary>'+e(title)+'</summary>'
+    html='<span style="color:#ffa460">بدون اتصال</span><details class="dk-pick-form" style="margin-top:6px"><summary>'+e(title)+'</summary>'
     html+=f'<form action="{ROOT}/catalog/parts/save" method="post">'
     html+=f'<input type="hidden" name="variant_id" value="{int(variant["variant_id"])}">'
     html+='<p class="dk-pick-hint">'+e(scope["category"])+' · سایز '+e(scope["size"])
