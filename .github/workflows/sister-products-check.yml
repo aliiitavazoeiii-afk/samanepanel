@@ -85,6 +85,50 @@ jobs:
                             "cost":"80000","effective_date":tomorrow},
                       follow_redirects=False)
                   assert cost.status_code==303,cost.text
+                  # Actual V4 workflow: model -> 3 color slots -> size checkbox ->
+                  # per-size listing price -> multi-SKU atomic sale.
+                  from daily_sales_service.platform_packs_v4 import available_models
+                  from daily_sales_service.effective_costs import today
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      add_model(conn,"شورت زنانه دارما","مدل تست","","سفید","M")
+                      white=next(x for x in sku_rows(conn,"شورت زنانه دارما") if x["color"]=="سفید")
+                      batch_adjust(conn,"شورت زنانه دارما",white["id"],"M","home",
+                                   {white["id"]:8},"شمارش سفید")
+                      model_key=available_models(conn,"شورت زنانه دارما")[0]["key"]
+                  form=client.get("/daily-sales/platforms/site?category=شورت زنانه دارما",auth=auth)
+                  assert form.status_code==200 and 'm2-color-3' in form.text
+                  created_v4=client.post("/daily-sales/platforms/site/add",auth=auth,
+                      data={"model_key":model_key,"category":"شورت زنانه دارما",
+                            "pack_qty":3,"color_1":"مشکی","color_2":"سفید",
+                            "color_3":"مشکی","size":"M","title":"پک مشکی سفید"},
+                      follow_redirects=False)
+                  assert created_v4.status_code==303,created_v4.text
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      variant_id=conn.execute("SELECT id FROM platform_bundle_variants").fetchone()[0]
+                  priced=client.post("/daily-sales/pricing/sales/variants/save",auth=auth,
+                      data={"channel":"site",f"price_{variant_id}":380000},
+                      follow_redirects=False)
+                  assert priced.status_code==303,priced.text
+                  priced_page=client.get("/daily-sales/pricing/sales?channel=site",auth=auth)
+                  assert priced_page.status_code==200 and "پک مشکی سفید" in priced_page.text
+                  sold_v4=client.post("/daily-sales/platforms/site/sales/add",auth=auth,
+                      data={"variant_id":variant_id,"packs":1,"warehouse":"home",
+                            "sale_date":today(),"order_ref":"test-v4"},
+                      follow_redirects=False)
+                  assert sold_v4.status_code==303,sold_v4.text
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      assert conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                                          (sku["id"],)).fetchone()[0]==1
+                      assert conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                                          (white["id"],)).fetchone()[0]==7
+                      assert conn.execute("SELECT units FROM platform_bundle_sales").fetchone()[0]==3
+                  duplicate=client.post("/daily-sales/platforms/site/sales/add",auth=auth,
+                      data={"variant_id":variant_id,"packs":1,"warehouse":"home",
+                            "sale_date":today(),"order_ref":"test-v4"},follow_redirects=False)
+                  assert duplicate.status_code==200 and "قبلاً ثبت شده" in duplicate.text
+                  with dbconnect(os.environ["SALES_DB_PATH"]) as conn:
+                      assert conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                                          (sku["id"],)).fetchone()[0]==1
           print("SISTER_HTTP_PLATFORM_PRICING_SALES_OK")
           PY
 
