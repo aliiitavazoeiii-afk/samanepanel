@@ -71,6 +71,8 @@ def ensure_v2(conn):
     ensure_cost_history(conn)
     from .platform_catalog import ensure_platforms
     ensure_platforms(conn)
+    from .digikala_auto_link import ensure_auto_schema
+    ensure_auto_schema(conn)
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
