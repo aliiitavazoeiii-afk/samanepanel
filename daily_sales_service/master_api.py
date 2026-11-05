@@ -122,23 +122,27 @@ def stock_adjust(master_id:int=Form(...),source:str=Form(...),stock:str=Form(...
     return RedirectResponse(ROOT+"/master/stock",status_code=303)
 
 @router.get(ROOT+"/catalog")
-def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
-    from .digikala_auto_link import audit_totals,parts_for
+def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(conn_dep)):
+    from .digikala_auto_link import audit_totals
     audit=audit_totals(conn)
+    # Older ?unmapped=1 bookmarks keep working. Default view shows both
+    # statuses, with CONNECTED variants first (not 50 unlinked items).
+    status="unmapped" if unmapped else status if status in ("all","connected","unmapped") else "all"
     page_no=max(1,min(page_no,10000))
     where="WHERE 1=1";args=[]
-    if unmapped: where+=" AND p.master_id IS NULL"
+    if status=="unmapped":where+=" AND p.master_id IS NULL"
+    elif status=="connected":where+=" AND p.master_id IS NOT NULL"
     if q:
         where+=" AND (p.title LIKE ? OR CAST(p.variant_id AS TEXT) LIKE ? OR p.category LIKE ?)"
         args+=['%'+q+'%']*3
     total=conn.execute("SELECT COUNT(*) FROM products p "+where,args).fetchone()[0]
-    mapped=conn.execute("SELECT COUNT(*) FROM products WHERE master_id IS NOT NULL").fetchone()[0]
+    page_no=min(page_no,max(1,(total+49)//50))
     rows=conn.execute("""SELECT p.*,m.code master_code,m.category master_category,
        m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price,
        a.status auto_status,a.reason auto_reason
        FROM products p LEFT JOIN master_products m ON m.id=p.master_id
        LEFT JOIN dk_auto_match_audit a ON a.variant_id=p.variant_id """+where+
-       " ORDER BY p.master_id IS NULL DESC,p.category,p.title LIMIT 50 OFFSET ?",
+       " ORDER BY (p.master_id IS NULL) ASC,p.category,p.title,p.variant_id LIMIT 50 OFFSET ?",
        args+[(page_no-1)*50]).fetchall()
     all_masters=conn.execute("SELECT id,category,code,size,color FROM master_products WHERE active=1 ORDER BY category,code,size,color LIMIT 10000").fetchall()
     list_options='<option value="">انتخاب محصول اصلی</option>'+''.join(
@@ -161,9 +165,22 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
     body+='<div><label>محصول اصلی (شامل دسته و رنگ و سایز)</label><select name="master_id" required>'+list_options+'</select></div>'
     body+='<div><label>قیمت فروش دیجی‌کالا (تومان)</label><input type="number" min="0" name="sale_price" placeholder="خالی = قیمت فروش محصول اصلی"></div>'
     body+='<button type="submit">ذخیره اتصال</button></form></div>'
-    body+='<div class="panel"><h3>جست‌وجوی ۵۳۸ تنوع دیجی‌کالا</h3>'
-    body+=f'<form method="get" action="{ROOT}/catalog" class="forms"><div><label>عنوان یا کد تنوع</label><input name="q" value="{e(q)}"></div>'
-    body+=f'<div><label>فقط بدون اتصال</label><input type="checkbox" name="unmapped" value="1"'+(' checked' if unmapped else '')+'></div><button>جست‌وجو</button></form></div>'
+    body+='<div class="panel"><h3>نمایش و جست‌وجوی تنوع‌ها</h3>'
+    body+='<p class="faint">در حالت «همه»، ابتدا تنوع‌های متصل نمایش داده می‌شوند؛ کدهای بدون اتصال در صفحه‌های بعدی هستند.</p>'
+    body+='<div class="m2-tabs">'
+    for key,label,count in (
+        ("all","همه",audit["total"]),
+        ("connected","متصل",audit["mapped"]),
+        ("unmapped","بدون اتصال",audit["unmapped"]),
+    ):
+        href=f'{ROOT}/catalog?status={key}'+(f'&q={quote(q)}' if q else '')
+        cls=' class="current"' if key==status else ''
+        body+=f'<a{cls} href="{e(href)}">{e(label)} · {fmt(count)}</a>'
+    body+='</div>'
+    body+=f'<form method="get" action="{ROOT}/catalog" class="forms">'
+    body+=f'<input type="hidden" name="status" value="{e(status)}">'
+    body+=f'<div><label>عنوان یا کد تنوع</label><input name="q" value="{e(q)}" placeholder="جست‌وجو در همین وضعیت"></div>'
+    body+='<button>جست‌وجو</button></form></div>'
     catalog_rows=""
     for r in rows:
         parts=conn.execute("""SELECT m.color,m.size,m.subtype,COUNT(*) AS qty
@@ -185,10 +202,12 @@ def catalog(q:str="",unmapped:int=0,page_no:int=1,conn=Depends(conn_dep)):
                          (e(r["title"]),"title"),(e(r["category"]),""),
                          (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else (r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)),"num"),
                          (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else '—',"")])
-    body+='<div class="panel"><h3>فهرست کدهای دیجی‌کالا · '+fmt(total)+' ردیف</h3>'+table(
+    body+='<div class="panel"><h3>فهرست کدهای دیجی‌کالا · '+fmt(total)+' ردیف</h3>'
+    body+=f'<p class="faint">صفحه {fmt(page_no)} از {fmt(max(1,(total+49)//50))} · {e({"all":"همه (متصل‌ها در ابتدا)","connected":"فقط متصل","unmapped":"فقط بدون اتصال"}[status])}</p>'
+    body+=table(
         ["کد تنوع","عنوان دیجی‌کالا","گروه ارسالی","ترکیب اتصال به موجودی واقعی","قیمت فعلی/پیش‌فرض (تومان)","موجودی"],catalog_rows)+'</div>'
-    if total>page_no*50:body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&unmapped={unmapped}">صفحه بعد</a>'
-    if page_no>1:body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&unmapped={unmapped}">صفحه قبل</a>'
+    if total>page_no*50:body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&status={status}">صفحه بعد</a>'
+    if page_no>1:body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
     return page('محصولات دیجی‌کالا',body,'۵۳۸ کد تنوع مرجع • نگاشت به محصول، رنگ، سایز و قیمت فروش')
 
