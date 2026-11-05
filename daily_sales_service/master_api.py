@@ -151,10 +151,6 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
        LEFT JOIN dk_auto_match_audit a ON a.variant_id=p.variant_id """+where+
        " ORDER BY (p.master_id IS NULL) ASC,p.category,p.title,p.variant_id LIMIT 50 OFFSET ?",
        args+[(page_no-1)*50]).fetchall()
-    all_masters=conn.execute("SELECT id,category,code,size,color FROM master_products WHERE active=1 ORDER BY category,code,size,color LIMIT 10000").fetchall()
-    list_options='<option value="">انتخاب محصول اصلی</option>'+''.join(
-        f'<option value="{m["id"]}">{e(m["category"])} · {e(m["code"])} · {e(m["color"])} · {e(m["size"])} (#{m["id"]})</option>'
-        for m in all_masters)
     body=STYLES+notice(
         f'از {fmt(audit["total"])} تنوع دیجی‌کالا، {fmt(audit["mapped"])} کد متصل است؛ '
         f'{fmt(audit["automatic"])} کد با تطبیق خودکار ترکیب واقعی کالا، '
@@ -167,11 +163,9 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     body+=f'{fmt(audit["statuses"].get("ambiguous",0))} عنوان چندگزینه‌ای · '
     body+=f'{fmt(audit["statuses"].get("unknown",0))} بدون تطبیق قطعی</p>'
     body+='</div>'
-    body+=f'<div class="panel"><h3>اتصال کد تنوع به کالای اصلی و قیمت فروش آن در دیجی‌کالا</h3><form class="forms" action="{ROOT}/catalog/map" method="post">'
-    body+='<div><label>کد تنوع دیجی‌کالا</label><input type="number" min="1" name="variant_id" required placeholder="کد تنوع"></div>'
-    body+='<div><label>محصول اصلی (شامل دسته و رنگ و سایز)</label><select name="master_id" required>'+list_options+'</select></div>'
-    body+='<div><label>قیمت فروش دیجی‌کالا (تومان)</label><input type="number" min="0" name="sale_price" placeholder="خالی = قیمت فروش محصول اصلی"></div>'
-    body+='<button type="submit">ذخیره اتصال</button></form></div>'
+    body+='<div class="panel"><h3>اتصال دستی رنگ‌های بسته</h3>'
+    body+='<p>در ستون «ترکیب اتصال به موجودی واقعی» روی «انتخاب رنگ‌های پک» بزن؛ به تعداد نوشته‌شده در عنوان، رنگ هر عدد را از کالاهای ثبت‌شده انتخاب و ذخیره کن. اتصال فقط برای سایز و دسته معتبر همان محصول ثبت می‌شود.</p>'
+    body+='<p class="faint">۱۶ تنوعی که مشخص کردی فقط از فهرست این صفحه کنار گذاشته شده‌اند؛ دیتابیس و سوابق فروش آن‌ها تغییر نکرده است.</p></div>'
     body+='<div class="panel"><h3>نمایش و جست‌وجوی تنوع‌ها</h3>'
     body+='<p class="faint">در حالت «همه»، ابتدا تنوع‌های متصل نمایش داده می‌شوند؛ کدهای بدون اتصال در صفحه‌های بعدی هستند.</p>'
     body+='<nav aria-label="فیلتر اتصال دیجی‌کالا" style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
