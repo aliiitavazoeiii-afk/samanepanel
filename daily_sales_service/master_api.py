@@ -167,16 +167,16 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     body+='<button type="submit">ذخیره اتصال</button></form></div>'
     body+='<div class="panel"><h3>نمایش و جست‌وجوی تنوع‌ها</h3>'
     body+='<p class="faint">در حالت «همه»، ابتدا تنوع‌های متصل نمایش داده می‌شوند؛ کدهای بدون اتصال در صفحه‌های بعدی هستند.</p>'
-    body+='<div class="m2-tabs">'
+    body+='<nav aria-label="فیلتر اتصال دیجی‌کالا" style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
     for key,label,count in (
         ("all","همه",audit["total"]),
         ("connected","متصل",audit["mapped"]),
         ("unmapped","بدون اتصال",audit["unmapped"]),
     ):
         href=f'{ROOT}/catalog?status={key}'+(f'&q={quote(q)}' if q else '')
-        cls=' class="current"' if key==status else ''
-        body+=f'<a{cls} href="{e(href)}">{e(label)} · {fmt(count)}</a>'
-    body+='</div>'
+        shade="#c4621c" if key==status else "#1b3b58"
+        body+=f'<a class="button" style="background:{shade};border-radius:10px" href="{e(href)}">{e(label)} · {fmt(count)}</a>'
+    body+='</nav>'
     body+=f'<form method="get" action="{ROOT}/catalog" class="forms">'
     body+=f'<input type="hidden" name="status" value="{e(status)}">'
     body+=f'<div><label>عنوان یا کد تنوع</label><input name="q" value="{e(q)}" placeholder="جست‌وجو در همین وضعیت"></div>'
