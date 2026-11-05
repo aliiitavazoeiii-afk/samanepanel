@@ -18,6 +18,8 @@ jobs:
         run: pip install -r deploy/darma-fresh/requirements.sister-sales.txt
       - name: Compile all sister modules
         run: python -m compileall -q daily_sales_service tests
+      - name: Validate safe isolated deployment script
+        run: bash -n deploy/darma-fresh/upgrade_sales_channels.sh
       - name: Run legacy and master inventory regression tests
         env:
           SALES_MASTER_STRICT: '1'
