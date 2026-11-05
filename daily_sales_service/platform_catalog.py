@@ -47,6 +47,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_platform_order
 
 def ensure_platforms(conn):
     conn.executescript(SCHEMA)
+    from .platform_packs_v4 import ensure_bundle_schema
+    ensure_bundle_schema(conn)
 
 def create_listing(conn,channel,master_id,title,pack_qty):
     if channel not in SALE_CHANNELS:raise ImportErrorDetail("پلتفرم نامعتبر است.")
@@ -147,4 +149,12 @@ def sale_summary(conn,from_date=None,to_date=None):
     if from_date:sql+=" AND sale_date>=?";params.append(valid_date(from_date))
     if to_date:sql+=" AND sale_date<=?";params.append(valid_date(to_date))
     sql+=" GROUP BY channel"
-    return {r["channel"]:dict(r) for r in conn.execute(sql,params)}
+    baseline={r["channel"]:dict(r) for r in conn.execute(sql,params)}
+    from .platform_packs_v4 import new_sale_summary
+    newer=new_sale_summary(conn,from_date,to_date)
+    for channel,values in newer.items():
+        merged=baseline.setdefault(channel,{"channel":channel,"orders":0,"packs":0,"units":0,
+             "gross":0,"known_cogs":0,"unknown_cogs":0})
+        for key in ("orders","packs","units","gross","known_cogs","unknown_cogs"):
+            merged[key]=int(merged.get(key) or 0)+int(values.get(key) or 0)
+    return baseline
