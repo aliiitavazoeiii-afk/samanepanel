@@ -1,0 +1,100 @@
+"""Audit 538 genuine DigiKala titles and verify safety of physical SKU mappings."""
+import tempfile
+import unittest
+from pathlib import Path
+
+from daily_sales_service.engine import init_db,create_preview,commit_preview
+from daily_sales_service.catalog_import import apply_catalog
+from daily_sales_service.master_v2_logic import sku_rows,batch_adjust
+from daily_sales_service.digikala_auto_link import apply_links,scan,parts_for,proposed_match
+from daily_sales_service.effective_costs import today,schedule_cost
+from test_engine import make_xlsx
+
+class DigiKalaAutoLinkTest(unittest.TestCase):
+ def setUp(self):
+    folder=tempfile.TemporaryDirectory()
+    self.addCleanup(folder.cleanup)
+    self.conn=init_db(Path(folder.name)/"dk.sqlite3")
+    self.addCleanup(self.conn.close)
+    self.assertEqual(apply_catalog(self.conn,dry_run=False)["expected"],213)
+
+ def test_all_538_are_scanned_and_known_undershirts_link(self):
+    result=scan(self.conn)
+    self.assertEqual(result["scanned"],538)
+    self.assertEqual(sum(result["summary"].values()),538)
+    undershirts=[dict(v) for v in self.conn.execute("SELECT * FROM products WHERE category='زیرپوش مردانه'")]
+    self.assertEqual(len(undershirts),9)
+    matched={x["variant_id"]:x for x in result["items"]}
+    for variant in undershirts:
+        self.assertEqual(matched[variant["variant_id"]]["status"],"matched",variant["title"])
+        self.assertEqual(len(matched[variant["variant_id"]]["parts"]),1)
+    self.assertGreater(result["summary"].get("matched",0),100)
+    self.assertGreater(result["summary"].get("unknown",0)+result["summary"].get("ambiguous",0),0)
+    print("DK_538_AUDIT_BASELINE",result["summary"])
+
+ def test_single_numeric_size_is_not_guessed_and_unknown_colors_left_alone(self):
+    samples=[dict(x) for x in self.conn.execute(
+        "SELECT * FROM products WHERE title LIKE '%دارما%' AND title LIKE '%| 38 |%'")]
+    self.assertTrue(samples)
+    masters=[dict(x) for x in self.conn.execute("SELECT * FROM master_products")]
+    for variant in samples:
+        self.assertEqual(proposed_match(variant,masters)["status"],"unknown")
+    mold=dict(self.conn.execute("SELECT * FROM products WHERE category='مراقبت کفش و لوازم جانبی' LIMIT 1").fetchone())
+    self.assertEqual(proposed_match(mold,masters)["status"],"unknown")
+
+ def test_dia_two_pack_color_slots_and_idempotent_apply(self):
+    target=dict(self.conn.execute("""SELECT * FROM products
+        WHERE title LIKE '%دیا%' AND title LIKE '%مجموعه 2 عددی%'
+          AND title LIKE '%سرمه ای%' LIMIT 1""").fetchone())
+    masters=[dict(x) for x in self.conn.execute("SELECT * FROM master_products")]
+    p=proposed_match(target,masters)
+    self.assertEqual(p["status"],"matched",p)
+    self.assertEqual(len(p["parts"]),2)
+    before=self.conn.execute("SELECT COUNT(*) FROM dk_variant_parts").fetchone()[0]
+    preview=apply_links(self.conn,dry_run=True)
+    self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM dk_variant_parts").fetchone()[0],before)
+    first=apply_links(self.conn,dry_run=False)
+    self.assertGreater(first["summary"].get("matched",0),100)
+    actual=parts_for(self.conn,target["variant_id"])
+    self.assertEqual(sum(n for _,n in actual),2)
+    second=apply_links(self.conn,dry_run=False)
+    self.assertEqual(second["summary"].get("matched",0),0)
+    self.assertEqual(second["summary"].get("auto_connected",0),first["summary"]["matched"])
+    self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM dk_variant_parts").fetchone()[0],
+                     sum(len(x["parts"]) for x in first["items"] if x["status"]=="matched"))
+    self.assertIsNone(self.conn.execute("SELECT cost_toman FROM sales LIMIT 1").fetchone())
+
+ def test_real_digikala_two_pack_deducts_two_and_idempotent_import(self):
+    apply_links(self.conn,dry_run=False)
+    item=self.conn.execute("""SELECT p.variant_id,p.master_id FROM products p
+      WHERE p.title LIKE '%دیا%' AND p.title LIKE '%مجموعه 2 عددی%'
+       AND p.title LIKE '%سرمه ای%' AND p.master_id IS NOT NULL LIMIT 1""").fetchone()
+    self.assertIsNotNone(item)
+    mid=item["master_id"]
+    sku=dict(self.conn.execute("SELECT * FROM master_products WHERE id=?",(mid,)).fetchone())
+    batch_adjust(self.conn,sku["category"],mid,sku["size"],"home",{mid:9},"شمارش تست")
+    schedule_cost(self.conn,sku["category"],"","*",50000,today())
+    doc=lambda count:make_xlsx([["کد تنوع","تعداد ارسالی","قیمت فروش (تومان)"],
+                                 [item["variant_id"],count,300000]])
+    first=create_preview(self.conn,today(),"seller",[("orders.xlsx",doc(2))])
+    self.assertFalse(first["errors"],first.get("errors"))
+    self.assertEqual(first["rows"][0]["cost"],100000)
+    self.assertEqual(first["stock_changes"][0]["delta"],-4)
+    commit_preview(self.conn,first["token"])
+    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()[0],5)
+    repeated=create_preview(self.conn,today(),"seller",[("orders.xlsx",doc(2))])
+    self.assertFalse(repeated["errors"])
+    commit_preview(self.conn,repeated["token"])
+    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()[0],5)
+
+ def test_manual_links_and_sale_history_are_unchanged(self):
+    first=self.conn.execute("SELECT variant_id FROM products ORDER BY variant_id LIMIT 1").fetchone()[0]
+    sku=self.conn.execute("SELECT id FROM master_products LIMIT 1").fetchone()[0]
+    self.conn.execute("UPDATE products SET master_id=? WHERE variant_id=?",(sku,first))
+    plan=apply_links(self.conn,dry_run=False)
+    self.assertEqual(self.conn.execute("SELECT master_id FROM products WHERE variant_id=?",(first,)).fetchone()[0],sku)
+    self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM dk_variant_parts WHERE variant_id=?",(first,)).fetchone()[0],0)
+    self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sales").fetchone()[0],0)
+    self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM master_stock_events").fetchone()[0],0)
+
+if __name__=="__main__":unittest.main()
