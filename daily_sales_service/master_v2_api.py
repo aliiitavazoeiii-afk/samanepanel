@@ -15,7 +15,7 @@ from .master_v2_logic import (
 from .master_v2_ui import (
     page_with_style, category_tabs, category_option, group_options, inventory_grid, family_title,
 )
-from .master_api import catalog as digikala_catalog, catalog_map as digikala_map
+from .master_api import catalog as digikala_catalog, catalog_map as digikala_map, save_digikala_pack
 from .master_v2_corrections import undo_adjustment, revise_transfer
 
 router=APIRouter()
@@ -367,6 +367,7 @@ def save_sale_price(channel:str=Form(...),conn=Depends(conn_dep)):
 # The existing 538 DigiKala external variants and their mapping remain intact.
 router.add_api_route(ROOT+"/catalog",digikala_catalog,methods=["GET"])
 router.add_api_route(ROOT+"/catalog/map",digikala_map,methods=["POST"])
+router.add_api_route(ROOT+"/catalog/parts/save",save_digikala_pack,methods=["POST"])
 
 from .platform_api import router as platform_router
 from .capital_api import router as capital_router
