@@ -159,7 +159,8 @@ class MasterV2Test(unittest.TestCase):
   map_variant(self.conn,variant_id,mid,500000)
   def xlsx(qty):
    return [("order.xlsx",make_xlsx([["کد تنوع","تعداد ارسالی","وضعیت","قیمت فروش (تومان)"],[variant_id,qty,"دریافت",500000]]))]
-  day="2026-10-31"
+  from daily_sales_service.effective_costs import today
+  day=today()  # an immediate cost created today must not leak backward into a past sale
   p=create_preview(self.conn,day,"khorshid",xlsx(2))
   self.assertFalse(p["errors"],p["errors"])
   self.assertEqual(p["rows"][0]["cost"],90000)
