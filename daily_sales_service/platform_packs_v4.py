@@ -11,7 +11,14 @@ from collections import Counter, defaultdict
 from .engine import ImportErrorDetail, money
 from .master_engine import CATEGORIES, now
 from .effective_costs import dated_cost, today, valid_date
-from .master_v2_ui import family_title
+def family_title(sku):
+    # Keep the display-only grouping independent from the FastAPI UI import
+    # to avoid circular imports during SQLite schema initialization.
+    label=str(sku["title"])
+    color=str(sku["color"])
+    suffix=" - "+color
+    return label[:-len(suffix)] if color not in ("","-") and label.endswith(suffix) else label
+
 from .platform_catalog import SALE_CHANNELS, PLATFORMS
 
 SCHEMA = """
