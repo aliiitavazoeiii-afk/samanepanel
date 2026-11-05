@@ -126,10 +126,15 @@ def map_variant(conn, variant_id, master_id, sale_price):
     price = None if sale_price in ("",None) else money(sale_price)
     conn.execute("BEGIN IMMEDIATE")
     try:
-        variant = conn.execute("SELECT master_id FROM products WHERE variant_id=?", (variant_id,)).fetchone()
+        variant = conn.execute("SELECT master_id,title FROM products WHERE variant_id=?", (variant_id,)).fetchone()
         master = conn.execute("SELECT id,active FROM master_products WHERE id=?", (master_id,)).fetchone()
         if not variant: raise ImportErrorDetail("کد تنوع دیجی‌کالا پیدا نشد.")
         if not master or not master["active"]: raise ImportErrorDetail("محصول اصلی تعریف نشده یا غیرفعال است.")
+        from .digikala_auto_link import pack_count
+        # The legacy one-SKU manual mapper is not allowed to silently treat a
+        # multi-item pack as one physical unit. Use precise component mapping.
+        if variant["master_id"] is None and (pack_count(variant["title"]) or 1)>1:
+            raise ImportErrorDetail("برای پک چندعددی، اتصال تک‌رنگ دستی کافی نیست؛ ترکیب دقیق رنگ‌های داخل پک باید مشخص باشد.")
         existing = conn.execute("SELECT 1 FROM sales WHERE variant_id=? LIMIT 1", (variant_id,)).fetchone()
         if existing and variant["master_id"]!=master_id:
             raise ImportErrorDetail("این تنوع فروش ثبت‌شده دارد؛ برای تغییر اتصال، ابتدا سوابق فروش و موجودی باید تطبیق داده شوند.")
@@ -264,9 +269,9 @@ def strict_commit(conn,token):
             if vid in new:
                 current_signature=signature(parts)
                 if int(new[vid]["master_id"])!=master_id or (
-                   new[vid].get("parts_signature") and
-                   new[vid]["parts_signature"]!=current_signature):
-                    raise ImportErrorDetail(f"ترکیب کالا یا اتصال کد {vid} پس از پیش‌نمایش تغییر کرده است.")
+                    new[vid].get("parts_signature") != current_signature
+                ):
+                    raise ImportErrorDetail(f"ترکیب کالا یا اتصال کد {vid} پس از پیش‌نمایش تغییر کرده است؛ پیش‌نمایش جدید بگیر.")
             if vid in old:
                 for mid,multiplier in parts:
                     old_per[mid]+=int(old[vid]["qty"])*multiplier
