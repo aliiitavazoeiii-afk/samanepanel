@@ -32,7 +32,9 @@ class ManualPackTest(unittest.TestCase):
     self.assertIn("همه · 522",page)
     for code in (50613316,50613319,50614490,50588316,74677012,74677021):
         self.assertNotIn(str(code),page)
-        self.assertNotIn(str(code),catalog(conn=self.conn,q=str(code)).body.decode())
+        searched=catalog(conn=self.conn,q=str(code)).body.decode()
+        self.assertIn("0 ردیف",searched)
+        self.assertNotIn(f'href="/daily-sales/catalog?q={code}"',searched)
         self.assertIsNotNone(self.variant(code))
     self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM products").fetchone()[0],538)
 
