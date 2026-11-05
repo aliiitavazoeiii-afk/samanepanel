@@ -133,6 +133,10 @@ def map_variant(conn, variant_id, master_id, sale_price):
         existing = conn.execute("SELECT 1 FROM sales WHERE variant_id=? LIMIT 1", (variant_id,)).fetchone()
         if existing and variant["master_id"]!=master_id:
             raise ImportErrorDetail("این تنوع فروش ثبت‌شده دارد؛ برای تغییر اتصال، ابتدا سوابق فروش و موجودی باید تطبیق داده شوند.")
+        # A manual reassignment without historical sales must not retain old
+        # automatic color-slot parts for a different physical SKU.
+        if variant["master_id"] != master_id:
+            conn.execute("DELETE FROM dk_variant_parts WHERE variant_id=?",(variant_id,))
         conn.execute("UPDATE products SET master_id=?,sale_price_toman=? WHERE variant_id=?",
                      (master_id,price,variant_id))
         conn.execute("COMMIT")
@@ -185,21 +189,37 @@ def strict_preview(conn,sale_date,source,files):
     existing={r["variant_id"]:r for r in conn.execute("SELECT * FROM sales WHERE sale_date=? AND source=?",(sale_date,source))}
     cfg=settings_for(conn);prepared=[]
     from .master_v2_logic import cost_for
+    from .digikala_auto_link import parts_for,signature
     for vid,items in sorted(by_variant.items()):
         price,qty=items[0];master=masters[int(variants[vid]["master_id"])]
+        parts=parts_for(conn,vid,master["id"])
+        if not parts or any(mid not in masters or not masters[mid]["active"] for mid,_ in parts):
+            errors.append(f"کد تنوع {vid} ترکیب موجودی معتبر و فعال ندارد.")
+            continue
+        cost=0
+        for mid,units_per_listing in parts:
+            part_cost=cost_for(conn,dict(masters[mid]),sale_date)
+            if part_cost is None:
+                cost=None
+                break
+            cost+=part_cost*units_per_listing
         fee=fee_unit(price,master["category"],cfg)
         prepared.append({"variant_id":vid,"master_id":master["id"],
-                         "title":master["title"]+" / "+master["color"]+" / "+master["size"],
+                         "parts_signature":signature(parts),
+                         "title":variants[vid]["title"],
                          "category":master["category"],"qty":qty,"price":price,
-                         "cost":cost_for(conn,dict(master),sale_date),**fee})
+                         "cost":cost,**fee})
     old_per=defaultdict(int);new_per=defaultdict(int)
     for vid,old in existing.items():
         variant=variants.get(vid)
         if not variant or variant["master_id"] is None:
             errors.append(f"فروش قبلی کد {vid} بدون اتصال محصول است؛ اصلاح خودکار موجودی امن نیست.")
             continue
-        old_per[int(variant["master_id"])]+=int(old["qty"])
-    for item in prepared:new_per[int(item["master_id"])]+=int(item["qty"])
+        for mid,units in parts_for(conn,vid,variant["master_id"]):
+            old_per[mid]+=int(old["qty"])*units
+    for item in prepared:
+        for mid,units in parts_for(conn,item["variant_id"],item["master_id"]):
+            new_per[mid]+=int(item["qty"])*units
     col={"seller":"seller_stock","khorshid":"khorshid_stock","digikala":"digikala_stock"}[source]
     changes=[]
     for mid in set(old_per)|set(new_per):
@@ -232,16 +252,25 @@ def strict_commit(conn,token):
         new={r["variant_id"]:r for r in p["rows"]}
         old_per=defaultdict(int);new_per=defaultdict(int)
         all_variants=set(old)|set(new)
-        links={}
+        from .digikala_auto_link import parts_for,signature
         for vid in all_variants:
             link=conn.execute("SELECT master_id FROM products WHERE variant_id=?",(vid,)).fetchone()
             if link is None or link["master_id"] is None:
                 raise ImportErrorDetail(f"کد {vid} به محصول اصلی متصل نیست.")
-            links[vid]=int(link["master_id"])
-            if vid in new and int(new[vid]["master_id"])!=links[vid]:
-                raise ImportErrorDetail(f"اتصال محصول {vid} تغییر کرده؛ پیش‌نمایش جدید بگیر.")
-            if vid in old:old_per[links[vid]]+=int(old[vid]["qty"])
-            if vid in new:new_per[links[vid]]+=int(new[vid]["qty"])
+            master_id=int(link["master_id"])
+            parts=parts_for(conn,vid,master_id)
+            if vid in new:
+                current_signature=signature(parts)
+                if int(new[vid]["master_id"])!=master_id or (
+                   new[vid].get("parts_signature") and
+                   new[vid]["parts_signature"]!=current_signature):
+                    raise ImportErrorDetail(f"ترکیب کالا یا اتصال کد {vid} پس از پیش‌نمایش تغییر کرده است.")
+            if vid in old:
+                for mid,multiplier in parts:
+                    old_per[mid]+=int(old[vid]["qty"])*multiplier
+            if vid in new:
+                for mid,multiplier in parts:
+                    new_per[mid]+=int(new[vid]["qty"])*multiplier
         col={"seller":"seller_stock","khorshid":"khorshid_stock","digikala":"digikala_stock"}[source]
         adjustments={}
         for mid in set(old_per)|set(new_per):
