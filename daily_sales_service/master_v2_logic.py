@@ -73,6 +73,8 @@ def ensure_v2(conn):
     ensure_platforms(conn)
     from .digikala_auto_link import ensure_auto_schema
     ensure_auto_schema(conn)
+    from .sister_finance_logic import ensure_finance_schema
+    ensure_finance_schema(conn)
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
