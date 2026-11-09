@@ -58,7 +58,7 @@ _POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
-         "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "catalog/map", "catalog/parts/save",
+         "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "catalog/map", "catalog/parts/save", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel",
          "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
@@ -73,6 +73,10 @@ _CANONICAL_PAGES = {
     "catalog": "/settings/products/platforms/digikala/",
     "platforms": "/settings/products/platforms/",
     "capital-report": "/report/sister-capital/",
+    "finance": "/finance/",
+    "finance/accounts": "/finance/accounts/",
+    "finance/movements": "/payments/",
+    "finance/sales": "/finance/sales/",
 }
 
 
@@ -123,7 +127,8 @@ def embedded_response(request, upstream_html, tail, status=200):
     title_match = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.I | re.S)
     title = unescape(re.sub(r"<[^>]*>", "", title_match.group(1))).strip() if title_match else "مدیریت محصولات و فروش"
     section = (
-        "stock" if tail.startswith("master/stock")
+        "finance" if tail.startswith("finance")
+        else "stock" if tail.startswith("master/stock")
         else "catalog" if tail.startswith(("catalog","platforms"))
         else "pricing" if tail.startswith("pricing")
         else "master" if tail.startswith("master")
