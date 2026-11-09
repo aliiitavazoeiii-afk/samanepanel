@@ -212,6 +212,7 @@ def daily_sales_page(conn,channel,day=""):
     body+='<div><label>محصول و سایز</label><select name="variant_id" required>'
     body+=''.join(f'<option value="{v["variant_id"]}">{e(v["title"])} · سایز {e(v["size"])} · {e("، ".join(v["colors"]))} · قیمت پک {fmt(v["price_toman"]) if v["price_toman"] else "ثبت نشده"}</option>' for v in rows)
     body+='</select></div><div><label>تعداد بسته فروخته‌شده</label><input type="number" name="packs" min="1" value="1" required></div>'
+    body+='<div><label>قیمت واقعی فروش هر بسته (اختیاری)</label><input type="number" name="actual_price" min="1" placeholder="خالی = قیمت تعریف‌شده"></div>'
     body+='<div><label>انبار مبدأ</label><select name="warehouse"><option value="home">خانه</option><option value="khorshid">خورشید</option></select></div>'
     body+='<div><label>شماره سفارش (برای جلوگیری از ثبت تکراری)</label><input name="order_ref" maxlength="100" placeholder="شناسه سفارش"></div>'
     body+='<div><button class="m2-btn" type="submit"'+("" if rows else " disabled") +'>ثبت فروش و کسر موجودی</button></div></form>'
