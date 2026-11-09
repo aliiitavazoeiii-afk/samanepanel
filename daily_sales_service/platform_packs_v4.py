@@ -225,7 +225,7 @@ def save_variant_prices(conn,channel,prices):
     except Exception:
         conn.execute("ROLLBACK");raise
 
-def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref=""):
+def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref="",actual_price=""):
     if channel not in SALE_CHANNELS:raise ImportErrorDetail("پلتفرم نامعتبر است.")
     if warehouse not in ("home","khorshid"):raise ImportErrorDetail("محل موجودی نامعتبر است.")
     day=valid_date(sale_date)
@@ -247,6 +247,9 @@ def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref
         price=row["price_toman"]
         if price is None or int(price)<=0:
             raise ImportErrorDetail("اول قیمت فروش همین سایز را در قیمت‌گذاری پلتفرم وارد کن.")
+        if actual_price not in (None,""):
+            price=money(actual_price)
+            if price<=0:raise ImportErrorDetail("قیمت واقعی فروش هر بسته باید مثبت باشد.")
         if ref and (conn.execute("SELECT id FROM platform_bundle_sales WHERE channel=? AND external_ref=?",
                                 (channel,ref)).fetchone() or
                     conn.execute("SELECT id FROM platform_sales WHERE channel=? AND external_ref=?",
