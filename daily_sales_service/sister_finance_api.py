@@ -64,7 +64,8 @@ def finance_home(conn=Depends(conn_dep)):
     body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">حساب‌ها و طلب‌ها</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=payment">ثبت پرداختی</a>'
-    body+=f'<a class="m2-btn" href="{ROOT}/finance/sales">گزارش تفصیلی فروش</a></div>'
+    body+=f'<a class="m2-btn" href="{ROOT}/finance/sales">گزارش تفصیلی فروش</a>'
+    body+='<a class="m2-btn" href="/calculator/">محاسبه‌گر</a></div>'
     body+='<p class="m2-hint">موجودی حساب بانکی بر اساس مانده اولیه و گردش‌های این دفتر محاسبه می‌شود. موجودی یا مطالبات دفتر قدیمی با این مبالغ جمع نشده‌اند.</p>'
     return page_with_style("مرکز مالی",body)
 
