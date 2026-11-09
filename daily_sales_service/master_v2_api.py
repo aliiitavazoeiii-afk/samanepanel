@@ -373,3 +373,5 @@ from .platform_api import router as platform_router
 from .capital_api import router as capital_router
 router.include_router(platform_router)
 router.include_router(capital_router)
+from .sister_finance_api import router as finance_router
+router.include_router(finance_router)
