@@ -143,6 +143,64 @@ class SisterFinanceTest(unittest.TestCase):
             register_movement(self.conn,"receipt",1,bank,0,today())
         self.assertEqual(len(movements(self.conn)),0)
 
+    def test_real_http_sale_creates_basalam_claim_and_receipt_settles_it(self):
+        import os
+        from unittest.mock import patch
+        from httpx import BasicAuth
+        from fastapi.testclient import TestClient
+        import daily_sales_service.app as app_mod
+        db=str(Path(self.folder.name)/"finance.sqlite3")
+        with patch.dict(os.environ,{"SALES_ADMIN_PASSWORD":"t"*32,"SALES_ADMIN_USER":"bridge"}), patch.object(app_mod,"DB",db):
+            with TestClient(app_mod.app) as client:
+                auth=BasicAuth("bridge","t"*32)
+                for path in ("/daily-sales/finance","/daily-sales/finance/accounts",
+                             "/daily-sales/finance/movements?section=receipt",
+                             "/daily-sales/finance/movements?section=payment",
+                             "/daily-sales/finance/sales"):
+                    response=client.get(path,auth=auth)
+                    self.assertEqual(response.status_code,200,(path,response.text[:160]))
+                model=available_models(self.conn,"شورت زنانه دارما")[0]["key"]
+                created=client.post("/daily-sales/platforms/basalam/add",auth=auth,
+                    data={"model_key":model,"category":"شورت زنانه دارما","pack_qty":"1",
+                          "color_1":"مشکی","size":"M","title":"آزمایش مالی باسلام"},
+                    follow_redirects=False)
+                self.assertEqual(created.status_code,303,created.text[:200])
+                variant=list_bundle_variants(self.conn,"basalam")[0]["variant_id"]
+                saved=client.post("/daily-sales/pricing/sales/variants/save",auth=auth,
+                    data={"channel":"basalam",f"price_{variant}":"500000"},follow_redirects=False)
+                self.assertEqual(saved.status_code,303,saved.text[:160])
+                sold=client.post("/daily-sales/platforms/basalam/sales/add",auth=auth,
+                    data={"variant_id":str(variant),"packs":"1","warehouse":"home",
+                          "sale_date":today(),"order_ref":"HTTP-BAS-1"},follow_redirects=False)
+                self.assertEqual(sold.status_code,303,sold.text[:160])
+                day=client.get("/daily-sales/platforms/basalam/sales",auth=auth)
+                self.assertIn("75,000",day.text)
+                self.assertIn("345,000",day.text)
+                before=client.get("/daily-sales/api/sister-finance.json",auth=auth).json()
+                self.assertEqual(before["platforms"]["basalam"]["outstanding"],425000)
+                bank=client.post("/daily-sales/finance/accounts/add",auth=auth,
+                    data={"title":"ملت تست","opening":"100000"},follow_redirects=False)
+                self.assertEqual(bank.status_code,303)
+                bank_id=accounts(self.conn)[0]["id"]
+                basalam=next(p for p in parties(self.conn) if p["code"]=="basalam")
+                received=client.post("/daily-sales/finance/movements/add",auth=auth,
+                    data={"kind":"receipt","party_id":str(basalam["id"]),
+                          "account_id":str(bank_id),"amount":"200000",
+                          "movement_date":today(),"reference":"HTTP-REC-1"},follow_redirects=False)
+                self.assertEqual(received.status_code,303,received.text[:200])
+                after=client.get("/daily-sales/api/sister-finance.json",auth=auth).json()
+                self.assertEqual(after["platforms"]["basalam"]["outstanding"],225000)
+                self.assertEqual(after["accounts"][0]["balance"],300000)
+                self.assertEqual(after["sales"]["profit"],345000)
+                self.assertEqual(after["sales"]["gross"],500000)
+                movement=movements(self.conn)[0]["id"]
+                cancelled=client.post("/daily-sales/finance/movements/cancel",auth=auth,
+                    data={"movement_id":str(movement),"return_kind":"receipt"},
+                    follow_redirects=False)
+                self.assertEqual(cancelled.status_code,303)
+                self.assertEqual(client.get("/daily-sales/api/sister-finance.json",
+                    auth=auth).json()["platforms"]["basalam"]["outstanding"],425000)
+
     def test_finance_routes_and_html_show_derived_claims(self):
         from daily_sales_service.sister_finance_api import (
             router,finance_home,finance_accounts,finance_movements,all_sales
