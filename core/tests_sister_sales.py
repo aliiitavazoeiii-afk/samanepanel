@@ -70,6 +70,43 @@ class SalesChannelRoutesTest(SimpleTestCase):
             "/report/sister-capital/",
         )
 
+    def test_isolated_finance_normal_routes_and_audited_forms(self):
+        for name,expected in (
+            ("finance","/finance/"),
+            ("finance_accounts","/finance/accounts/"),
+            ("payments","/payments/"),
+            ("sister_finance_sales","/finance/sales/"),
+        ):
+            self.assertEqual(reverse(name),expected)
+            self.assertEqual(resolve(expected).func,sister_sales.digikala_proxy)
+            self.assertEqual(self.client.get(expected).status_code,302)
+        for name in ("legacy_finance","legacy_finance_accounts","legacy_payments"):
+            self.assertNotEqual(resolve(reverse(name)).func,sister_sales.digikala_proxy)
+        for route in ("finance","finance/accounts","finance/movements",
+                      "finance/sales","api/sister-finance.json"):
+            self.assertIn(route,sister_sales._ALLOWED)
+        for route in ("finance/accounts/add","finance/parties/add",
+                      "finance/movements/add","finance/movements/cancel"):
+            self.assertIn(route,sister_sales._POST)
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/finance"),
+                         "/finance/")
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/finance/accounts"),
+                         "/finance/accounts/")
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/finance/movements?section=receipt"),
+                         "/payments/?section=receipt")
+        request=RequestFactory().get("/payments/")
+        request.user=SimpleNamespace(is_authenticated=True)
+        markup=('<html><head><style>.m2-shell{max-width:1200px}</style></head><body><main>'
+                '<div class="m2-shell"><h1>دریافتی‌ها</h1>'
+                '<form method="post" action="/sales/digikala/finance/movements/add"><input name="amount"></form>'
+                '<a href="/sales/digikala/finance/accounts">حساب‌ها</a>'
+                '</div></main></body></html>')
+        html=sister_sales.embedded_response(request,markup,"finance/movements").content.decode()
+        self.assertIn('name="csrfmiddlewaretoken"',html)
+        self.assertIn('href="/finance/accounts/"',html)
+        self.assertIn('action="/sales/digikala/finance/movements/add"',html)
+        self.assertIn("دریافتی‌ها",html)
+
     def test_master_proxy_requires_auth(self):
         for url in ("/settings/products/new/", "/settings/products/digikala/",
                     "/settings/products/platforms/", "/report/sister-capital/",
