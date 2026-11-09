@@ -49,6 +49,16 @@ class SisterFinanceTest(unittest.TestCase):
                          (500000,75000,80000,425000,345000))
         self.assertEqual(sales_report(self.conn)["net"],425000)
 
+    def test_actual_discounted_order_price_controls_commission_not_catalog_price(self):
+        self.sale(price=500000)
+        vid=list_bundle_variants(self.conn,"basalam")[0]["variant_id"]
+        out=book_bundle_sale(self.conn,"basalam",vid,1,"home",today(),"discount-2",actual_price="400000")
+        self.assertEqual((out["gross"],out["fees"],out["receivable"],out["profit"]),
+                         (400000,60000,340000,260000))
+        self.assertEqual(platform_balances(self.conn)["basalam"]["outstanding"],765000)
+        self.assertEqual(sales_report(self.conn,"basalam")["fees"],135000)
+        self.assertEqual(self.conn.execute("SELECT price_per_pack FROM platform_bundle_sales ORDER BY id DESC LIMIT 1").fetchone()[0],400000)
+
     def test_multicolor_sale_uses_total_pack_price_not_per_piece_fee(self):
         sale=self.sale(qty=2,price=530000,colors=("مشکی","سفید","مشکی"))
         self.assertEqual((sale["gross"],sale["fees"],sale["receivable"]), (1060000,159000,901000))
