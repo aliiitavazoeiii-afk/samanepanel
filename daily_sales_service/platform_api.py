@@ -55,10 +55,10 @@ async def add_platform(channel:str,request:Request,conn=Depends(conn_dep)):
     return RedirectResponse(ROOT+"/platforms/"+channel,status_code=303)
 
 @router.get(ROOT+"/platforms/{channel}/sales")
-def sales_page(channel:str,conn=Depends(conn_dep)):
+def sales_page(channel:str,day:str="",conn=Depends(conn_dep)):
     if channel not in SALE_CHANNELS:return error_page("این پلتفرم برای ثبت فروش آماده نیست.")
     from .platform_packs_ui import daily_sales_page
-    return daily_sales_page(conn,channel)
+    return daily_sales_page(conn,channel,day)
 
 @router.post(ROOT+"/platforms/{channel}/sales/add")
 async def post_sale(channel:str,request:Request,conn=Depends(conn_dep)):
@@ -76,4 +76,4 @@ async def post_sale(channel:str,request:Request,conn=Depends(conn_dep)):
         else:
             raise ImportErrorDetail("محصول پلتفرم را انتخاب کن.")
     except (ImportErrorDetail,ValueError,TypeError) as exc:return error_page(exc,channel)
-    return RedirectResponse(ROOT+"/platforms/"+channel+"/sales",status_code=303)
+    return RedirectResponse(ROOT+"/platforms/"+channel+"/sales?day="+quote(str(values["sale_date"])),status_code=303)
