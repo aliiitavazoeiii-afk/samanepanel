@@ -269,12 +269,14 @@ def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref
             all_costs[mid]=unit
             if unit is None:cost_total=None
             elif cost_total is not None:cost_total+=int(unit)
+        from .sister_finance_logic import commission_for
+        fee=commission_for(channel,n*int(price))
         cur=conn.execute("""INSERT INTO platform_bundle_sales
           (channel,variant_id,sale_date,external_ref,packs,units,warehouse,
            price_per_pack,gross_toman,cogs_toman,commission_toman,created_at)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
           (channel,vid,day,ref,n,n*len(parts),warehouse,int(price),n*int(price),
-           n*cost_total if cost_total is not None else None,None,now()))
+           n*cost_total if cost_total is not None else None,fee,now()))
         sale_id=int(cur.lastrowid)
         for mid,qty_per_pack in quantities.items():
             amount=qty_per_pack*n
@@ -291,7 +293,9 @@ def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref
                (sale_id,mid,amount,all_costs[mid]))
         conn.execute("COMMIT")
         return {"sale_id":sale_id,"packs":n,"units":n*len(parts),"gross":n*int(price),
-                "cogs":n*cost_total if cost_total is not None else None}
+                "fees":fee,"receivable":n*int(price)-fee,
+                "cogs":n*cost_total if cost_total is not None else None,
+                "profit":(n*(int(price)-cost_total)-fee) if cost_total is not None else None}
     except Exception:
         conn.execute("ROLLBACK");raise
 
