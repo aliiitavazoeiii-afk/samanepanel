@@ -58,14 +58,24 @@
 </style>
 {% endif %}
 <div class="sister-suite">
-  <div class="page-kicker">تعاریف و فروش / مدیریت محصولات</div>
+  <div class="page-kicker">{% if section == "finance" %}حسابداری / پنل مستقل{% else %}تعاریف و فروش / مدیریت محصولات{% endif %}</div>
   <nav class="section-nav" aria-label="بخش‌های محصولات و فروش">
+    {% if section == "finance" %}
+    <a href="{% url 'finance' %}">مرکز مالی</a>
+    <a href="{% url 'finance_accounts' %}">حساب‌ها</a>
+    <a href="{% url 'payments' %}?section=receipt">دریافتی‌ها</a>
+    <a href="{% url 'payments' %}?section=payment">پرداختی‌ها</a>
+    <a href="{% url 'sister_finance_sales' %}">گزارش فروش</a>
+    <a href="{% url 'sale_start' %}">فروش روزانه</a>
+    {% else %}
     <a href="{% url 'settings_products' %}">محصولات و کدها</a>
     <a href="{% url 'settings_product_new' %}" {% if section == 'master' %}class="active"{% endif %}>تعریف محصولات</a>
     <a href="{% url 'sister_product_platforms' %}" {% if section == 'catalog' %}class="active"{% endif %}>پلتفرم‌ها</a>
     <a href="{% url 'sister_product_pricing' %}" {% if section == 'pricing' %}class="active"{% endif %}>قیمت‌گذاری</a>
     <a href="{% url 'inventory_stock' %}" {% if section == 'stock' %}class="active"{% endif %}>موجودی کالا</a>
     <a href="{% url 'sale_start' %}">فروش روزانه</a>
+    <a href="{% url 'finance_accounts' %}">حساب‌ها</a>
+    {% endif %}
   </nav>
   {{ embedded_html|safe }}
   <footer>مبالغ به تومان هستند. فروش تأییدشده و اصلاح موجودی با سابقه ثبت می‌شوند.</footer>
