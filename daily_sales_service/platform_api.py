@@ -68,7 +68,7 @@ async def post_sale(channel:str,request:Request,conn=Depends(conn_dep)):
                 "sale_date":form.get("sale_date"),"order_ref":form.get("order_ref") or ""}
         if form.get("variant_id"):
             from .platform_packs_v4 import book_bundle_sale
-            book_bundle_sale(conn,channel,form["variant_id"],**values)
+            book_bundle_sale(conn,channel,form["variant_id"],actual_price=form.get("actual_price") or "",**values)
         elif form.get("listing_id"):
             # Existing v3 sales remain available to integrations, but the new
             # user interface only shows size/pack variants created by V4.
