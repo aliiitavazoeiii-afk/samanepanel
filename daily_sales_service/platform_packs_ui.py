@@ -7,6 +7,7 @@ import json
 from urllib.parse import quote
 from .app import ROOT,e,fmt
 from .master_engine import CATEGORIES
+from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .platform_catalog import PLATFORMS, SALE_CHANNELS, list_listings
 from .platform_packs_v4 import available_models,list_bundle_groups,list_bundle_variants
