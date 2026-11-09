@@ -131,19 +131,25 @@ def book_sale(conn,channel,listing_id,packs,warehouse,sale_date,order_ref=""):
             raise ImportErrorDetail("موجودی انبار انتخابی برای این تعداد بسته کافی نیست.")
         after=int(current[0])-units
         conn.execute(f"UPDATE master_products SET {col}=?,updated_at=? WHERE id=?",(after,now(),row["master_id"]))
+        from .sister_finance_logic import commission_for
+        fee=commission_for(channel,units*unit_price)
         cur=conn.execute("""INSERT INTO platform_sales
           (channel,listing_id,sale_date,external_ref,packs,units,warehouse,
            unit_sale_price,cost_per_unit,gross_toman,cogs_toman,commission_toman,created_at)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
           (channel,lid,date_key,order_ref,n,units,warehouse,unit_price,
            per_unit_cost,units*unit_price,units*per_unit_cost if per_unit_cost is not None else None,
-           None,now()))
+           fee,now()))
         conn.execute("""INSERT INTO master_stock_events
           (occurred_at,master_id,source,delta,balance_after,reference)
           VALUES(?,?,?,?,?,?)""",
           (now(),row["master_id"],warehouse,-units,after,f"platform:{channel}:{cur.lastrowid}"))
         conn.execute("COMMIT")
-        return {"sale_id":cur.lastrowid,"units":units,"gross":units*unit_price}
+        gross=units*unit_price
+        cost=units*per_unit_cost if per_unit_cost is not None else None
+        return {"sale_id":cur.lastrowid,"units":units,"gross":gross,
+                "fees":fee,"receivable":gross-fee,"cogs":cost,
+                "profit":gross-fee-cost if cost is not None else None}
     except Exception:
         conn.execute("ROLLBACK");raise
 
