@@ -173,32 +173,56 @@ def price_page(conn,channel):
     body+=f'<p><a href="{ROOT}/platforms/{channel}">بازگشت به تعریف محصولات {e(PLATFORMS[channel])}</a></p>'
     return page_with_style("قیمت فروش "+PLATFORMS[channel],body)
 
-def daily_sales_page(conn,channel):
-    from .effective_costs import today
+def daily_sales_page(conn,channel,day=""):
+    from .effective_costs import today,valid_date
+    from .sister_finance_logic import sales_report,platform_balances
     if channel not in SALE_CHANNELS:raise ValueError("پلتفرم نامعتبر")
+    try:
+        selected=valid_date(day) if day else today()
+        stats=sales_report(conn,channel,selected,selected,limit=200)
+    except (ValueError,ImportErrorDetail) as exc:
+        return page_with_style("تاریخ نامعتبر",f'<div class="m2-msg">{e(exc)}</div>')
     rows=[x for x in list_bundle_variants(conn,channel) if x["bundle_active"] and x["variant_active"]]
+    claim=platform_balances(conn)[channel]["outstanding"]
     body=f'<h1>فروش روزانه {e(PLATFORMS[channel])}</h1>'
-    body+='<p class="m2-hint">فروش از محصولات تعریف‌شده در همین پلتفرم انتخاب می‌شود؛ به تعداد بسته × ترکیب رنگ‌ها از موجودی خانه یا خورشید کسر خواهد شد.</p>'
-    body+=f'<div class="m2-card"><h3>ثبت فروش</h3><form method="post" action="{ROOT}/platforms/{channel}/sales/add" class="m2-fields">'
-    body+=f'<div><label>تاریخ فروش</label><input name="sale_date" type="date" value="{today()}" required></div>'
+    body+='<p class="m2-hint">ثبت سفارش، کسر موجودی، محاسبه هزینه پلتفرم و بهای تمام‌شده و ایجاد طلب از همان پلتفرم، همگی به یک فروش متصل هستند.</p>'
+    body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">مانده طلب از {e(PLATFORMS[channel])}: {fmt(claim)} تومان</a>'
+    body+=f'<a class="m2-btn" href="{ROOT}/finance/sales?channel={channel}">گزارش کامل این پلتفرم</a></div>'
+    body+=f'<form class="m2-filters m2-day-filter" method="get" action="{ROOT}/platforms/{channel}/sales"><label>گزارش فروش کدام روز؟</label>'
+    body+=f'<div class="m2-fields"><input type="date" name="day" value="{selected}" required><button class="m2-btn" type="submit">نمایش روز</button></div></form>'
+    body+='<div class="m2-finance-cards">'
+    overview=[("سفارش",stats["orders"],"ردیف"),("تعداد کالای فیزیکی",stats["units"],"عدد"),
+              ("فروش ناخالص",stats["gross"],"تومان"),
+              ("کارمزد "+PLATFORMS[channel],stats["fees"],"تومان"),
+              ("طلب ایجادشده از فروش",stats["net"],"تومان"),
+              ("بهای تمام‌شده",stats["cogs_known"],"تومان · موارد دارای بها"),
+              ("سود فروش",stats["profit"],"تومان · پس از کارمزد و بهای کالا")]
+    for title,value,foot in overview:
+        body+=f'<div class="m2-card m2-finance-tile"><small>{e(title)}</small><strong class="m2-finance-value">{fmt(value)}</strong><span class="m2-unit">{e(foot)}</span></div>'
+    body+='</div>'
+    if stats["unknown_cost_lines"]:
+        body+=f'<div class="m2-msg">{stats["unknown_cost_lines"]} ردیف امروز بهای تمام‌شده ندارد؛ تا تکمیل بها، سود کل نامشخص می‌ماند.</div>'
+    if channel=="basalam":
+        body+='<p class="m2-hint">کارمزد باسلام برابر ۱۵٪ مبلغ ناخالص هر سفارش است. مبلغ قابل‌دریافت = فروش − کارمزد؛ سود = مبلغ قابل‌دریافت − بهای تمام‌شده.</p>'
+    else:
+        body+='<p class="m2-hint">برای این کانال هزینه پلتفرم دیگری اعلام نشده است؛ فعلاً هزینه ثبت‌شده آن صفر است و هزینه‌ای به‌صورت حدسی ساخته نمی‌شود.</p>'
+    body+=f'<div class="m2-card m2-finance-section"><h3>ثبت فروش {e(PLATFORMS[channel])}</h3><form method="post" action="{ROOT}/platforms/{channel}/sales/add" class="m2-fields">'
+    body+=f'<div><label>تاریخ فروش</label><input name="sale_date" type="date" value="{selected}" required></div>'
     body+='<div><label>محصول و سایز</label><select name="variant_id" required>'
-    body+=''.join(f'<option value="{v["variant_id"]}">{e(v["title"])} · سایز {e(v["size"])} · {e("، ".join(v["colors"]))} · {fmt(v["price_toman"]) if v["price_toman"] else "بدون قیمت"}</option>' for v in rows)
+    body+=''.join(f'<option value="{v["variant_id"]}">{e(v["title"])} · سایز {e(v["size"])} · {e("، ".join(v["colors"]))} · قیمت پک {fmt(v["price_toman"]) if v["price_toman"] else "ثبت نشده"}</option>' for v in rows)
     body+='</select></div><div><label>تعداد بسته فروخته‌شده</label><input type="number" name="packs" min="1" value="1" required></div>'
     body+='<div><label>انبار مبدأ</label><select name="warehouse"><option value="home">خانه</option><option value="khorshid">خورشید</option></select></div>'
-    body+='<div><label>شماره سفارش (برای جلوگیری از ثبت تکراری)</label><input name="order_ref" placeholder="شماره سفارش"></div>'
+    body+='<div><label>شماره سفارش (برای جلوگیری از ثبت تکراری)</label><input name="order_ref" maxlength="100" placeholder="شناسه سفارش"></div>'
     body+='<div><button class="m2-btn" type="submit"'+("" if rows else " disabled") +'>ثبت فروش و کسر موجودی</button></div></form>'
-    if not rows:
-        body+=f'<p class="m2-hint"><a href="{ROOT}/platforms/{channel}">اول محصول پلتفرم را تعریف کن.</a></p>'
-    body+='</div><div class="m2-card" style="margin-top:16px"><h3>فروش‌های اخیر</h3>'
-    sales=list(conn.execute("""SELECT s.*,b.title,v.size FROM platform_bundle_sales s
-      JOIN platform_bundle_variants v ON v.id=s.variant_id
-      JOIN platform_bundle_models b ON b.id=v.bundle_id
-      WHERE s.channel=? ORDER BY s.id DESC LIMIT 60""",(channel,)))
-    if sales:
-        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>محصول</th><th>سایز</th><th>بسته</th><th>عدد کسرشده</th><th>فروش (تومان)</th><th>انبار</th></tr></thead><tbody>'
-        for sale in sales:
-            body+=f'<tr><th>{e(sale["sale_date"])}</th><td>{e(sale["title"])}</td><td>{e(sale["size"])}</td><td>{fmt(sale["packs"])}</td><td>{fmt(sale["units"])}</td><td>{fmt(sale["gross_toman"])}</td><td>{e("خانه" if sale["warehouse"]=="home" else "خورشید")}</td></tr>'
+    if not rows:body+=f'<p class="m2-hint"><a href="{ROOT}/platforms/{channel}">اول کالا را در پلتفرم تعریف کن.</a></p>'
+    body+='</div>'
+    body+='<div class="m2-card m2-finance-section"><h3>ریز فروش‌های روز انتخابی</h3>'
+    if stats["lines"]:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>محصول</th><th>بسته</th><th>عدد کالا</th><th>فروش</th><th>هزینه پلتفرم</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
+        for r in stats["lines"]:
+            body+=f'<tr><th>{e(r["title"])}</th><td>{fmt(r["packs"])}</td><td>{fmt(r["units"])}</td><td>{fmt(r["gross"])}</td><td>{fmt(r["fees"])}</td><td>{fmt(r["cogs"])}</td><td>{fmt(r["net"])}</td><td>{fmt(r["profit"])}</td></tr>'
         body+='</tbody></table></div>'
-    else:body+='<p class="m2-hint">هنوز فروشی در این پلتفرم ثبت نشده است.</p>'
-    body+='</div><p class="m2-hint">تا ثبت قواعد کمیسیون هر پلتفرم، سود خالص نامشخص می‌ماند.</p>'
+    else:body+='<p class="m2-hint">برای این روز هنوز فروش ثبت نشده است.</p>'
+    body+='</div>'
+    body+=f'<p><a href="{ROOT}/finance/movements?section=receipt">ثبت دریافت از {e(PLATFORMS[channel])} در حسابداری</a></p>'
     return page_with_style("فروش روزانه "+PLATFORMS[channel],body)
