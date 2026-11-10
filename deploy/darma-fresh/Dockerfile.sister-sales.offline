@@ -1,0 +1,10 @@
+# Build from the verified image of the CURRENTLY RUNNING sister-DigiKala
+# container. The deployment script supplies/tag this local base.
+# No pip install, remote registry or dependency download is permitted.
+FROM dia-darma-fresh-sister-offline-base:local
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY daily_sales_service/ /app/daily_sales_service/
+COPY tests/ /app/tests/
+EXPOSE 8018
+CMD ["uvicorn", "daily_sales_service.app:app", "--host", "0.0.0.0", "--port", "8018"]
