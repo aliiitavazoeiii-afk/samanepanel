@@ -95,6 +95,31 @@ if [ "$ready" != "1" ]; then
   exit 1
 fi
 
+echo "Live HTTP smoke without httpx or external Internet (stdlib urllib only)"
+docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+import base64,json,os,urllib.request
+secret=os.environ["SALES_ADMIN_PASSWORD"]
+account=os.environ.get("SALES_ADMIN_USER","bridge")
+encoded=base64.b64encode((account+":"+secret).encode()).decode()
+paths=("/daily-sales/healthz","/daily-sales/finance",
+       "/daily-sales/finance/accounts","/daily-sales/finance/movements?section=receipt",
+       "/daily-sales/finance/movements?section=payment",
+       "/daily-sales/finance/sales","/daily-sales/api/sister-finance.json")
+for path in paths:
+    req=urllib.request.Request("http://127.0.0.1:8018"+path,
+        headers={"Authorization":"Basic "+encoded})
+    with urllib.request.urlopen(req,timeout=8) as response:
+        assert response.status==200,(path,response.status)
+        content=response.read(500000)
+    if path.endswith("sister-finance.json"):
+        payload=json.loads(content)
+        assert isinstance(payload.get("platforms"),dict)
+        assert "basalam" in payload["platforms"]
+        assert "digikala" in payload["platforms"]
+        assert isinstance(payload.get("total_receivable"),int)
+    print("SISTER_LIVE_HTTP_OK",path)
+PY
+
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); n=c.execute("SELECT count(*) FROM products").fetchone()[0]; print("SISTER_VARIANTS",n); assert n==538; print("CURRENT_STOCK_SELLER_AND_DIGIKALA",tuple(c.execute("SELECT sum(seller_stock),sum(digikala_stock) FROM products").fetchone())); c.close()'
 
 echo "Checking effective-dated costing and linked platform tables"
