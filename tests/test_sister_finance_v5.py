@@ -153,6 +153,8 @@ class SisterFinanceTest(unittest.TestCase):
             register_movement(self.conn,"receipt",1,bank,0,today())
         self.assertEqual(len(movements(self.conn)),0)
 
+    @unittest.skipUnless(__import__("importlib").util.find_spec("httpx") is not None,
+                         "httpx unavailable in previously installed offline runtime; live urllib HTTP smoke runs in deployment")
     def test_real_http_sale_creates_basalam_claim_and_receipt_settles_it(self):
         import os
         from unittest.mock import patch
