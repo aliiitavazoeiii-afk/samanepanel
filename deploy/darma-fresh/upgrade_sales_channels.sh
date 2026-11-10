@@ -36,7 +36,37 @@ if docker compose -f compose.fresh.yml ps --status running --services | grep -qx
 fi
 
 docker compose -f compose.fresh.yml config --quiet
-docker compose -f compose.fresh.yml build web sister-digikala
+
+# Docker Hub / PyPI may be blocked or unavailable on the server.
+# Always rebuild source-only from the EXISTING RUNNING sister containers:
+# the local images already contain the verified Python dependencies.
+# This does not restart or alter any running container while building.
+echo "Prepare offline builds from the running sister-only Docker images"
+WEB_CID="$(docker compose -f compose.fresh.yml ps -q web)"
+SALES_CID="$(docker compose -f compose.fresh.yml ps -q sister-digikala)"
+test -n "$WEB_CID" && test -n "$SALES_CID" || {
+  echo "ERROR: running sister web and sister-digikala images are required for a safe offline upgrade" >&2
+  exit 1
+}
+WEB_BASE="$(docker inspect --format '{{.Image}}' "$WEB_CID")"
+SALES_BASE="$(docker inspect --format '{{.Image}}' "$SALES_CID")"
+docker image inspect "$WEB_BASE" "$SALES_BASE" >/dev/null
+
+echo "Verify existing runtime dependencies (no downloads)"
+docker compose -f compose.fresh.yml exec -T web python -c 'import django, psycopg2; print("DJANGO_OFFLINE_RUNTIME_OK")'
+docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import fastapi, uvicorn, multipart; print("SALES_OFFLINE_RUNTIME_OK")'
+
+echo "Tag immutable base images; never tag original Darma or Dia containers"
+docker image tag "$WEB_BASE" dia-darma-fresh-web-offline-base:local
+docker image tag "$SALES_BASE" dia-darma-fresh-sister-offline-base:local
+
+echo "Offline-only build of sister Django source (no pip, no PyPI)"
+docker build --pull=false --network=none -f deploy/darma-fresh/Dockerfile.web.offline \
+  -t dia-darma-fresh-web:latest .
+echo "Offline-only build of sister sales source (no pip, no PyPI)"
+docker build --pull=false --network=none -f deploy/darma-fresh/Dockerfile.sister-sales.offline \
+  -t dia-darma-fresh-sister-digikala:latest .
+
 echo "Django system checks — no changes to DB"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py check
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python web manage.py test core.tests_sister_sales -v 2
@@ -51,7 +81,7 @@ echo "Verify new product, pricing and stock routes"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.app import app; from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog","/catalog/parts/save"); from daily_sales_service.platform_api import router as platforms; from daily_sales_service.capital_api import router as capital; p.update(x.path for sub in (platforms,capital) for x in sub.routes if hasattr(x,"path")); required+=("/platforms","/platforms/{channel}","/platforms/{channel}/sales","/platforms/{channel}/add","/pricing/sales/variants/save","/capital-report","/api/sister-capital.json","/finance","/finance/accounts","/finance/movements","/finance/sales","/finance/accounts/add","/finance/parties/add","/finance/movements/add","/finance/movements/cancel","/api/sister-finance.json"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
 
 echo "Start the sister sales service and isolated Django web"
-docker compose -f compose.fresh.yml up -d --no-deps sister-digikala web
+docker compose -f compose.fresh.yml up -d --no-build --no-deps sister-digikala web
 
 ready=0
 for _ in $(seq 1 50); do
@@ -108,5 +138,6 @@ echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
 echo "SISTER_PLATFORM_PACKS_SIZE_PRICING_READY"
 echo "DK_538_AUTO_LINK_AUDITED_READY"
 echo "SISTER_FINANCE_BASALAM_15_PERCENT_LEDGER_READY"
+echo "SISTER_DOCKER_OFFLINE_BUILD_NO_PIP_READY"
 echo "Existing SSH tunnel: /settings/products/ ; /settings/products/platforms/ ; /settings/products/pricing/ ; /inventory/stock/ ; /report/sister-capital/ ; /sales/ ; /finance/ ; /finance/accounts/ ; /payments/"
 docker compose -f compose.fresh.yml ps
