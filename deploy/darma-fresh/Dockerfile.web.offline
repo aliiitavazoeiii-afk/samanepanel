@@ -1,0 +1,9 @@
+# Rebuild only Django source against the previously running local image.
+# Python, Django and PostgreSQL client packages are preserved unchanged.
+FROM dia-darma-fresh-web-offline-base:local
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY . /app
+RUN chmod +x /app/entrypoint.sh
+EXPOSE 8000
+ENTRYPOINT ["/app/entrypoint.sh"]
