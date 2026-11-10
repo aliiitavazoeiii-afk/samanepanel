@@ -80,7 +80,7 @@ prepare_offline_base() {
     while IFS= read -r key; do
       test -n "$key" && change_args+=(--change "ENV ${key}=")
     done < <(docker inspect --format '{{json .Config.Env}}' "$cid" | \
-      python3 -c 'import json,re,sys; a=json.load(sys.stdin); print("\\n".join(k for item in a for k in [item.split("=",1)[0]] if re.search("PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY|CREDENTIAL|AUTH|(^|_)PASS($|_)",k,re.I)))')
+      python3 -c 'import json,re,sys; a=json.load(sys.stdin); print("\n".join(k for item in a for k in [item.split("=",1)[0]] if re.search("PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY|CREDENTIAL|AUTH|(^|_)PASS($|_)",k,re.I)))')
     docker commit --pause=false "${change_args[@]}" "$cid" "$offline_tag" >/dev/null || {
       echo "ERROR: Cannot recover the sister image offline; existing containers remain untouched." >&2
       return 1
