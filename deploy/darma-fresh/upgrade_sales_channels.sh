@@ -53,7 +53,7 @@ SALES_BASE="$(docker inspect --format '{{.Image}}' "$SALES_CID")"
 docker image inspect "$WEB_BASE" "$SALES_BASE" >/dev/null
 
 echo "Verify existing runtime dependencies (no downloads)"
-docker compose -f compose.fresh.yml exec -T web python -c 'import django, psycopg2; print("DJANGO_OFFLINE_RUNTIME_OK")'
+docker compose -f compose.fresh.yml exec -T web python -c 'import django, psycopg; print("DJANGO_OFFLINE_RUNTIME_OK")'
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import fastapi, uvicorn, multipart; print("SALES_OFFLINE_RUNTIME_OK")'
 
 echo "Tag immutable base images; never tag original Darma or Dia containers"
