@@ -48,17 +48,59 @@ test -n "$WEB_CID" && test -n "$SALES_CID" || {
   echo "ERROR: running sister web and sister-digikala images are required for a safe offline upgrade" >&2
   exit 1
 }
-WEB_BASE="$(docker inspect --format '{{.Image}}' "$WEB_CID")"
-SALES_BASE="$(docker inspect --format '{{.Image}}' "$SALES_CID")"
-docker image inspect "$WEB_BASE" "$SALES_BASE" >/dev/null
+test "$(docker inspect --format '{{.State.Running}}' "$WEB_CID")" = true
+test "$(docker inspect --format '{{.State.Running}}' "$SALES_CID")" = true
 
-echo "Verify existing runtime dependencies (no downloads)"
+echo "Verify existing running sister runtimes before touching any image"
 docker compose -f compose.fresh.yml exec -T web python -c 'import django, psycopg; print("DJANGO_OFFLINE_RUNTIME_OK")'
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import fastapi, uvicorn, multipart; print("SALES_OFFLINE_RUNTIME_OK")'
 
-echo "Tag immutable base images; never tag original Darma or Dia containers"
-docker image tag "$WEB_BASE" dia-darma-fresh-web-offline-base:local
-docker image tag "$SALES_BASE" dia-darma-fresh-sister-offline-base:local
+# A previous docker build/prune may have removed the immutable image ID
+# referenced by an active container. Image inspection by that ID then fails,
+# although the application remains healthy and a usable local tag exists.
+# Recover from the local project image tag first; do not pull or install.
+# As a last resort, snapshot the live container's rootfs without restarting it.
+# Mounted Postgres/SQLite volumes are never part of docker commit.
+prepare_offline_base() {
+  local cid="$1" local_tag="$2" offline_tag="$3" imports="$4"
+  local container_image
+  container_image="$(docker inspect --format '{{.Image}}' "$cid")"
+  if docker image inspect "$container_image" >/dev/null 2>&1; then
+    echo "OFFLINE_SOURCE=LIVE_IMAGE_ID $offline_tag"
+    docker image tag "$container_image" "$offline_tag"
+  elif docker image inspect "$local_tag" >/dev/null 2>&1 && \
+       docker run --rm --network none --entrypoint python "$local_tag" -c "$imports"; then
+    echo "OFFLINE_SOURCE=VERIFIED_LOCAL_TAG $offline_tag"
+    docker image tag "$local_tag" "$offline_tag"
+  else
+    echo "OFFLINE_SOURCE=CONTAINER_SNAPSHOT $offline_tag"
+    # docker commit can capture runtime ENV, including passwords. Clear all
+    # secret-looking keys in the image metadata before saving the image.
+    local change_args=() key
+    while IFS= read -r key; do
+      test -n "$key" && change_args+=(--change "ENV ${key}=")
+    done < <(docker inspect --format '{{json .Config.Env}}' "$cid" | \
+      python3 -c 'import json,re,sys; a=json.load(sys.stdin); print("\\n".join(k for item in a for k in [item.split("=",1)[0]] if re.search("PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY|CREDENTIAL|AUTH|(^|_)PASS($|_)",k,re.I)))')
+    docker commit --pause=false "${change_args[@]}" "$cid" "$offline_tag" >/dev/null || {
+      echo "ERROR: Cannot recover the sister image offline; existing containers remain untouched." >&2
+      return 1
+    }
+  fi
+  docker image inspect "$offline_tag" >/dev/null
+  docker run --rm --network none --entrypoint python "$offline_tag" -c "$imports" || {
+    echo "ERROR: Recovered sister image has missing Python dependencies; refusing upgrade." >&2
+    return 1
+  }
+}
+
+prepare_offline_base "$WEB_CID" dia-darma-fresh-web:latest \
+  dia-darma-fresh-web-offline-base:local \
+  'import django,psycopg; print("OFFLINE_WEB_BASE_OK")'
+prepare_offline_base "$SALES_CID" dia-darma-fresh-sister-digikala:latest \
+  dia-darma-fresh-sister-offline-base:local \
+  'import fastapi,uvicorn,multipart; print("OFFLINE_SALES_BASE_OK")'
+
+echo "OFFLINE_SISTER_BASE_IMAGES_READY"
 
 echo "Offline-only build of sister Django source (no pip, no PyPI)"
 docker build --pull=false --network=none -f deploy/darma-fresh/Dockerfile.web.offline \
