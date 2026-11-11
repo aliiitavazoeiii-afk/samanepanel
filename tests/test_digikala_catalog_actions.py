@@ -11,6 +11,7 @@ from daily_sales_service.dk_catalog_preferences import (
 )
 from daily_sales_service.digikala_manual_pack import CATALOG_HIDDEN_VARIANT_IDS, manual_link
 from daily_sales_service.digikala_auto_link import scan
+from daily_sales_service.app import app  # Ensure active router finishes loading before legacy module.
 from daily_sales_service.master_api import catalog
 from daily_sales_service.master_v2_api import router
 
