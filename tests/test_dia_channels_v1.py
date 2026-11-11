@@ -36,10 +36,10 @@ class DiaChannelsImport(unittest.TestCase):
             "SELECT id,seller_stock,khorshid_stock,digikala_stock,cost_toman,sale_price_toman "
             "FROM master_products ORDER BY id")]
         plan = dia.preflight(self.conn)
-        self.assertEqual(26, len(plan))
-        self.assertEqual(76, sum(len(x["sizes"]) for x in plan))
-        self.assertEqual(26, sum(x["state"] == "create" for x in plan))
-        self.assertEqual((26, 76), dia.apply(self.conn, plan))
+        self.assertEqual(28, len(plan))
+        self.assertEqual(80, sum(len(x["sizes"]) for x in plan))
+        self.assertEqual(28, sum(x["state"] == "create" for x in plan))
+        self.assertEqual((28, 80), dia.apply(self.conn, plan))
         self.assertEqual((0, 0), dia.apply(self.conn, dia.preflight(self.conn)))
         after = [tuple(x) for x in self.conn.execute(
             "SELECT id,seller_stock,khorshid_stock,digikala_stock,cost_toman,sale_price_toman "
@@ -48,9 +48,9 @@ class DiaChannelsImport(unittest.TestCase):
         self.assertEqual(0, self.conn.execute(
             "SELECT COUNT(*) FROM platform_bundle_variants WHERE price_toman IS NOT NULL").fetchone()[0])
         for channel in dia.CHANNELS:
-            self.assertEqual(13, self.conn.execute(
+            self.assertEqual(14, self.conn.execute(
                 "SELECT COUNT(*) FROM platform_bundle_models WHERE channel=?", (channel,)).fetchone()[0])
-            self.assertEqual(38, self.conn.execute(
+            self.assertEqual(40, self.conn.execute(
                 "SELECT COUNT(*) FROM platform_bundle_variants v JOIN platform_bundle_models b "
                 "ON b.id=v.bundle_id WHERE b.channel=?", (channel,)).fetchone()[0])
             for code in ("nvy", "nvy-nvy"):
@@ -58,7 +58,7 @@ class DiaChannelsImport(unittest.TestCase):
                     "SELECT v.size FROM platform_bundle_variants v JOIN platform_bundle_models b "
                     "ON b.id=v.bundle_id WHERE b.title=? AND b.channel=?", ("DIA "+code,channel))}
                 self.assertEqual({"M","L","XL","XXL"}, sizes)
-            for code in ("24-wh", "24-wh-blk", "24-blk"):
+            for code in ("24", "24-wh", "24-wh-blk", "24-blk"):
                 sizes = {r[0] for r in self.conn.execute(
                     "SELECT v.size FROM platform_bundle_variants v JOIN platform_bundle_models b "
                     "ON b.id=v.bundle_id WHERE b.title=? AND b.channel=?", ("DIA "+code,channel))}
@@ -71,6 +71,31 @@ class DiaChannelsImport(unittest.TestCase):
                 "WHERE b.channel=? AND b.title='DIA blk-nvy 4adadi' AND v.size='L' "
                 "ORDER BY p.position", (channel,))]
             self.assertEqual(["مشکی", "مشکی", "سرمه ای", "سرمه ای"], actual)
+
+    def test_upgrade_existing_13_to_14_adds_only_striped_single(self):
+        # Simulate a successful previous importer run with the original 13 DIA packs.
+        original_recipes = dia.RECIPES
+        old_recipes = tuple(item for item in original_recipes if item[0] != "24")
+        with patch.object(dia, "RECIPES", old_recipes), patch.object(dia, "EXPECTED_PER_CHANNEL", 38):
+            self.assertEqual((26, 76), dia.apply(self.conn, dia.preflight(self.conn)))
+        old_rows = [tuple(r) for r in self.conn.execute(
+            "SELECT id,bundle_id,size,price_toman FROM platform_bundle_variants ORDER BY id")]
+        new_plan = dia.preflight(self.conn)
+        self.assertEqual(26, sum(x["state"] == "already_present" for x in new_plan))
+        self.assertEqual(2, sum(x["state"] == "create" for x in new_plan))
+        self.assertEqual((2, 4), dia.apply(self.conn, new_plan))
+        self.assertEqual(old_rows, [tuple(r) for r in self.conn.execute(
+            "SELECT id,bundle_id,size,price_toman FROM platform_bundle_variants WHERE id<=? ORDER BY id",
+            (old_rows[-1][0],))])
+        for channel in dia.CHANNELS:
+            rows = [tuple(r) for r in self.conn.execute(
+                """SELECT v.size,m.color FROM platform_bundle_variants v
+                JOIN platform_bundle_models b ON b.id=v.bundle_id
+                JOIN platform_bundle_parts p ON p.variant_id=v.id
+                JOIN master_products m ON m.id=p.master_id
+                WHERE b.channel=? AND b.title='DIA 24' ORDER BY v.size,p.position""",
+                (channel,))]
+            self.assertEqual([("L","راه راه مشکی"),("XL","راه راه مشکی")], rows)
 
     def test_missing_physical_size_aborts_before_any_channel(self):
         self.conn.execute(
@@ -93,7 +118,7 @@ class DiaChannelsImport(unittest.TestCase):
         self.conn.close()
         reader = dia.connect(self.db, readonly=True)
         try:
-            self.assertEqual(26, len(dia.preflight(reader)))
+            self.assertEqual(28, len(dia.preflight(reader)))
             self.assertEqual(0, reader.total_changes)
         finally:
             reader.close()
