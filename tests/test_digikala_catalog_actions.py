@@ -82,6 +82,28 @@ class CatalogActionsTests(unittest.TestCase):
         with self.assertRaisesRegex(ImportErrorDetail,"بازیابی"):
             manual_link(self.conn,self.vid,[1])
 
+    def test_actual_http_post_routes_reject_unknown_id_without_db_writes(self):
+        # A real HTTP request is the compatibility gate; app.routes is not flat
+        # for FastAPI 0.137+ and caused false rollback of a healthy deployment.
+        from fastapi.testclient import TestClient
+        with patch.dict(os.environ, {"SALES_ADMIN_USER":"bridge",
+                                     "SALES_ADMIN_PASSWORD":"x"*32}):
+            with patch("daily_sales_service.app.DB",self.db):
+                with TestClient(app) as client:
+                    for endpoint,payload in (
+                        ("edit",{"variant_id":"-999999","display_title":"Test"}),
+                        ("archive",{"variant_id":"-999999"}),
+                        ("restore",{"variant_id":"-999999"}),
+                    ):
+                        response=client.post("/daily-sales/catalog/"+endpoint,
+                                             auth=("bridge","x"*32),data=payload,
+                                             follow_redirects=False)
+                        self.assertEqual(response.status_code,200,
+                                         (endpoint,response.status_code,response.text[:200]))
+                        self.assertIn("خطای عملیات",response.text)
+        self.assertEqual(0,self.conn.execute(
+            "SELECT COUNT(*) FROM dk_catalog_preferences").fetchone()[0])
+
     def test_invalid_edits_and_missing_code_protected(self):
         for value in ("", "x"*221):
             with self.assertRaises(ImportErrorDetail):
@@ -95,10 +117,13 @@ class CatalogActionsTests(unittest.TestCase):
 
     def test_routes_and_safe_return_url(self):
         paths={x.path for x in router.routes if hasattr(x,'path')}
-        app_paths={x.path for x in app.routes if hasattr(x,'path')}
+        # FastAPI >=0.137 keeps include_router() routes behind lazy
+        # _IncludedRouter wrappers. app.routes is intentionally NOT flat.
+        app_paths=app.openapi()["paths"]
         for path in ("/daily-sales/catalog/edit","/daily-sales/catalog/archive","/daily-sales/catalog/restore"):
             self.assertIn(path,paths)
-            self.assertIn(path,app_paths,"FastAPI app does not expose "+path)
+            self.assertIn(path,app_paths,"OpenAPI does not expose "+path)
+            self.assertIn("post",app_paths[path])
         link=catalog_redirect("unmapped","&external=https://fake.invalid",200000)
         self.assertTrue(link.startswith("/daily-sales/catalog?"))
         self.assertNotIn("https://",link)
