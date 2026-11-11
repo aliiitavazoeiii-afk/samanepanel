@@ -131,6 +131,17 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertIn('name="csrfmiddlewaretoken"',out)
         self.assertIn('action="/sales/digikala/catalog/parts/save"',out)
 
+    def test_digikala_catalog_row_edit_archive_restore_are_csrf_protected(self):
+        for route in ("catalog/edit", "catalog/archive", "catalog/restore"):
+            self.assertIn(route,sister_sales._ALLOWED)
+            self.assertIn(route,sister_sales._POST)
+            self.assertEqual(self.client.post("/sales/digikala/"+route).status_code,302)
+            req=RequestFactory().get("/settings/products/platforms/digikala/")
+            req.user=SimpleNamespace(is_authenticated=True)
+            form='<form method="post" action="/sales/digikala/'+route+'"><button>ok</button></form>'
+            html=sister_sales.add_csrf(req,form)
+            self.assertIn('name="csrfmiddlewaretoken"',html)
+
     def test_post_form_has_csrf_token(self):
         request = RequestFactory().get("/sales/digikala/")
         html = sister_sales.add_csrf(request,'<form action="/x" method="post"><button>ok</button></form>')
