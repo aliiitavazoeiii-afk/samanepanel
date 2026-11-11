@@ -19,7 +19,9 @@ jobs:
       - name: Compile all sister modules
         run: python -m compileall -q daily_sales_service tests
       - name: Validate safe isolated deployment script
-        run: bash -n deploy/darma-fresh/upgrade_sales_channels.sh
+        run: |
+          bash -n deploy/darma-fresh/upgrade_sales_channels.sh
+          bash -n deploy/darma-fresh/hotpatch_digikala_catalog_actions.sh
       - name: Run legacy and master inventory regression tests
         env:
           SALES_MASTER_STRICT: '1'
