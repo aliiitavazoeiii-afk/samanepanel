@@ -174,8 +174,15 @@ def scan(conn):
     masters=[dict(r) for r in conn.execute("SELECT * FROM master_products")]
     existing_sold={int(r[0]) for r in conn.execute("SELECT DISTINCT variant_id FROM sales")}
     report=[]
+    archived={int(r[0]) for r in conn.execute(
+        "SELECT variant_id FROM dk_catalog_preferences WHERE archived=1")}
     for variant in conn.execute("SELECT * FROM products ORDER BY variant_id"):
         row=dict(variant)
+        if row["variant_id"] in archived:
+            report.append({"variant_id":row["variant_id"],"status":"removed",
+                           "reason":"حذف دستی از فهرست کاری؛ تطبیق جدید انجام نمی‌شود",
+                           "parts":[]})
+            continue
         if row["master_id"] is not None:
             automatic=conn.execute(
                 "SELECT 1 FROM dk_variant_parts WHERE variant_id=? LIMIT 1",
