@@ -19,8 +19,9 @@ class CatalogActionsTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
+        self.db = str(Path(temp.name)/"sales.sqlite3")
         with patch.dict(os.environ, {"SALES_START_EMPTY_STOCK": "1"}):
-            self.conn = init_db(str(Path(temp.name)/"sales.sqlite3"))
+            self.conn = init_db(self.db)
         self.addCleanup(self.conn.close)
         self.vid=int(next(r[0] for r in self.conn.execute(
             "SELECT variant_id FROM products ORDER BY variant_id")
