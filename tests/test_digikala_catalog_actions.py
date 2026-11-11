@@ -94,7 +94,7 @@ class CatalogActionsTests(unittest.TestCase):
             "SELECT 1 FROM dk_catalog_preferences WHERE variant_id=?", (self.vid,)).fetchone())
 
     def test_routes_and_safe_return_url(self):
-        paths={x.path for x in router.routes}
+        paths={x.path for x in router.routes if hasattr(x,'path')}
         for path in ("/daily-sales/catalog/edit","/daily-sales/catalog/archive","/daily-sales/catalog/restore"):
             self.assertIn(path,paths)
         link=catalog_redirect("unmapped","&external=https://fake.invalid",200000)
