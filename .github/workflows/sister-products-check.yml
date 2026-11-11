@@ -23,6 +23,7 @@ jobs:
           bash -n deploy/darma-fresh/upgrade_sales_channels.sh
           bash -n deploy/darma-fresh/hotpatch_digikala_catalog_actions.sh
           bash -n deploy/darma-fresh/hotpatch_digikala_catalog_actions_v2.sh
+          bash -n deploy/darma-fresh/hotpatch_digikala_catalog_actions_v3.sh
       - name: Run legacy and master inventory regression tests
         env:
           SALES_MASTER_STRICT: '1'
