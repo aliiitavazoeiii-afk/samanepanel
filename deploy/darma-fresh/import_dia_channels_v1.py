@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely register the owner's 13 DIA pack recipes for BOTH site and Basalam.
+"""Safely register the owner's 14 DIA pack recipes for BOTH site and Basalam.
 
 Run inside the existing dia-darma-fresh sister-digikala container, even before
 the sister-finance upgrade.  No Docker rebuild or external dependencies.
@@ -39,11 +39,12 @@ RECIPES = (
     ("blk-nvy 4adadi", ("blk", "blk", "nvy", "nvy"), REGULAR),
     ("wh-blk", ("wh", "blk"), REGULAR),
     ("wh-nvy", ("wh", "nvy"), REGULAR),
+    ("24", ("24",), STRIPED),
     ("24-wh", ("24", "wh"), STRIPED),
     ("24-wh-blk", ("24", "wh", "blk"), STRIPED),
     ("24-blk", ("24", "blk"), STRIPED),
 )
-EXPECTED_PER_CHANNEL = 38
+EXPECTED_PER_CHANNEL = 40
 NEEDED_TABLES = {
     "master_products", "platform_bundle_models", "platform_bundle_variants",
     "platform_bundle_parts",
@@ -146,7 +147,7 @@ def preflight(conn):
 
 def backup(conn, db):
     backup_path = str(Path(db).with_name(
-        "dia-13-site-basalam-before-" +
+        "dia-14-site-basalam-before-" +
         datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".sqlite3"))
     if Path(backup_path).exists():
         raise RuntimeError("Backup path already exists: " + backup_path)
@@ -214,7 +215,7 @@ def main():
         plan = preflight(conn)
         counts = dict(
             recipes=len(RECIPES), channels=list(CHANNELS),
-            channel_variants=EXPECTED_PER_CHANNEL, total_variants=76,
+            channel_variants=EXPECTED_PER_CHANNEL, total_variants=80,
             already_present=sum(1 for item in plan if item["state"] == "already_present"),
             to_create=sum(1 for item in plan if item["state"] == "create"),
             prices="UNSET", stock="UNCHANGED",
@@ -231,7 +232,7 @@ def main():
         created, variants = apply(conn, plan)
         print("SISTER_DIA_CREATED_GROUPS=" + str(created), flush=True)
         print("SISTER_DIA_CREATED_VARIANTS=" + str(variants), flush=True)
-        print("SISTER_DIA_SITE_BASALAM_CATALOG_READY_76", flush=True)
+        print("SISTER_DIA_SITE_BASALAM_CATALOG_READY_80", flush=True)
     finally:
         conn.close()
 
