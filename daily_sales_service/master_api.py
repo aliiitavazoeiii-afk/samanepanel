@@ -123,60 +123,63 @@ def stock_adjust(master_id:int=Form(...),source:str=Form(...),stock:str=Form(...
 
 @router.get(ROOT+"/catalog")
 def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(conn_dep)):
+    """DigiKala variants: local display edits and reversible per-item removal.
+
+    The original external catalog, mappings, real inventory, and historic sales
+    are never modified by listing edits/removals.
+    """
     from .digikala_auto_link import audit_totals
     from .digikala_manual_pack import CATALOG_HIDDEN_VARIANT_IDS
     from .digikala_manual_ui import STYLES,build_manual_form
     audit=audit_totals(conn)
     hidden=tuple(sorted(CATALOG_HIDDEN_VARIANT_IDS))
     placeholders=",".join("?" for _ in hidden)
-    # Older ?unmapped=1 bookmarks keep working. Default view shows both
-    # statuses, with CONNECTED variants first (not 50 unlinked items).
-    status="unmapped" if unmapped else status if status in ("all","connected","unmapped") else "all"
+    status="unmapped" if unmapped else status if status in ("all","connected","unmapped","removed") else "all"
     page_no=max(1,min(page_no,10000))
-    where="WHERE p.variant_id NOT IN ("+placeholders+")"
+    joins=(" FROM products p LEFT JOIN dk_catalog_preferences d ON d.variant_id=p.variant_id "
+           "LEFT JOIN master_products m ON m.id=p.master_id "
+           "LEFT JOIN dk_auto_match_audit a ON a.variant_id=p.variant_id ")
+    basic="p.variant_id NOT IN ("+placeholders+")"
+    active=basic+" AND COALESCE(d.archived,0)=0"
+    removed=basic+" AND COALESCE(d.archived,0)=1"
+    visible_total=conn.execute("SELECT COUNT(*)"+joins+"WHERE "+active,hidden).fetchone()[0]
+    connected=conn.execute("SELECT COUNT(*)"+joins+"WHERE "+active+" AND p.master_id IS NOT NULL",hidden).fetchone()[0]
+    removed_total=conn.execute("SELECT COUNT(*)"+joins+"WHERE "+removed,hidden).fetchone()[0]
+    where=removed if status=="removed" else active
     args=list(hidden)
     if status=="unmapped":where+=" AND p.master_id IS NULL"
     elif status=="connected":where+=" AND p.master_id IS NOT NULL"
     if q:
-        where+=" AND (p.title LIKE ? OR CAST(p.variant_id AS TEXT) LIKE ? OR p.category LIKE ?)"
-        args+=['%'+q+'%']*3
-    total=conn.execute("SELECT COUNT(*) FROM products p "+where,args).fetchone()[0]
-    visible_connected=conn.execute("SELECT COUNT(*) FROM products p "+("WHERE p.variant_id NOT IN ("+placeholders+") AND p.master_id IS NOT NULL"),hidden).fetchone()[0]
-    visible_total=conn.execute("SELECT COUNT(*) FROM products p WHERE p.variant_id NOT IN ("+placeholders+")",hidden).fetchone()[0]
+        where+=" AND (p.title LIKE ? OR COALESCE(d.display_title,'') LIKE ? OR CAST(p.variant_id AS TEXT) LIKE ? OR p.category LIKE ?)"
+        args+=["%"+q+"%"]*4
+    total=conn.execute("SELECT COUNT(*)"+joins+"WHERE "+where,args).fetchone()[0]
     page_no=min(page_no,max(1,(total+49)//50))
-    rows=conn.execute("""SELECT p.*,m.code master_code,m.category master_category,
-       m.color master_color,m.size master_size,m.title master_title,m.sale_price_toman master_sale_price,
-       a.status auto_status,a.reason auto_reason
-       FROM products p LEFT JOIN master_products m ON m.id=p.master_id
-       LEFT JOIN dk_auto_match_audit a ON a.variant_id=p.variant_id """+where+
-       " ORDER BY (p.master_id IS NULL) ASC,p.category,p.title,p.variant_id LIMIT 50 OFFSET ?",
-       args+[(page_no-1)*50]).fetchall()
+    rows=conn.execute("""SELECT p.*, m.code master_code,m.category master_category,
+        m.color master_color,m.size master_size,m.title master_title,
+        m.sale_price_toman master_sale_price,a.status auto_status,a.reason auto_reason,
+        d.display_title,d.display_price_toman,d.archived
+        """+joins+"WHERE "+where+
+        " ORDER BY (p.master_id IS NULL) ASC,p.category,p.title,p.variant_id LIMIT 50 OFFSET ?",
+        args+[(page_no-1)*50]).fetchall()
     body=STYLES+notice(
-        f'از {fmt(audit["total"])} تنوع دیجی‌کالا، {fmt(audit["mapped"])} کد متصل است؛ '
-        f'{fmt(audit["automatic"])} کد با تطبیق خودکار ترکیب واقعی کالا، '
-        f'{fmt(audit["unmapped"])} کد بدون اتصال مانده است. '
-        'سایزهای عددی ناقص، رنگ یا مدل مبهم و پک‌های نامشخص به‌صورت حدسی وصل نمی‌شوند. '
-        'موجودی و سابقه فروش دست‌نخورده می‌مانند.')
-    body+=f'<div class="panel"><h3>همگام‌سازی هوشمند با موجودی کالا</h3>'
-    body+='<p>تطبیق بر اساس دسته، رنگ، سایز و نوع انجام می‌شود. ترکیب پک‌های چندرنگ و تعداد هر جزء جداگانه ثبت می‌شود؛ لینک‌های قبلی حفظ می‌شوند.</p>'
-    body+=f'<p>وضعیت بررسی: {fmt(audit["statuses"].get("matched",0)+audit["statuses"].get("auto_connected",0))} اتصال خودکار تأییدشده · '
-    body+=f'{fmt(audit["statuses"].get("ambiguous",0))} عنوان چندگزینه‌ای · '
-    body+=f'{fmt(audit["statuses"].get("unknown",0))} بدون تطبیق قطعی</p>'
-    body+='</div>'
-    body+='<div class="panel"><h3>اتصال دستی رنگ‌های بسته</h3>'
-    body+='<p>در ستون «ترکیب اتصال به موجودی واقعی» روی «انتخاب رنگ‌های پک» بزن؛ به تعداد نوشته‌شده در عنوان، رنگ هر عدد را از کالاهای ثبت‌شده انتخاب و ذخیره کن. اتصال فقط برای سایز و دسته معتبر همان محصول ثبت می‌شود.</p>'
-    body+='<p class="faint">۱۶ تنوعی که مشخص کردی فقط از فهرست این صفحه کنار گذاشته شده‌اند؛ دیتابیس و سوابق فروش آن‌ها تغییر نکرده است.</p></div>'
+        f'کاتالوگ اصلی دیجی‌کالا: {fmt(audit["total"])} تنوع؛ '
+        f'فهرست کاری: {fmt(visible_total)} تنوع، شامل {fmt(connected)} متصل. '
+        f'{fmt(removed_total)} تنوع تکی حذف شده و قابل بازیابی است. '
+        'ویرایش نام/قیمت فقط در این پنل اعمال می‌شود؛ قیمت دیجی‌کالا و اسناد فروش تغییر نمی‌کنند.')
+    body+='<div class="panel"><h3>مدیریت تکی محصولات دیجی‌کالا</h3>'
+    body+='<p>برای هر محصول «ویرایش» یا «حذف» را بزن. حذف از فهرست این پنل است، نه پاک‌کردن فاکتور فروش، SKU اصلی یا انبار. در «حذف‌شده‌ها» می‌توانی محصول را بازیابی کنی.</p>'
+    body+='<p class="faint">۱۶ تنوع کنارگذاشته‌شده قبلی نیز بدون حذف داده‌ها کنار گذاشته شده‌اند.</p></div>'
     body+='<div class="panel"><h3>نمایش و جست‌وجوی تنوع‌ها</h3>'
-    body+='<p class="faint">در حالت «همه»، ابتدا تنوع‌های متصل نمایش داده می‌شوند؛ کدهای بدون اتصال در صفحه‌های بعدی هستند.</p>'
-    body+='<nav aria-label="فیلتر اتصال دیجی‌کالا" style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
+    body+='<nav style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
     for key,label,count in (
         ("all","همه",visible_total),
-        ("connected","متصل",visible_connected),
-        ("unmapped","بدون اتصال",visible_total-visible_connected),
+        ("connected","متصل",connected),
+        ("unmapped","بدون اتصال",visible_total-connected),
+        ("removed","حذف‌شده‌ها",removed_total),
     ):
-        href=f'{ROOT}/catalog?status={key}'+(f'&q={quote(q)}' if q else '')
+        link=f'{ROOT}/catalog?status={key}'+(f'&q={quote(q)}' if q else '')
         shade="#c4621c" if key==status else "#1b3b58"
-        body+=f'<a class="button" style="background:{shade};border-radius:10px" href="{e(href)}">{e(label)} · {fmt(count)}</a>'
+        body+=f'<a class="button" style="background:{shade};border-radius:10px" href="{e(link)}">{e(label)} · {fmt(count)}</a>'
     body+='</nav>'
     body+=f'<form method="get" action="{ROOT}/catalog" class="forms">'
     body+=f'<input type="hidden" name="status" value="{e(status)}">'
@@ -185,35 +188,108 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     catalog_rows=""
     options_cache={}
     for r in rows:
-        parts=conn.execute("""SELECT m.color,m.size,m.subtype,COUNT(*) AS qty
-            FROM dk_variant_parts p JOIN master_products m ON m.id=p.master_id
-            WHERE p.variant_id=? GROUP BY p.master_id ORDER BY MIN(p.position)""",
-            (r["variant_id"],)).fetchall()
-        if parts:
-            pieces=" + ".join((str(part["qty"])+"× "+e(part["color"])+" / "+e(part["size"])
-                              +( (" ("+e(part["subtype"])+")") if part["subtype"] else ""))
-                              for part in parts)
-            label="دستی" if r["auto_status"]=="manual_connected" else "خودکار"
-            mapped_to='<strong>'+label+'</strong> · '+pieces
-        elif r["master_id"]:
-            mapped_to=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+
-                       e(r["master_color"])+" / "+e(r["master_size"])+" · دستی")
+        vid=int(r["variant_id"])
+        title=r["display_title"] or r["title"]
+        price=(r["display_price_toman"] if r["display_price_toman"] is not None else
+               r["sale_price_toman"] if r["sale_price_toman"] is not None else
+               r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)
+        mapping=""
+        if status=="removed":
+            mapping='<span class="faint">حذف‌شده از فهرست کاری</span>'
         else:
-            mapped_to=build_manual_form(conn,r,options_cache)
-            if r["auto_reason"]:
-                mapped_to+='<small class="faint" style="display:block;margin-top:5px">'+e(r["auto_reason"])+'</small>'
-        catalog_rows+=tr([(f'<a href="{ROOT}/catalog?q={r["variant_id"]}">{r["variant_id"]}</a>',"num"),
-                         (e(r["title"]),"title"),(e(r["category"]),""),
-                         (mapped_to,""),(fmt(r["sale_price_toman"] if r["sale_price_toman"] is not None else (r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)),"num"),
-                         (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else '—',"")])
+            parts=conn.execute("""SELECT m.color,m.size,m.subtype,COUNT(*) AS qty
+                FROM dk_variant_parts p JOIN master_products m ON m.id=p.master_id
+                WHERE p.variant_id=? GROUP BY p.master_id ORDER BY MIN(p.position)""",
+                (vid,)).fetchall()
+            if parts:
+                pieces=" + ".join(
+                    (str(part["qty"])+"× "+e(part["color"])+" / "+e(part["size"])
+                     +( " ("+e(part["subtype"])+")" if part["subtype"] else ""))
+                    for part in parts)
+                label="دستی" if r["auto_status"]=="manual_connected" else "خودکار"
+                mapping="<strong>"+label+"</strong> · "+pieces
+            elif r["master_id"]:
+                mapping=(e(r["master_category"])+" / "+e(r["master_code"])+" / "+
+                         e(r["master_color"])+" / "+e(r["master_size"])+" · دستی")
+            else:
+                mapping=build_manual_form(conn,r,options_cache)
+                if r["auto_reason"]:
+                    mapping+='<small class="faint" style="display:block;margin-top:5px">'+e(r["auto_reason"])+'</small>'
+        hidden_fields=(f'<input type="hidden" name="variant_id" value="{vid}">'
+                       f'<input type="hidden" name="status" value="{e(status)}">'
+                       f'<input type="hidden" name="q" value="{e(q)}">'
+                       f'<input type="hidden" name="page_no" value="{page_no}">')
+        if status=="removed":
+            action=(f'<form method="post" action="{ROOT}/catalog/restore">'+hidden_fields+
+                    '<button type="submit" style="background:#166b55;border-color:#166b55">بازیابی محصول</button></form>')
+        else:
+            action=(
+                '<details style="min-width:215px"><summary style="cursor:pointer;font-weight:bold">ویرایش</summary>'
+                f'<form method="post" action="{ROOT}/catalog/edit" style="display:grid;gap:8px;margin-top:8px">'
+                +hidden_fields+
+                f'<label>عنوان نمایشی<input name="display_title" maxlength="220" value="{e(title)}" required style="width:100%"></label>'
+                f'<label>قیمت نمایشی (تومان؛ اختیاری)<input name="display_price" type="number" min="1" value="{e(r["display_price_toman"] if r["display_price_toman"] is not None else "")}" placeholder="قیمت اصلی" style="width:100%"></label>'
+                '<button type="submit">ذخیره ویرایش</button></form></details>'
+                f'<form method="post" action="{ROOT}/catalog/archive" style="margin-top:8px" '
+                'onsubmit="return confirm(&quot;این محصول فقط از فهرست کاری حذف شود؟ سوابق و موجودی محفوظ می‌ماند.&quot;)">'
+                +hidden_fields+
+                '<button type="submit" style="background:#9d3345;border-color:#9d3345">حذف</button></form>')
+        catalog_rows+=tr([
+            (f'<a href="{ROOT}/catalog?q={vid}">{vid}</a>',"num"),
+            (e(title)+('<small class="faint" style="display:block">عنوان ویرایش‌شده</small>' if r["display_title"] else ""),"title"),
+            (e(r["category"]),""),
+            (mapping,""),
+            (fmt(price),"num"),
+            (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else "—",""),
+            (action,""),
+        ])
     body+='<div class="panel"><h3>فهرست کدهای دیجی‌کالا · '+fmt(total)+' ردیف</h3>'
-    body+=f'<p class="faint">صفحه {fmt(page_no)} از {fmt(max(1,(total+49)//50))} · {e({"all":"همه (متصل‌ها در ابتدا)","connected":"فقط متصل","unmapped":"فقط بدون اتصال"}[status])}</p>'
-    body+=table(
-        ["کد تنوع","عنوان دیجی‌کالا","گروه ارسالی","ترکیب اتصال به موجودی واقعی","قیمت فعلی/پیش‌فرض (تومان)","موجودی"],catalog_rows)+'</div>'
-    if total>page_no*50:body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&status={status}">صفحه بعد</a>'
-    if page_no>1:body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
+    descriptions={"all":"همه (متصل‌ها در ابتدا)","connected":"فقط متصل",
+                  "unmapped":"فقط بدون اتصال","removed":"حذف‌شده‌های قابل بازیابی"}
+    body+=f'<p class="faint">صفحه {fmt(page_no)} از {fmt(max(1,(total+49)//50))} · {e(descriptions[status])}</p>'
+    body+=table(["کد تنوع","عنوان در پنل","گروه ارسالی",
+                 "ترکیب اتصال به موجودی واقعی","قیمت نمایشی/پیش‌فرض (تومان)",
+                 "موجودی","عملیات"],catalog_rows)+'</div>'
+    if total>page_no*50:
+        body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&status={status}">صفحه بعد</a>'
+    if page_no>1:
+        body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
-    return page('محصولات دیجی‌کالا',body,'اتصال دستی رنگ‌های هر پک به موجودی، بدون حذف سوابق')
+    return page('محصولات دیجی‌کالا',body,'ویرایش و حذف تکی؛ با امکان بازیابی و حفظ سوابق')
+
+
+@router.post(ROOT+"/catalog/edit")
+def catalog_edit(variant_id:int=Form(...),display_title:str=Form(...),display_price:str=Form(""),
+                 status:str=Form("all"),q:str=Form(""),page_no:int=Form(1),conn=Depends(conn_dep)):
+    from .dk_catalog_preferences import update_display,catalog_redirect
+    try:
+        update_display(conn,variant_id,display_title,display_price)
+    except (ImportErrorDetail,ValueError) as ex:
+        return fail(ex)
+    return RedirectResponse(catalog_redirect(status,q,page_no),status_code=303)
+
+
+@router.post(ROOT+"/catalog/archive")
+def catalog_archive(variant_id:int=Form(...),status:str=Form("all"),
+                    q:str=Form(""),page_no:int=Form(1),conn=Depends(conn_dep)):
+    from .dk_catalog_preferences import set_archived,catalog_redirect
+    try:
+        set_archived(conn,variant_id,True)
+    except (ImportErrorDetail,ValueError) as ex:
+        return fail(ex)
+    return RedirectResponse(catalog_redirect(status,q,page_no),status_code=303)
+
+
+@router.post(ROOT+"/catalog/restore")
+def catalog_restore(variant_id:int=Form(...),status:str=Form("removed"),
+                    q:str=Form(""),page_no:int=Form(1),conn=Depends(conn_dep)):
+    from .dk_catalog_preferences import set_archived,catalog_redirect
+    try:
+        set_archived(conn,variant_id,False)
+    except (ImportErrorDetail,ValueError) as ex:
+        return fail(ex)
+    return RedirectResponse(catalog_redirect(status,q,page_no),status_code=303)
+
 
 @router.post(ROOT+"/catalog/parts/save")
 async def save_digikala_pack(request:Request,conn=Depends(conn_dep)):
