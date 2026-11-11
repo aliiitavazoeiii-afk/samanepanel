@@ -95,8 +95,10 @@ class CatalogActionsTests(unittest.TestCase):
 
     def test_routes_and_safe_return_url(self):
         paths={x.path for x in router.routes if hasattr(x,'path')}
+        app_paths={x.path for x in app.routes if hasattr(x,'path')}
         for path in ("/daily-sales/catalog/edit","/daily-sales/catalog/archive","/daily-sales/catalog/restore"):
             self.assertIn(path,paths)
+            self.assertIn(path,app_paths,"FastAPI app does not expose "+path)
         link=catalog_redirect("unmapped","&external=https://fake.invalid",200000)
         self.assertTrue(link.startswith("/daily-sales/catalog?"))
         self.assertNotIn("https://",link)
