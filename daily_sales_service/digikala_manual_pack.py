@@ -73,6 +73,9 @@ def manual_link(conn,variant_id,ids):
         if row is None:raise ImportErrorDetail("این کد تنوع دیجی‌کالا وجود ندارد.")
         if variant_id in CATALOG_HIDDEN_VARIANT_IDS:
             raise ImportErrorDetail("این کد بنا به درخواست شما از اتصال در فهرست کنار گذاشته شده است.")
+        from .dk_catalog_preferences import is_archived
+        if is_archived(conn,variant_id):
+            raise ImportErrorDetail("این تنوع از فهرست کاری حذف شده است؛ ابتدا بازیابی کن.")
         if row["master_id"] is not None:
             raise ImportErrorDetail("این تنوع قبلاً متصل شده؛ اتصال آن بدون بررسی فروش قبلی تغییر نمی‌کند.")
         if conn.execute("SELECT 1 FROM sales WHERE variant_id=? LIMIT 1",(variant_id,)).fetchone():
