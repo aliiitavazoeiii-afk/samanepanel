@@ -75,6 +75,8 @@ def ensure_v2(conn):
     ensure_auto_schema(conn)
     from .sister_finance_logic import ensure_finance_schema
     ensure_finance_schema(conn)
+    from .dk_catalog_preferences import ensure_catalog_preferences
+    ensure_catalog_preferences(conn)
 
 def _clean(value,limit=220):
     value=re.sub(r"\s+"," ",str(value or "").strip())
