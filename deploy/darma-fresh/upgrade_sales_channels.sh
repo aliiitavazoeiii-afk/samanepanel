@@ -203,7 +203,28 @@ echo "SISTER_MASTER_CATALOG_READY"
 echo "BODY_XLSX_PRODUCT_DEFINITIONS_READY"
 echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
 echo "SISTER_PLATFORM_PACKS_SIZE_PRICING_READY"
+echo "Read-only verification of sale-derived claims and comprehensive capital"
+docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+from daily_sales_service.engine import dbconnect
+from daily_sales_service.capital_api import financial_capital
+from daily_sales_service.digikala_daily_ui import daily_page
+from daily_sales_service.effective_costs import today
+db=dbconnect("/data/sales.sqlite3")
+totals=financial_capital(db)
+assert totals["total_receivable"]==sum(x["outstanding"] for x in totals["platform_receivables"].values())
+if totals["total_value"] is not None:
+    assert totals["total_capital"]==totals["total_value"]+totals["total_receivable"]+totals["cash_balance"]
+page=daily_page(db,today()).body.decode("utf-8")
+assert 'بارگذاری اکسل دیجی‌کالا' in page
+assert 'فروش ثبت‌شده پلتفرم‌های دیگر' not in page
+print("SISTER_DAILY_XLSX_UI_AND_CAPITAL_INVARIANT_PASS",{
+    "inventory":totals["total_value"],"cash":totals["cash_balance"],
+    "claims":totals["total_receivable"],"capital":totals["total_capital"]})
+db.close()
+PY
+
 echo "DK_538_AUTO_LINK_AUDITED_READY"
+echo "SISTER_DAILY_XLSX_AND_FINANCIAL_CAPITAL_READY"
 echo "SISTER_FINANCE_BASALAM_15_PERCENT_LEDGER_READY"
 echo "SISTER_DOCKER_OFFLINE_BUILD_NO_PIP_READY"
 echo "Existing SSH tunnel: /settings/products/ ; /settings/products/platforms/ ; /settings/products/pricing/ ; /inventory/stock/ ; /report/sister-capital/ ; /sales/ ; /finance/ ; /finance/accounts/ ; /payments/"
