@@ -67,7 +67,7 @@ def notice(content,kind='notice'):return f'<div class="notice {kind}">{content}<
 def table(headers,body):return '<div class="scroll"><table><thead><tr>'+''.join(f'<th>{e(x)}</th>' for x in headers)+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 def tr(cells):return '<tr>'+''.join(f'<td class="{cls}">{cell}</td>' for cell,cls in cells)+'</tr>'
 def page(title,body,desc=''):
- nav=[('داشبورد',ROOT+'/'),('ورود فروش',ROOT+'/import'),('تعریف محصولات اصلی',ROOT+'/master'),('موجودی کالا',ROOT+'/master/stock'),('پلتفرم‌ها',ROOT+'/platforms'),('گزارش جامع سرمایه',ROOT+'/capital-report'),('حساب‌ها',ROOT+'/finance/accounts'),('دریافتی و پرداختی',ROOT+'/finance/movements'),('تنظیمات مالی',ROOT+'/settings')]
+ nav=[('فروش روزانه',ROOT+'/'),('تعریف محصولات اصلی',ROOT+'/master'),('موجودی کالا',ROOT+'/master/stock'),('پلتفرم‌ها',ROOT+'/platforms'),('گزارش جامع سرمایه',ROOT+'/capital-report'),('حساب‌ها',ROOT+'/finance/accounts'),('دریافتی و پرداختی',ROOT+'/finance/movements'),('تنظیمات مالی',ROOT+'/settings')]
  return HTMLResponse('''<!doctype html><html lang="fa"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'''+e(title)+''' | فروش روزانه</title><style>'''+STYLE+'''</style></head><body><header><b>فروش روزانه · پنل دوم دیجی‌کالا</b><nav>'''+''.join(f'<a href="{p}">{n}</a>' for n,p in nav)+'''</nav></header><main><div class="hero"><div><h1>'''+e(title)+'''</h1><p>'''+e(desc)+'''</p></div></div>'''+body+'''</main><footer>هزینه‌ها به تومان هستند • نرخ‌ها و بهای تمام‌شده در لحظه ثبت فروش فریز می‌شوند</footer></body></html>''')
 
 def fail(err):return page('خطای عملیات',notice(e(err),'error')+f'<a class="button" href="{ROOT}/import">بازگشت به ورود فروش</a>')
@@ -76,43 +76,14 @@ def fail(err):return page('خطای عملیات',notice(e(err),'error')+f'<a cl
 def health():return {'ok':True}
 
 @app.get(ROOT+'/',response_class=HTMLResponse)
-def dashboard(request:Request,start:str|None=None,end:str|None=None,conn=Depends(conn_dep)):
- stats=report(conn,start,end)
- cards=[('فروش ناخالص',fmt(stats['gross'])+' تومان'),('هزینه دیجی‌کالا',fmt(stats['fee'])+' تومان'),('دریافتی پس از دیجی‌کالا',fmt(stats['net_after_digikala'])+' تومان'),('سود پس از بهای تمام‌شده',fmt(stats['profit'])+' تومان' if stats['profit'] is not None else 'نامشخص'),('تعداد فروخته‌شده',fmt(stats['units'])),('ردیف فاقد بهای تمام‌شده',fmt(stats['unknown_cost_lines']))]
- body='<div class="grid">'+''.join(f'<div class="card"><small>{e(k)}</small><strong>{e(v)}</strong></div>' for k,v in cards)+'</div>'
- from .platform_catalog import PLATFORMS
- from .sister_finance_logic import sales_report,platform_balances
- platform_rows=''
- for channel in ('basalam','site','mold'):
-  st=sales_report(conn,channel,start,end)
-  platform_rows+=tr([(f'<a href="{ROOT}/platforms/{channel}/sales">{e(PLATFORMS[channel])}</a>','title'),
-      (fmt(st['orders']),'num'),(fmt(st['units']),'num'),(fmt(st['gross']),'num'),
-      (fmt(st['fees']),'num'),(fmt(st['cogs_known']),'num'),
-      (fmt(st['net']),'num'),(fmt(st['profit']),'num')])
- body+='<div class="panel"><h3>سایر پلتفرم‌ها · فروش، کارمزد و سود</h3>'+table(
-  ['پلتفرم','سفارش','عدد کالا','فروش (تومان)','هزینه پلتفرم','بهای کالا (معلوم)','طلب از فروش','سود پس از هزینه'],
-  platform_rows)+'</div>'
- claims=platform_balances(conn)
- body+='<div class="panel"><h3>مانده مطالبات پلتفرم‌ها</h3><div class="grid">'+''.join(
-  f'<div class="card"><small>طلب از {e(data["title"])}</small><strong>{fmt(data["outstanding"])} تومان</strong></div>'
-  for data in claims.values())+'</div>'
- body+=f'<p style="margin-top:12px"><a href="{ROOT}/finance/accounts">حساب‌ها</a> · <a href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a> · <a href="{ROOT}/finance/sales">گزارش فروش همه پلتفرم‌ها</a></p></div>'
-
- if stats['unknown_cost_lines']:body+=notice(f"محاسبه سود قطعی نیست: {stats['unknown_cost_lines']} ردیف فروش هنوز بهای تمام‌شده ندارد. «دریافتی پس از دیجی‌کالا» سود نیست.")
- body+=f'''<div class="panel"><form class="forms" method="get"><div><label>از تاریخ (میلادی)</label><input type="date" name="start" value="{e(start or '')}"></div><div><label>تا تاریخ (میلادی)</label><input type="date" name="end" value="{e(end or '')}"></div><button type="submit">نمایش گزارش</button></form></div>'''
- catrows=''.join(tr([(e(cat),'title'),(fmt(v['units']),'num'),(fmt(v['gross']),'num'),(fmt(v['fee']),'num'),(fmt(v['profit_known']) if not v['unknown_cost_lines'] else 'نامشخص','num')]) for cat,v in stats['categories'].items())
- body+='<div class="panel"><h3>گزارش تفکیک گروه کالا</h3>'+table(['گروه','تعداد','فروش','هزینه دیجی‌کالا','سود'],catrows)+'</div>'
- rows=''.join(tr([(e(r['sale_date']),'num'),(e(r['source']),'num'),(e(r['variant_id']),'num'),(e(r['title']),'title'),(fmt(r['qty']),'num'),(fmt(r['gross']),'num'),(fmt(r['total_fee']),'num'),(fmt(r['profit']),'num')]) for r in stats['rows'][:300])
- body+='<div class="panel"><h3>ریز فروش‌ها (حداکثر ۳۰۰ ردیف)</h3>'+table(['تاریخ','مبدأ موجودی','کد تنوع','محصول','تعداد','فروش','هزینه دیجی‌کالا','سود'],rows)+'</div>'
- body+=f'<div class="panel"><a href="{ROOT}/api/report.csv">دریافت CSV فروش‌ها</a></div>'
- return page('داشبورد فروش روزانه',body,'تفکیک فروش، کارمزد دیجی‌کالا، موجودی و سود واقعی')
+def dashboard(sale_date:str="",brand:str="",size:str="",saved:str="",conn=Depends(conn_dep)):
+ from .digikala_daily_ui import daily_page
+ try:return daily_page(conn,sale_date,brand,size,saved)
+ except (ValueError,ImportErrorDetail) as exc:return fail(exc)
 
 @app.get(ROOT+'/import',response_class=HTMLResponse)
 def import_page(_=Depends(authorize)):
- body=notice('ابتدا پیش‌نمایش می‌گیری؛ تا تأیید نهایی هیچ موجودی کم نمی‌شود. تکرار فایل برای همان تاریخ و مبدأ جایگزین فروش قبلی می‌شود، نه فروش جدید.')
- body+=f'''<div class="panel"><h3>بارگذاری فایل‌های فروش روزانه</h3><form method="post" action="{ROOT}/preview" enctype="multipart/form-data"><div class="forms"><div><label>تاریخ فروش (میلادی)</label><input required type="date" name="sale_date" value="{date.today().isoformat()}"></div><div><label>کسر از کدام انبار؟</label><select name="source"><option value="seller">خانه</option><option value="khorshid">خورشید</option></select></div><div><label>فایل XLSX (امکان انتخاب چند فایل)</label><input name="files" type="file" required multiple accept=".xlsx"></div><button type="submit">نمایش پیش‌نمایش</button></div></form></div>'''
- body+=notice('فایل مرجع موجودی با گزارش فروش روزانه فرق دارد. گزارش فروش باید «عنوان یا کد تنوع» و «تعداد ارسالی» داشته باشد. اگر قیمت معامله در فایل نباشد، قیمت فروش ثبت‌شده در کاتالوگ مبنا می‌شود؛ آن را قبل از تأیید کنترل کن.')
- return page('بارگذاری فروش روزانه',body,'پیش‌نمایش، کنترل موجودی و ثبت اتمیک')
+ return RedirectResponse(ROOT+'/',status_code=303)
 
 @app.post(ROOT+'/preview',response_class=HTMLResponse)
 async def preview(sale_date:str=Form(...),source:str=Form(...),files:list[UploadFile]=File(...),conn=Depends(conn_dep)):
@@ -120,26 +91,26 @@ async def preview(sale_date:str=Form(...),source:str=Form(...),files:list[Upload
   if len(files)>15:raise ImportErrorDetail('حداکثر ۱۵ فایل در هر نوبت قابل پذیرش است.')
   reports=[]
   for f in files:
-   if not f.filename.lower().endswith('.xlsx'):raise ImportErrorDetail(f'پسوند XLSX لازم است: {f.filename}')
+   if not f.filename or not f.filename.lower().endswith('.xlsx'):
+    raise ImportErrorDetail(f'پسوند XLSX لازم است: {f.filename}')
    reports.append((Path(f.filename).name,await f.read()))
   result=create_preview(conn,sale_date,source,reports)
  except (ImportErrorDetail,ValueError,KeyError) as ex:return fail(ex)
  if result.get('errors'):
-  return page('پیش‌نمایش رد شد',notice('<ul>'+''.join('<li>'+e(error)+'</li>' for error in result['errors'][:80])+'</ul>','error')+f'<a class="button" href="{ROOT}/import">اصلاح و بارگذاری مجدد</a>')
- total=sum(x['qty']*x['price'] for x in result['rows'])
- fee=sum(x['qty']*x['fee'] for x in result['rows'])
- body=f'<div class="grid"><div class="card"><small>تعداد کالا</small><strong>{fmt(sum(x["qty"] for x in result["rows"]))}</strong></div><div class="card"><small>فروش ناخالص</small><strong>{fmt(total)}</strong></div><div class="card"><small>هزینه دیجی‌کالا</small><strong>{fmt(fee)}</strong></div><div class="card"><small>خالص بعد از دیجی‌کالا</small><strong>{fmt(total-fee)}</strong></div></div>'
- if result['fallback_prices']:body+=notice(f"قیمت {result['fallback_prices']} ردیف از قیمت پیش‌فرض کاتالوگ آمده؛ تخفیف‌ها یا قیمت واقعی را بررسی کن.")
- if result['known_cost_count']<len(result['rows']):body+=notice('برخی محصولات فاقد بهای تمام‌شده‌اند؛ سود قطعی فقط برای ردیف‌های قیمت‌گذاری‌شده قابل محاسبه است.')
- body+='<div class="panel">'+table(['کد تنوع','محصول','تعداد','قیمت واحد','کارمزد %','هزینه واحد دیجی‌کالا','بهای تمام‌شده واحد'],''.join(tr([(e(x['variant_id']),'num'),(e(x['title']),'title'),(fmt(x['qty']),'num'),(fmt(x['price']),'num'),(e(x['commission_percent']),'num'),(fmt(x['fee']),'num'),(fmt(x['cost']),'num')]) for x in result['rows']))+'</div>'
- body+=f'''<div class="panel"><form action="{ROOT}/commit" method="post"><input name="token" type="hidden" value="{e(result['token'])}"><button type="submit">تأیید نهایی، ذخیره فروش و اصلاح موجودی</button></form></div>'''
- return page('پیش‌نمایش فروش',body,f'{e(sale_date)} • {e(source)} • {result["files_count"]} فایل • {result["ignored"]} ردیف کنار گذاشته شد')
+  from .master_v2_ui import page_with_style
+  return page_with_style('بارگذاری ناموفق',
+    '<h1>فایل فروش قابل ثبت نیست</h1><div class="m2-msg"><ul>'+
+    ''.join('<li>'+e(error)+'</li>' for error in result['errors'][:80])+
+    '</ul></div><p><a href="'+ROOT+'/">اصلاح فایل و بارگذاری دوباره</a></p>')
+ from .digikala_daily_ui import preview_page
+ return preview_page(result)
 
 @app.post(ROOT+'/commit',response_class=HTMLResponse)
 def commit(token:str=Form(...),conn=Depends(conn_dep)):
  try:result=commit_preview(conn,token)
  except (ImportErrorDetail,ValueError) as exc:return fail(exc)
- return page('فروش ثبت شد',notice(f"ثبت موفق: {result['units']} کالا، {result['lines']} ردیف، تاریخ {e(result['date'])}. موجودی کسر/اصلاح شد.",'ok')+f'<a class="button" href="{ROOT}/">مشاهده داشبورد</a>')
+ from urllib.parse import urlencode
+ return RedirectResponse(ROOT+'/?'+urlencode({'sale_date':result['date'],'saved':'1'}),status_code=303)
 
 @app.get(ROOT+'/inventory',response_class=HTMLResponse)
 def inventory(q:str='',conn=Depends(conn_dep)):
