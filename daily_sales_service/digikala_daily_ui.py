@@ -177,7 +177,7 @@ def preview_page(data):
     body+=f'<p class="m2-hint">{e(data["sale_date"])} · {data["files_count"]} فایل اکسل · انبار {_source_label(data["source"])} · {data["ignored"]} ردیف کنار گذاشته‌شده</p>'
     body+=_cards({"gross":gross,"fee":fees,"net":gross-fees,"profit":profit,"cogs_known":known,
                  "packs":sum(int(x["qty"]) for x in rows),
-                 "units":sum(int(x["qty"]) * max(1,len(x.get("parts_signature",[]))) for x in rows)})
+                 "units":sum(int(x["qty"]) * (sum(int(part.split(":")[1]) for part in x.get("parts_signature","").split(";") if ":" in part) or 1) for x in rows)})
     if data["fallback_prices"]:
         body+=f'<div class="m2-msg">قیمت فروش {data["fallback_prices"]} ردیف از قیمت کاتالوگ خوانده شده است؛ با قیمت واقعی فایل مقایسه کن.</div>'
     if unknown:
