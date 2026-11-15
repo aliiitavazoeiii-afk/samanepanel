@@ -210,7 +210,7 @@ def preview_page(data):
             body+=f'<li>{e(item.get("code",""))} / {e(item.get("color",""))} / {e(item.get("size",""))}: {fmt(item["stock_after"])} عدد</li>'
         body+='</ul></div>'
     if data["fallback_prices"]:
-        body+=f'<div class="m2-msg">قیمت {data["fallback_prices"]} ردیف به‌صورت خودکار از قیمت‌های تعریف‌شده پنل یا کاتالوگ دیجی‌کالا خوانده شده است. منبع قیمت هر ردیف را پیش از تأیید کنترل کن؛ قیمت اولیه فهرست ممکن است قدیمی باشد.</div>'
+        body+=f'<div class="m2-msg">قیمت {data["fallback_prices"]} ردیف به‌صورت خودکار از قیمت‌های تعریف‌شده پنل یا کاتالوگ دیجی‌کالا خوانده شده است. مبلغ قیمت فروش را پیش از تأیید کنترل کن؛ قیمت اولیه فهرست ممکن است قدیمی باشد.</div>'
     if unknown:
         body+=f'<div class="m2-msg">{unknown} ردیف بهای تمام‌شده ندارد و سود قطعی آن‌ها هنوز نامشخص است.</div>'
     body+='<section class="m2-card m2-dk-section"><h3>ردیف‌های تجمیع‌شده از اکسل‌ها</h3>'
