@@ -165,8 +165,9 @@ def _daily_digikala_price(conn, variant, master):
         return int(listed),"قیمت فروش اختصاصی کد تنوع"
     # Master prices are per physical item and may not price a multi-item pack.
     from .digikala_auto_link import parts_for
-    physical_count=sum(q for _,q in parts_for(conn,variant["variant_id"],master["id"]))
-    if physical_count==1 and int(master["sale_price_toman"] or 0)>0:
+    physical_count=(sum(q for _,q in parts_for(conn,variant["variant_id"],master["id"]))
+                    if master is not None else 0)
+    if master is not None and physical_count==1 and int(master["sale_price_toman"] or 0)>0:
         return int(master["sale_price_toman"]),"قیمت تعریف‌شده کالای تکی"
     for field,label in (
         ("promotion_price_rial","قیمت تخفیفی فهرست دیجی‌کالا"),
