@@ -70,18 +70,20 @@ class PlatformV3Test(unittest.TestCase):
         book_sale(self.conn,"site",pid,2,"home",today(),"site-123")
     self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],14)
 
- def test_two_platforms_share_one_stock_and_invalid_sale_does_not_deduct(self):
+ def test_two_platforms_share_one_stock_and_shortage_does_not_duplicate_order(self):
     self.seed(5)
     set_channel_prices(self.conn,"site","شورت زنانه دارما","","M",50000)
     set_channel_prices(self.conn,"basalam","شورت زنانه دارما","","M",60000)
     site=create_listing(self.conn,"site",self.sku["id"],"پک دو",2)
     salam=create_listing(self.conn,"basalam",self.sku["id"],"تکی",1)
     book_sale(self.conn,"site",site,2,"home",today(),"s-22")
+    book_sale(self.conn,"basalam",salam,2,"home",today(),"b-10")
+    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],-1)
     with self.assertRaises(ImportErrorDetail):
-        book_sale(self.conn,"basalam",salam,2,"home",today(),"b-10")
-    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],1)
-    book_sale(self.conn,"basalam",salam,1,"home",today(),"b-10")
-    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],0)
+        book_sale(self.conn,"basalam",salam,1,"home",today(),"b-10")
+    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],-1)
+    book_sale(self.conn,"basalam",salam,1,"home",today(),"b-11")
+    self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku["id"],)).fetchone()[0],-2)
 
  def test_mold_platform_rejects_wrong_category_and_unpriced_sale(self):
     with self.assertRaises(ImportErrorDetail):
