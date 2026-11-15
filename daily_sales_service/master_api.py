@@ -165,7 +165,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
         f'کاتالوگ اصلی دیجی‌کالا: {fmt(audit["total"])} تنوع؛ '
         f'فهرست کاری: {fmt(visible_total)} تنوع، شامل {fmt(connected)} متصل. '
         f'{fmt(removed_total)} تنوع تکی حذف شده و قابل بازیابی است. '
-        'ویرایش نام/قیمت فقط در این پنل اعمال می‌شود؛ قیمت دیجی‌کالا و اسناد فروش تغییر نمی‌کنند.')
+        'قیمت ثبت‌شده در این صفحه، مبنای فروش‌های روزانه بعدی در پنل است؛ قیمت سایت دیجی‌کالا و اسناد فروش قبلی تغییر نمی‌کنند.')
     body+='<div class="panel"><h3>همگام‌سازی هوشمند با موجودی کالا</h3>'
     body+='<p>اتصال خودکار فقط برای رنگ، سایز، برند و تعداد قطعی انجام می‌شود؛ اتصال‌های دستی و فروش‌های قبلی حفظ می‌شوند.</p>'
     body+=f'<p>تطبیق خودکار: {fmt(audit["automatic"])} · بدون اتصال اصلی: {fmt(audit["unmapped"])}</p></div>'
@@ -231,7 +231,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
                 f'<form method="post" action="{ROOT}/catalog/edit" style="display:grid;gap:8px;margin-top:8px">'
                 +hidden_fields+
                 f'<label>عنوان نمایشی<input name="display_title" maxlength="220" value="{e(title)}" required style="width:100%"></label>'
-                f'<label>قیمت نمایشی (تومان؛ اختیاری)<input name="display_price" type="number" min="1" value="{e(r["display_price_toman"] if r["display_price_toman"] is not None else "")}" placeholder="قیمت اصلی" style="width:100%"></label>'
+                f'<label>قیمت مبنای فروش روزانه (تومان؛ اختیاری)<input name="display_price" type="number" min="1" value="{e(r["display_price_toman"] if r["display_price_toman"] is not None else "")}" placeholder="قیمت اصلی" style="width:100%"></label>'
                 '<button type="submit">ذخیره ویرایش</button></form></details>'
                 f'<form method="post" action="{ROOT}/catalog/archive" style="margin-top:8px" '
                 'onsubmit="return confirm(&quot;این محصول فقط از فهرست کاری حذف شود؟ سوابق و موجودی محفوظ می‌ماند.&quot;)">'
@@ -251,7 +251,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
                   "unmapped":"فقط بدون اتصال","removed":"حذف‌شده‌های قابل بازیابی"}
     body+=f'<p class="faint">صفحه {fmt(page_no)} از {fmt(max(1,(total+49)//50))} · {e(descriptions[status])}</p>'
     body+=table(["کد تنوع","عنوان در پنل","گروه ارسالی",
-                 "ترکیب اتصال به موجودی واقعی","قیمت نمایشی/پیش‌فرض (تومان)",
+                 "ترکیب اتصال به موجودی واقعی","قیمت مبنای فروش روزانه (تومان)",
                  "موجودی","عملیات"],catalog_rows)+'</div>'
     if total>page_no*50:
         body+=f'<a class="button" href="{ROOT}/catalog?page_no={page_no+1}&q={quote(q)}&status={status}">صفحه بعد</a>'
