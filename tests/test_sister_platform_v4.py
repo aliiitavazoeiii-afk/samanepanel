@@ -69,16 +69,20 @@ class BundleV4Test(unittest.TestCase):
             book_bundle_sale(self.conn,"basalam",variant["M"],2,"home",today(),"BAS-101")
         self.assertEqual(sale_summary(self.conn)["basalam"]["units"],6)
 
-    def test_insufficient_one_color_rolls_back_everything(self):
+    def test_shortage_one_color_commits_exact_signed_pack_stock(self):
         self.make(sizes=("M",))
         v=list_bundle_variants(self.conn,"basalam")[0]["variant_id"]
         save_variant_prices(self.conn,"basalam",{v:400000})
         self.set_stock("مشکی","M",20)
         self.set_stock("سفید","M",1)
+        sale=book_bundle_sale(self.conn,"basalam",v,2,"home",today(),"BAS-SHORTAGE")
+        self.assertEqual(sale["units"],6)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM platform_bundle_sales").fetchone()[0],1)
+        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku("مشکی","M")["id"],)).fetchone()[0],16)
+        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku("سفید","M")["id"],)).fetchone()[0],-1)
         with self.assertRaises(ImportErrorDetail):
-            book_bundle_sale(self.conn,"basalam",v,2,"home",today(),"BAS-FAIL")
-        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM platform_bundle_sales").fetchone()[0],0)
-        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku("مشکی","M")["id"],)).fetchone()[0],20)
+            book_bundle_sale(self.conn,"basalam",v,2,"home",today(),"BAS-SHORTAGE")
+        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.sku("سفید","M")["id"],)).fetchone()[0],-1)
 
     def test_missing_color_size_rejects_whole_listing_without_partial_rows(self):
         add_model(self.conn,CATEGORY,"مدل نصفه","","مشکی","M")
