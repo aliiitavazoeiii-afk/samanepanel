@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS master_products (
  color TEXT NOT NULL DEFAULT '-',
  sale_price_toman INTEGER NOT NULL DEFAULT 0 CHECK(sale_price_toman>=0),
  cost_toman INTEGER CHECK(cost_toman>=0),
- seller_stock INTEGER NOT NULL DEFAULT 0 CHECK(seller_stock>=0),
- digikala_stock INTEGER NOT NULL DEFAULT 0 CHECK(digikala_stock>=0),
+ seller_stock INTEGER NOT NULL DEFAULT 0,
+ digikala_stock INTEGER NOT NULL DEFAULT 0,
  active INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL,
@@ -60,6 +60,10 @@ def ensure_schema(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_dk_master_id ON products(master_id)")
     from .master_v2_logic import ensure_v2
     ensure_v2(conn)
+    # Existing SQLite CHECK(stock>=0) clauses must be removed atomically,
+    # otherwise even validated sales cannot persist signed inventory balances.
+    from .signed_stock_migration import ensure_signed_master_stock
+    ensure_signed_master_stock(conn)
 
 def add_master(conn, category, code, title, size="-", color="-", sale_price=0, cost=None):
     category = str(category or "").strip()
@@ -268,9 +272,11 @@ def strict_preview(conn,sale_date,source,files):
         if master is None:
             errors.append(f"محصول اصلی {mid} پیدا نشد.");continue
         remaining=int(master[col])+old_per[mid]-new_per[mid]
-        if remaining<0:
-            errors.append(f"موجودی ناکافی: {master['code']} / {master['color']} / {master['size']}؛ موجود {master[col]}، فروش جدید {new_per[mid]}.")
-        changes.append({"master_id":mid,"delta":old_per[mid]-new_per[mid],"stock_after":remaining})
+        # An already-sold item is still a real sale. A signed shortage is
+        # visible in preview and inventory, not a reason to reject the ledger.
+        changes.append({"master_id":mid,"delta":old_per[mid]-new_per[mid],"stock_after":remaining,
+                        "shortage":max(0,-remaining),"code":master["code"],
+                        "color":master["color"],"size":master["size"]})
     return {"errors":errors,"rows":prepared,"sale_date":sale_date,"source":source,
             "ignored":ignored,"fallback_prices":fallback,"files_count":len(files),
             "files_sha256":sha.hexdigest(),
@@ -317,8 +323,10 @@ def strict_commit(conn,token):
         for mid in set(old_per)|set(new_per):
             row=conn.execute(f"SELECT {col} FROM master_products WHERE id=?",(mid,)).fetchone()
             delta=old_per[mid]-new_per[mid]
-            if row is None or int(row[0])+delta<0:
-                raise ImportErrorDetail("موجودی یا اتصال کالا تغییر کرده؛ پیش‌نمایش جدید بگیر.")
+            if row is None:
+                raise ImportErrorDetail("کالای اصلی حذف شده؛ پیش‌نمایش جدید بگیر.")
+            # Reconcile against current stock, including existing shortages.
+            # Reuploads calculate old-new delta so no double deduction occurs.
             adjustments[mid]=(delta,int(row[0])+delta)
         for mid,(delta,balance) in adjustments.items():
             if not delta:continue
