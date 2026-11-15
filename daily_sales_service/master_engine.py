@@ -148,6 +148,36 @@ def map_variant(conn, variant_id, master_id, sale_price):
     except Exception:
         conn.execute("ROLLBACK");raise
 
+def _daily_digikala_price(conn, variant, master):
+    """Price of ONE DigiKala listing/pack, never the sum of physical SKU prices.
+
+    Sources are ordered by explicit operator configuration, then the existing
+    imported marketplace catalog. Historical sales keep their frozen price.
+    """
+    pref=conn.execute(
+        "SELECT display_price_toman FROM dk_catalog_preferences WHERE variant_id=?",
+        (int(variant["variant_id"]),)).fetchone()
+    override=pref["display_price_toman"] if pref else None
+    if override is not None and int(override)>0:
+        return int(override),"قیمت ثبت‌شده در کاتالوگ دیجی‌کالا"
+    listed=variant["sale_price_toman"]
+    if listed is not None and int(listed)>0:
+        return int(listed),"قیمت فروش اختصاصی کد تنوع"
+    # Master prices are per physical item and may not price a multi-item pack.
+    from .digikala_auto_link import parts_for
+    physical_count=sum(q for _,q in parts_for(conn,variant["variant_id"],master["id"]))
+    if physical_count==1 and int(master["sale_price_toman"] or 0)>0:
+        return int(master["sale_price_toman"]),"قیمت تعریف‌شده کالای تکی"
+    for field,label in (
+        ("promotion_price_rial","قیمت تخفیفی فهرست دیجی‌کالا"),
+        ("list_price_rial","قیمت فهرست دیجی‌کالا"),
+    ):
+        rial=int(variant[field] or 0)
+        if rial>0 and rial%10==0:
+            return rial//10,label
+    return None,"قیمت معتبر تعریف نشده"
+
+
 def strict_preview(conn,sale_date,source,files):
     try: date.fromisoformat(sale_date)
     except ValueError: raise ImportErrorDetail("تاریخ باید YYYY-MM-DD باشد.")
@@ -156,7 +186,7 @@ def strict_preview(conn,sale_date,source,files):
     masters={int(r["id"]):r for r in conn.execute("SELECT * FROM master_products")}
     by_title=defaultdict(list)
     for v in variants.values(): by_title[v["title_key"]].append(v)
-    entries={}; errors=[]; ignored=0; fallback=0
+    entries={}; price_sources={}; errors=[]; ignored=0; fallback=0
     sha=hashlib.sha256()
     for filename,data in files:
         sha.update(filename.encode()); sha.update(data)
@@ -178,14 +208,16 @@ def strict_preview(conn,sale_date,source,files):
                 errors.append(f"کد تنوع {var['variant_id']} هنوز به یک محصول فعال در «تعریف محصولات» متصل نیست.")
                 continue
             price=row["price"]
+            price_source="قیمت داخل فایل اکسل"
             if price is None:
-                price=var["sale_price_toman"] if var["sale_price_toman"] is not None else master["sale_price_toman"]
+                price,price_source=_daily_digikala_price(conn,var,master)
                 fallback+=1
-            if price<=0:
-                errors.append(f"کد {var['variant_id']}: قیمت فروش تعریف نشده است.")
+            if price is None or price<=0:
+                errors.append(f"کد {var['variant_id']}: قیمت فروش معتبر در پنل یا کاتالوگ دیجی‌کالا وجود ندارد.")
                 continue
             key=(int(var["variant_id"]),price)
             entries[key]=entries.get(key,0)+row["qty"]
+            price_sources[key]=price_source
     if errors:return {"errors":errors,"rows":[],"ignored":ignored,"fallback_prices":fallback}
     by_variant=defaultdict(list)
     for (vid,p),qty in entries.items():by_variant[vid].append((p,qty))
@@ -215,6 +247,7 @@ def strict_preview(conn,sale_date,source,files):
                          "parts_signature":signature(parts),
                          "title":variants[vid]["title"],
                          "category":master["category"],"qty":qty,"price":price,
+                         "price_source":price_sources.get((vid,price),"قیمت داخل فایل اکسل"),
                          "cost":cost,**fee})
     old_per=defaultdict(int);new_per=defaultdict(int)
     for vid,old in existing.items():
