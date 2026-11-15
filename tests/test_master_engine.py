@@ -69,13 +69,20 @@ class UnifiedStockTest(unittest.TestCase):
   self.assertTrue(x['errors'])
   self.assertIn('متصل نیست',x['errors'][0] if x['errors'] else '')
 
- def test_insufficient_stock_aggregates_multiple_variants(self):
+ def test_sale_beyond_available_stock_creates_signed_shortage_across_variants(self):
   mid=add_master(self.conn,'قالب','S-21','قالب',size='42',color='مشکی',sale_price=500000)
   adjust_master_stock(self.conn,mid,'seller',3,'شمارش اولیه')
   map_variant(self.conn,self.a,mid,500000);map_variant(self.conn,self.b,mid,500000)
   x=create_preview(self.conn,'2026-10-31','seller',self.sample([(self.a,2),(self.b,2)]))
-  self.assertTrue(x['errors'])
-  self.assertIn('موجودی ناکافی',x['errors'][0])
+  self.assertFalse(x['errors'],x['errors'])
+  self.assertEqual(x['stock_changes'][0]['stock_after'],-1)
+  self.assertEqual(x['stock_changes'][0]['shortage'],1)
   self.assertEqual(self.conn.execute('SELECT seller_stock FROM master_products WHERE id=?',(mid,)).fetchone()[0],3)
+  commit_preview(self.conn,x['token'])
+  self.assertEqual(self.conn.execute('SELECT seller_stock FROM master_products WHERE id=?',(mid,)).fetchone()[0],-1)
+  repeated=create_preview(self.conn,'2026-10-31','seller',self.sample([(self.a,2),(self.b,2)]))
+  self.assertFalse(repeated['errors'],repeated['errors'])
+  commit_preview(self.conn,repeated['token'])
+  self.assertEqual(self.conn.execute('SELECT seller_stock FROM master_products WHERE id=?',(mid,)).fetchone()[0],-1)
 
 if __name__=='__main__': unittest.main()
