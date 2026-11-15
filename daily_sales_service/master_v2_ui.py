@@ -49,6 +49,7 @@ STYLE="""
 .m2-table th:first-child{position:sticky;right:0;z-index:2;min-width:140px;text-align:right!important;background:#213b56}
 .m2-table .m2-subtotal td,.m2-table .m2-subtotal th{background:#3b2f2e!important;font-weight:800}
 .m2-table .m2-capital td,.m2-table .m2-capital th{background:#193e3b!important;font-weight:800}
+.m2-table .m2-negative{background:#8a1937!important;color:#fff;font-weight:900}
 .m2-table .m2-zero{background:#791622!important;color:#fff;font-weight:900}
 .m2-table .m2-low{background:#472633!important;color:#ffd5d8;font-weight:700}
 .m2-table .m2-empty{background:#0d2237;color:#627d96}
@@ -213,7 +214,7 @@ def inventory_grid(conn,skus,location,label):
             value=(cs or 0)*qty
             if cs is None and qty>0:unknown.add(idx)
             row_total+=qty;sums[idx]+=qty;worth[idx]+=value;capital+=value
-            css="m2-zero" if qty==0 else ("m2-low" if qty<10 else "")
+            css="m2-negative" if qty<0 else ("m2-zero" if qty==0 else ("m2-low" if qty<10 else ""))
             cells.append(f'<td class="{css}" title="بهای تمام‌شده هر عدد: {fmt(cs) if cs is not None else "نامشخص"}">{fmt(qty)}</td>')
         grand+=row_total
         rows.append(f'<tr><th>{e(color)}</th>'+''.join(cells)+f'<td><b>{fmt(row_total)}</b></td></tr>')
