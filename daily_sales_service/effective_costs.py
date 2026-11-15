@@ -108,7 +108,7 @@ def capital_snapshot(conn,as_of=None):
         qty=row["quantity"]
         cat["quantity"]+=qty;units+=qty
         if qty and row["effective_cost"] is None:
-            cat["missing_cost_units"]+=qty;unknown_units+=qty;unknown_count+=1
+            cat["missing_cost_units"]+=abs(qty);unknown_units+=abs(qty);unknown_count+=1
         elif row["value"] is not None:
             cat["known_value"]+=row["value"];total+=row["value"]
     return {"as_of":date_key,"stock_as_of":today(),"units":units,
