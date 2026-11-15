@@ -104,8 +104,10 @@ def category_for(category,title):
         padar="پادار" in title
         if slip and padar:return None,""
         return "بادیگارد",("اسلیپ" if slip else ("پادار" if padar else ""))
-    # Foot molds carry numbered shoe ranges not verified physical
-    # small/medium/large. Never infer the mapping by arbitrary thresholds.
+    # Mold listings can be offered for EXPLICIT manual physical size mapping.
+    # A numbered fitting range (e.g. 39 تا 44) never implies small/medium/large.
+    if ("قالب" in cat or "کفش" in cat) and "قالب کفش" in title:
+        return "قالب",""
     return None,""
 
 def color_parts(head,pieces,quantity):
