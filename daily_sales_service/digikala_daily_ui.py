@@ -8,6 +8,7 @@ from collections import Counter,defaultdict
 from urllib.parse import quote
 from .app import ROOT,e,fmt
 from .effective_costs import today,valid_date
+from .calendar_jalali import picker as jalali_picker, label as jalali_label, ASSETS as JALALI_ASSETS
 from .master_v2_ui import page_with_style
 
 SIZE_ORDER={"M":0,"L":1,"XL":2,"XXL":3,"2XL":3,"3XL":4,"XXXL":4,
@@ -75,7 +76,7 @@ def _file_form(day,source="seller"):
     body+='<div class="m2-dk-upload-head"><div><span class="m2-unit">ورود خودکار سفارش روزانه</span><h3>بارگذاری اکسل دیجی‌کالا</h3>'
     body+='<p class="m2-hint">اگر یک روز دو یا چند محموله داری، همه فایل‌های XLSX آن روز را هم‌زمان انتخاب کن. فایل‌ها تجمیع می‌شوند و یک صورت کامل می‌سازند.</p></div></div>'
     body+=f'<form action="{ROOT}/preview" enctype="multipart/form-data" method="post" class="m2-dk-upload-form">'
-    body+=f'<div><label>تاریخ فروش</label><input type="date" name="sale_date" value="{e(day)}" required></div>'
+    body+=f'<div><label>تاریخ فروش (شمسی)</label>{jalali_picker(day,today())}</div>'
     body+='<div><label>موجودی از کدام انبار کم شود؟</label><select name="source">'
     for code,label in (("seller","خانه"),("khorshid","خورشید")):
         body+=f'<option value="{code}"'+(" selected" if code==source else "")+f'>{label}</option>'
@@ -109,23 +110,41 @@ def _selected_link(day,brand="",size=""):
     if size:q+="&size="+quote(size)
     return ROOT+"/?"+q
 
-def daily_page(conn,sale_date="",brand="",size="",saved=""):
-    day=valid_date(sale_date or today())
+def daily_page(conn,sale_date="",brand="",size="",saved="",deleted=""):
+    requested_day=valid_date(sale_date or today())
+    day=requested_day
     sold=_sold_rows(conn,day)
+    last_report=False
+    if not sale_date and not sold:
+        last=conn.execute("SELECT MAX(sale_date) FROM sales").fetchone()[0]
+        if last:
+            day=last
+            sold=_sold_rows(conn,day)
+            last_report=True
     stats=_summary(sold)
     body='<div class="m2-dk-head"><h1>صورت فروش روزانه دیجی‌کالا</h1>'
     body+='<p class="m2-hint">همان گردش فروش دارما: فایل روز، صورت برندها و سایزها، هزینه کالا، هزینه دیجی‌کالا، سود و طلب ایجادشده.</p></div>'
-    body+=_file_form(day)
+    body+=_file_form(requested_day)
+    if last_report:
+        body+='<div class="m2-msg">برای امروز هنوز صورتی ثبت نشده؛ آخرین صورت ثبت‌شده در پایین نمایش داده شده است.</div>'
     if saved=="1":
         body+='<div class="m2-dk-success">صورت روزانه تأیید شد؛ موجودی فیزیکی اصلاح شد و مبلغ خالص فروش به طلب دیجی‌کالا در حسابداری منتقل شد.</div>'
-    body+=f'<div class="m2-dk-daybar"><h3>صورت فروش {e(day)}</h3><form method="get" action="{ROOT}/" class="m2-fields">'
-    body+=f'<div><label>انتخاب روز</label><input name="sale_date" type="date" value="{e(day)}"></div><div><button type="submit" class="m2-btn">نمایش روز</button></div></form></div>'
-    if not sold:
-        last=conn.execute("SELECT MAX(sale_date) FROM sales WHERE sale_date<?",(day,)).fetchone()[0]
-        body+='<div class="m2-card"><h3>هنوز فروشی برای این روز ثبت نشده است.</h3><p class="m2-hint">برای مشاهده گزارش روز، فایل‌های اکسل را از کادر بالای صفحه بارگذاری و تأیید کن.</p>'
-        if last:body+=f'<a href="{_selected_link(last)}">آخرین روز ثبت‌شده: {e(last)}</a>'
+    if deleted=="1":
+        body+='<div class="m2-dk-success">صورت این روز حذف شد؛ موجودی و طلب دیجی‌کالا برگشت داده شد و سند حذف در تاریخچه محفوظ است.</div>'
+    body+=f'<div class="m2-dk-daybar"><h3>صورت فروش {jalali_label(day)}</h3><form method="get" action="{ROOT}/" class="m2-fields">'
+    body+=f'<div><label>انتخاب روز (شمسی)</label>{jalali_picker(requested_day,today())}</div><div><button type="submit" class="m2-btn">نمایش روز</button></div></form></div>'
+    recent=[r[0] for r in conn.execute("SELECT DISTINCT sale_date FROM sales ORDER BY sale_date DESC LIMIT 8")]
+    if recent:
+        body+='<div class="m2-dk-size-filter"><small>صورت‌های ثبت‌شده:</small>'
+        for recent_day in recent:
+            body+=f'<a href="{_selected_link(recent_day)}">{jalali_label(recent_day)}</a>'
         body+='</div>'
-        return page_with_style("فروش روزانه دیجی‌کالا",body)
+    if not sold:
+        last=conn.execute("SELECT MAX(sale_date) FROM sales WHERE sale_date<>?",(day,)).fetchone()[0]
+        body+='<div class="m2-card"><h3>هنوز فروشی برای این روز ثبت نشده است.</h3><p class="m2-hint">برای مشاهده گزارش روز، فایل‌های اکسل را از کادر بالای صفحه بارگذاری و تأیید کن.</p>'
+        if last:body+=f'<a href="{_selected_link(last)}">آخرین روز ثبت‌شده: {jalali_label(last)}</a>'
+        body+='</div>'
+        return page_with_style("فروش روزانه دیجی‌کالا",body+JALALI_ASSETS)
     body+=_cards(stats)
     if stats["unknown"]:
         body+=f'<div class="m2-msg">بهای تمام‌شده {stats["unknown"]} ردیف فروش مشخص نیست؛ سود روز تا تکمیل قیمت تمام‌شده قطعی نیست. مبلغ طلب مستقل از بهای کالا محاسبه شده است.</div>'
