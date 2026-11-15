@@ -162,6 +162,35 @@ for path in paths:
     print("SISTER_LIVE_HTTP_OK",path)
 PY
 
+echo "Live catalog POST route smoke with stdlib urllib (no httpx2; invalid IDs only)"
+docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+import base64,os,sqlite3,urllib.parse,urllib.request
+secret=os.environ["SALES_ADMIN_PASSWORD"]
+account=os.environ.get("SALES_ADMIN_USER","bridge")
+encoded=base64.b64encode((account+":"+secret).encode()).decode()
+conn=sqlite3.connect("/data/sales.sqlite3")
+before=conn.execute("SELECT COUNT(*) FROM dk_catalog_preferences").fetchone()[0]
+for operation,values in (
+    ("edit",{"variant_id":"-999999","display_title":"Test"}),
+    ("archive",{"variant_id":"-999999"}),
+    ("restore",{"variant_id":"-999999"}),
+):
+    request=urllib.request.Request(
+        "http://127.0.0.1:8018/daily-sales/catalog/"+operation,
+        data=urllib.parse.urlencode(values).encode(),
+        headers={"Authorization":"Basic "+encoded},method="POST")
+    with urllib.request.urlopen(request,timeout=8) as response:
+        status=response.status
+        body=response.read(500000).decode("utf-8")
+    assert status==200,(operation,status)
+    assert "خطای عملیات" in body,(operation,body[:300])
+    print("SISTER_CATALOG_POST_HTTP_OK",operation)
+after=conn.execute("SELECT COUNT(*) FROM dk_catalog_preferences").fetchone()[0]
+assert before==after,(before,after)
+conn.close()
+print("SISTER_CATALOG_POST_NO_WRITES_OK")
+PY
+
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); n=c.execute("SELECT count(*) FROM products").fetchone()[0]; print("SISTER_VARIANTS",n); assert n==538; print("CURRENT_STOCK_SELLER_AND_DIGIKALA",tuple(c.execute("SELECT sum(seller_stock),sum(digikala_stock) FROM products").fetchone())); c.close()'
 
 echo "Checking effective-dated costing and linked platform tables"
