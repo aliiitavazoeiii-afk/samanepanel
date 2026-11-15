@@ -6,5 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY daily_sales_service/ /app/daily_sales_service/
 COPY tests/ /app/tests/
+# This test imports the DIA channel importer by its repository-relative path.
+COPY deploy/darma-fresh/import_dia_channels_v1.py /app/deploy/darma-fresh/import_dia_channels_v1.py
 EXPOSE 8018
 CMD ["uvicorn", "daily_sales_service.app:app", "--host", "0.0.0.0", "--port", "8018"]
