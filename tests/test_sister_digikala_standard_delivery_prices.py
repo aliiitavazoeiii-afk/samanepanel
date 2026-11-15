@@ -69,8 +69,9 @@ class StandardDigiKalaDailyImport(unittest.TestCase):
         self.assertEqual(self.conn.execute(
             "SELECT seller_stock FROM master_products WHERE id=?",(self.master_id,)
         ).fetchone()[0],before)
-        self.assertIn("قیمت ثبت‌شده در کاتالوگ دیجی‌کالا",
-                      preview_page(preview).body.decode("utf-8"))
+        html=preview_page(preview).body.decode("utf-8")
+        self.assertIn("قیمت فروش",html)
+        self.assertNotIn("<th>مبنای قیمت</th>",html)
         commit_preview(self.conn,preview["token"])
         self.assertEqual(self.conn.execute(
             "SELECT seller_stock FROM master_products WHERE id=?",(self.master_id,)
