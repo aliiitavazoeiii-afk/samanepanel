@@ -48,3 +48,43 @@ function j2g(y,m,d){
 function iso(g){return g[0]+"-"+String(g[1]).padStart(2,"0")+"-"+String(g[2]).padStart(2,"0");}
 function next(y,m,n){m+=n;if(m>12){m=1;y++;}if(m<1){m=12;y--;}return [y,m];}
 function display(s){var j=g2j(s);return fa(j[2])+" "+mons[j[1]-1]+" "+fa(j[0]);}
+
+"""
+JS2 = r"""
+document.querySelectorAll("[data-jal]").forEach(function(box){
+ var native=box.querySelector(".jal-native"),isoField=box.querySelector(".jal-iso");
+ var toggle=box.querySelector(".jal-button"),panel=box.querySelector(".jal-panel");
+ var value=isoField.value,j=g2j(value),yy=j[0],mm=j[1];
+ function node(tag,text,parent,click){var el=document.createElement(tag);el.textContent=text;if(click)el.onclick=click;parent.appendChild(el);return el;}
+ function close(){panel.hidden=true;}
+ function select(s){isoField.value=s;toggle.textContent=display(s)+" ▾";close();}
+ function draw(){
+  panel.replaceChildren();
+  var nav=node("div","",panel);nav.className="jal-nav";
+  node("button","ماه قبل",nav,function(){var a=next(yy,mm,-1);yy=a[0];mm=a[1];draw();});
+  node("strong",mons[mm-1]+" "+fa(yy),nav);
+  node("button","ماه بعد",nav,function(){var a=next(yy,mm,1);yy=a[0];mm=a[1];draw();});
+  var a=j2g(yy,mm,1),b=next(yy,mm,1),c=j2g(b[0],b[1],1);
+  var start=Date.UTC(a[0],a[1]-1,a[2]);
+  var days=Math.round((Date.UTC(c[0],c[1]-1,c[2])-start)/86400000);
+  var weekday=(new Date(start).getUTCDay()+1)%7;
+  var grid=node("div","",panel);grid.className="jal-grid";
+  ["ش","ی","د","س","چ","پ","ج"].forEach(function(x){node("small",x,grid);});
+  for(var k=0;k<weekday;k++)node("span","",grid);
+  for(var d=1;d<=days;d++){
+   (function(day){var date=iso(j2g(yy,mm,day));
+    var button=node("button",fa(day),grid,function(){select(date);});
+    button.type="button";
+    if(date===isoField.value)button.setAttribute("aria-current","date");
+   })(d);
+  }
+  var foot=node("div","",panel);foot.className="jal-foot";
+  node("button","امروز",foot,function(){select(box.dataset.today);});
+  node("button","بستن",foot,close);
+ }
+ native.hidden=true;native.disabled=true;isoField.disabled=false;toggle.hidden=false;
+ toggle.textContent=display(isoField.value)+" ▾";
+ toggle.onclick=function(){if(!panel.hidden){close();return;}
+  j=g2j(isoField.value);yy=j[0];mm=j[1];draw();panel.hidden=false;};
+ box.jalClose=close;
+});
