@@ -178,6 +178,12 @@ def preview_page(data):
     body+=_cards({"gross":gross,"fee":fees,"net":gross-fees,"profit":profit,"cogs_known":known,
                  "packs":sum(int(x["qty"]) for x in rows),
                  "units":sum(int(x["qty"]) * (sum(int(part.split(":")[1]) for part in x.get("parts_signature","").split(";") if ":" in part) or 1) for x in rows)})
+    shortages=[x for x in data.get("stock_changes",[]) if x.get("stock_after",0)<0]
+    if shortages:
+        body+='<div class="m2-msg"><strong>کسری موجودی پس از ثبت فروش:</strong> این فروش قابل ثبت است و مانده منفی در انبار نمایش داده می‌شود.<ul>'
+        for item in sorted(shortages,key=lambda x:(x.get("code",""),x.get("size",""))):
+            body+=f'<li>{e(item.get("code",""))} / {e(item.get("color",""))} / {e(item.get("size",""))}: {fmt(item["stock_after"])} عدد</li>'
+        body+='</ul></div>'
     if data["fallback_prices"]:
         body+=f'<div class="m2-msg">قیمت {data["fallback_prices"]} ردیف به‌صورت خودکار از قیمت‌های تعریف‌شده پنل یا کاتالوگ دیجی‌کالا خوانده شده است. منبع قیمت هر ردیف را پیش از تأیید کنترل کن؛ قیمت اولیه فهرست ممکن است قدیمی باشد.</div>'
     if unknown:
