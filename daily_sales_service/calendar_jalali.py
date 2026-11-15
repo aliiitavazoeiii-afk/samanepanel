@@ -26,3 +26,25 @@ CSS = """
 .m2-dk-delete{margin:17px 0;padding:14px;border:1px solid #8b4b50;border-radius:12px;background:#2a202d;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.m2-dk-delete button{background:#9e3443!important;color:#fff!important}
 </style>
 """
+
+JS1 = r"""
+<script>
+(function(){
+"use strict";
+var mons=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+var fmt=new Intl.DateTimeFormat("fa-IR-u-ca-persian",{year:"numeric",month:"numeric",day:"numeric",timeZone:"UTC"});
+function en(x){var a="۰۱۲۳۴۵۶۷۸۹",b="٠١٢٣٤٥٦٧٨٩";return String(x).replace(/[۰-۹٠-٩]/g,function(ch){var i=a.indexOf(ch);return String(i>=0?i:b.indexOf(ch));});}
+function fa(x){return String(x).replace(/[0-9]/g,function(d){return "۰۱۲۳۴۵۶۷۸۹"[Number(d)];});}
+function g2j(s){var z={};fmt.formatToParts(new Date(s+"T12:00:00Z")).forEach(function(k){z[k.type]=en(k.value);});return [Number(z.year),Number(z.month),Number(z.day)];}
+function j2g(y,m,d){
+ y+=1595;var days=-355668+365*y+Math.floor(y/33)*8+Math.floor((y%33+3)/4)+d+(m<7?(m-1)*31:(m-7)*30+186);
+ var gy=400*Math.floor(days/146097);days%=146097;
+ if(days>36524){days--;gy+=100*Math.floor(days/36524);days%=36524;if(days>=365)days++;}
+ gy+=4*Math.floor(days/1461);days%=1461;
+ if(days>365){gy+=Math.floor((days-1)/365);days=(days-1)%365;}
+ var gd=days+1,a=[0,31,(gy%4===0&&(gy%100!==0||gy%400===0))?29:28,31,30,31,30,31,31,30,31,30,31];
+ for(var gm=1;gm<=12;gm++){if(gd<=a[gm])return [gy,gm,gd];gd-=a[gm];}
+}
+function iso(g){return g[0]+"-"+String(g[1]).padStart(2,"0")+"-"+String(g[2]).padStart(2,"0");}
+function next(y,m,n){m+=n;if(m>12){m=1;y++;}if(m<1){m=12;y--;}return [y,m];}
+function display(s){var j=g2j(s);return fa(j[2])+" "+mons[j[1]-1]+" "+fa(j[0]);}
