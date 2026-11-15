@@ -39,7 +39,7 @@ def build_manual_form(conn,variant,cache=None):
     html='<span style="color:#ffa460">بدون اتصال</span><details class="dk-pick-form" style="margin-top:6px"><summary>'+e(title)+'</summary>'
     html+=f'<form action="{ROOT}/catalog/parts/save" method="post">'
     html+=f'<input type="hidden" name="variant_id" value="{int(variant["variant_id"])}">'
-    html+='<p class="dk-pick-hint">'+e(scope["category"])+' · سایز '+e(scope["size"])
+    html+='<p class="dk-pick-hint">'+e(scope["category"])+' · '+('سایز هر قالب را خودت انتخاب کن' if scope["size"]=="*" else 'سایز '+e(scope["size"]))
     html+=(' · '+e(scope["subtype"]) if scope["subtype"] else '')
     html+='<br>برای هر عدد داخل بسته یک رنگ از محصولات اصلی انتخاب کن. رنگ تکراری هم مجاز است.</p>'
     html+='<div class="dk-pick-grid">'
@@ -48,7 +48,7 @@ def build_manual_form(conn,variant,cache=None):
         html+=f'<select id="dk-pick-{int(variant["variant_id"])}-{i}" name="part_id" required>'
         html+='<option value="" selected disabled>انتخاب رنگ</option>'
         for m in candidates:
-            variant_label=(str(m["color"])+(f' · {m["subtype"]}' if m["subtype"] else '')+
+            variant_label=(str(m["color"])+(f' · سایز {m["size"]}' if scope["size"]=="*" else "")+(f' · {m["subtype"]}' if m["subtype"] else '')+
                           (f' · {m["title"]}' if m["title"] else '')+
                           f' (#{m["id"]})')
             html+=f'<option value="{int(m["id"])}">{e(variant_label)}</option>'
