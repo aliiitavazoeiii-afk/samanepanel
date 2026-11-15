@@ -152,7 +152,7 @@ def daily_page(conn,sale_date="",brand="",size="",saved=""):
     for s in sizes:
         body+=f'<a class="{"active" if s==size else ""}" href="{_selected_link(day,brand,s)}">{e(s)}</a>'
     body+='</div>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>مدل / رنگ</th><th>برند / سایز</th><th>تعداد بسته / عدد</th><th>قیمت واحد</th><th>فروش</th><th>دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>مدل / رنگ</th><th>برند / سایز</th><th>تعداد بسته / عدد</th><th>قیمت واحد</th><th>مبنای قیمت</th><th>فروش</th><th>دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
     for r in visible:
         body+=(f'<tr><th><strong>{e(r["title"])}</strong>'
                f'<div class="m2-dk-color">{e(r["colors"])}</div>'
@@ -179,7 +179,7 @@ def preview_page(data):
                  "packs":sum(int(x["qty"]) for x in rows),
                  "units":sum(int(x["qty"]) * (sum(int(part.split(":")[1]) for part in x.get("parts_signature","").split(";") if ":" in part) or 1) for x in rows)})
     if data["fallback_prices"]:
-        body+=f'<div class="m2-msg">قیمت فروش {data["fallback_prices"]} ردیف از قیمت کاتالوگ خوانده شده است؛ با قیمت واقعی فایل مقایسه کن.</div>'
+        body+=f'<div class="m2-msg">قیمت {data["fallback_prices"]} ردیف به‌صورت خودکار از قیمت‌های تعریف‌شده پنل یا کاتالوگ دیجی‌کالا خوانده شده است. منبع قیمت هر ردیف را پیش از تأیید کنترل کن؛ قیمت اولیه فهرست ممکن است قدیمی باشد.</div>'
     if unknown:
         body+=f'<div class="m2-msg">{unknown} ردیف بهای تمام‌شده ندارد و سود قطعی آن‌ها هنوز نامشخص است.</div>'
     body+='<section class="m2-card m2-dk-section"><h3>ردیف‌های تجمیع‌شده از اکسل‌ها</h3>'
@@ -187,7 +187,7 @@ def preview_page(data):
     for r in rows:
         qty=int(r["qty"]);gross_row=qty*int(r["price"]);fee_row=qty*int(r["fee"])
         cogs_row=qty*int(r["cost"]) if r["cost"] is not None else None
-        body+=f'<tr><th>{e(r["variant_id"])}</th><td>{e(r["title"])}</td><td>{e(r["category"])}</td><td>{fmt(qty)}</td><td>{fmt(r["price"])}</td><td>{fmt(gross_row)}</td><td>{fmt(fee_row)}</td><td>{_money(cogs_row)}</td><td>{fmt(gross_row-fee_row)}</td><td>{_money(gross_row-fee_row-cogs_row if cogs_row is not None else None)}</td></tr>'
+        body+=f'<tr><th>{e(r["variant_id"])}</th><td>{e(r["title"])}</td><td>{e(r["category"])}</td><td>{fmt(qty)}</td><td>{fmt(r["price"])}</td><td>{e(r.get("price_source","قیمت داخل فایل"))}</td><td>{fmt(gross_row)}</td><td>{fmt(fee_row)}</td><td>{_money(cogs_row)}</td><td>{fmt(gross_row-fee_row)}</td><td>{_money(gross_row-fee_row-cogs_row if cogs_row is not None else None)}</td></tr>'
     body+='</tbody></table></div></section>'
     if rows:
         body+=f'<form action="{ROOT}/commit" method="post" class="m2-dk-confirm"><input name="token" type="hidden" value="{e(data["token"])}"><button class="m2-btn" type="submit">تأیید نهایی صورت، کسر موجودی و ثبت طلب دیجی‌کالا</button></form>'
