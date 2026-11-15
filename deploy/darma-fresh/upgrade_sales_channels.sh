@@ -258,6 +258,10 @@ echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
 echo "SISTER_PLATFORM_PACKS_SIZE_PRICING_READY"
 echo "Read-only verification of sale-derived claims and comprehensive capital"
 docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+# Initialize the FastAPI application/router first. The finance and capital
+# routers use app-level dependencies, so importing capital_api standalone
+# before the application would create a circular Python module initialization.
+from daily_sales_service.app import app
 from daily_sales_service.engine import dbconnect
 from daily_sales_service.capital_api import financial_capital
 from daily_sales_service.digikala_daily_ui import daily_page
