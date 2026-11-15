@@ -47,14 +47,14 @@ def ghaleb(request):
 
 
 _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/upload",
-            "stock/adjust", "settings", "setting", "api/report.json", "api/report.csv",
+            "stock/adjust", "settings", "setting", "day/delete", "api/report.json", "api/report.csv",
             "master", "master/add", "master/rename", "master/edit", "master/stock", "master/stock/adjust",
             "master/stock/operations", "master/stock/bulk-adjust", "master/stock/transfer",
             "master/stock/undo", "master/stock/transfer/revise",
             "pricing", "pricing/cost", "pricing/sales", "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save",
             "catalog", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/restore", "finance", "finance/accounts", "finance/movements", "finance/sales", "api/sister-finance.json", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel", "platforms", "capital-report", "api/sister-capital.json",
             "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add"}
-_POST = {"preview", "commit", "cost", "costs/upload", "stock/adjust", "setting",
+_POST = {"preview", "commit", "day/delete", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
