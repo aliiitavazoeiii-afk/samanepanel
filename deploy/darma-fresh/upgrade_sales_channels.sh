@@ -120,7 +120,31 @@ echo "Legacy, fresh-stock and unified SKU master tests"
 docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint env sister-digikala -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -v
 
 echo "Verify new product, pricing and stock routes"
-docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala -c 'from daily_sales_service.app import app; from daily_sales_service.master_v2_api import router; p={x.path for x in router.routes if hasattr(x,"path")}; root="/daily-sales"; required=("/master","/master/stock","/master/stock/operations","/pricing","/pricing/cost","/pricing/sales","/catalog","/catalog/parts/save"); from daily_sales_service.platform_api import router as platforms; from daily_sales_service.capital_api import router as capital; p.update(x.path for sub in (platforms,capital) for x in sub.routes if hasattr(x,"path")); required+=("/platforms","/platforms/{channel}","/platforms/{channel}/sales","/platforms/{channel}/add","/pricing/sales/variants/save","/capital-report","/api/sister-capital.json","/finance","/finance/accounts","/finance/movements","/finance/sales","/finance/accounts/add","/finance/parties/add","/finance/movements/add","/finance/movements/cancel","/api/sister-finance.json"); missing=[x for x in required if root+x not in p]; print("SISTER_MASTER_ROUTES",len(p)); assert not missing,missing'
+docker compose -f compose.fresh.yml run --rm --no-deps --entrypoint python sister-digikala - <<'PY'
+from daily_sales_service.app import app
+# FastAPI >=0.137 retains nested include_router wrappers. OpenAPI is the
+# supported effective route inventory; never inspect only top-level router.routes.
+paths = app.openapi()["paths"]
+root = "/daily-sales"
+required = (
+    "/master", "/master/stock", "/master/stock/operations",
+    "/pricing", "/pricing/cost", "/pricing/sales",
+    "/catalog", "/catalog/parts/save",
+    "/platforms", "/platforms/{channel}", "/platforms/{channel}/sales",
+    "/platforms/{channel}/add", "/pricing/sales/variants/save",
+    "/capital-report", "/api/sister-capital.json",
+    "/finance", "/finance/accounts", "/finance/movements", "/finance/sales",
+    "/finance/accounts/add", "/finance/parties/add",
+    "/finance/movements/add", "/finance/movements/cancel",
+    "/api/sister-finance.json",
+)
+missing = [root + route for route in required if root + route not in paths]
+print("SISTER_MASTER_ROUTES_OPENAPI", len(paths))
+assert not missing, "Missing live API routes: " + repr(missing)
+assert "get" in paths[root + "/finance"]
+assert "post" in paths[root + "/finance/movements/add"]
+print("SISTER_MASTER_AND_FINANCE_ROUTES_OK")
+PY
 
 echo "Start the sister sales service and isolated Django web"
 docker compose -f compose.fresh.yml up -d --no-build --no-deps sister-digikala web
