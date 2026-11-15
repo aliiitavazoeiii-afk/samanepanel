@@ -189,7 +189,7 @@ def daily_page(conn,sale_date="",brand="",size="",saved="",deleted=""):
                f'<td>{fmt(r["net"])}</td><td>{_money(r["profit"])}</td></tr>')
     body+='</tbody></table></div></section>'
     body+='<p class="m2-hint">طلب روز حاصل فروش منهای کارمزد دیجی‌کالا است. این طلب در بخش حسابداری با واریزی‌ها تسویه می‌شود. سود برابر طلب ایجادشده منهای بهای تمام‌شده است.</p>'
-    return page_with_style("فروش روزانه دیجی‌کالا",body)
+    return page_with_style("فروش روزانه دیجی‌کالا",body+JALALI_ASSETS)
 
 def preview_page(data):
     rows=data["rows"]
