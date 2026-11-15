@@ -76,9 +76,9 @@ def fail(err):return page('خطای عملیات',notice(e(err),'error')+f'<a cl
 def health():return {'ok':True}
 
 @app.get(ROOT+'/',response_class=HTMLResponse)
-def dashboard(sale_date:str="",brand:str="",size:str="",saved:str="",conn=Depends(conn_dep)):
+def dashboard(sale_date:str="",brand:str="",size:str="",saved:str="",deleted:str="",conn=Depends(conn_dep)):
  from .digikala_daily_ui import daily_page
- try:return daily_page(conn,sale_date,brand,size,saved)
+ try:return daily_page(conn,sale_date,brand,size,saved,deleted)
  except (ValueError,ImportErrorDetail) as exc:return fail(exc)
 
 @app.get(ROOT+'/import',response_class=HTMLResponse)
@@ -111,6 +111,15 @@ def commit(token:str=Form(...),conn=Depends(conn_dep)):
  except (ImportErrorDetail,ValueError) as exc:return fail(exc)
  from urllib.parse import urlencode
  return RedirectResponse(ROOT+'/?'+urlencode({'sale_date':result['date'],'saved':'1'}),status_code=303)
+
+@app.post(ROOT+'/day/delete',response_class=HTMLResponse)
+def delete_day(sale_date:str=Form(...),confirm_date:str=Form(...),conn=Depends(conn_dep)):
+  from .digikala_daily_delete import void_daily_digikala_sales
+  from urllib.parse import urlencode
+  try:result=void_daily_digikala_sales(conn,sale_date,confirm_date)
+  except (ImportErrorDetail,ValueError) as exc:return fail(exc)
+  return RedirectResponse(ROOT+'/?'+urlencode({'sale_date':result['sale_date'],
+                                                'deleted':'1'}),status_code=303)
 
 @app.get(ROOT+'/inventory',response_class=HTMLResponse)
 def inventory(q:str='',conn=Depends(conn_dep)):
