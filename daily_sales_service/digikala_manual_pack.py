@@ -42,6 +42,11 @@ def listing_scope(variant):
             if match:
                 mapped=parse_size(match[2]+"-"+match[1])
         if mapped:size_labels.append(mapped)
+    if category=="قالب":
+        # Mold sizes in the master are small/medium/large, while the public
+        # listing can use a numeric fitting range (e.g. 39 تا 44). Never
+        # guess the master size; let the operator choose physical pieces.
+        return {"category":category,"subtype":"","size":"*","pack_qty":quantity}
     if len(size_labels)!=1:
         return {"error":"سایز عنوان معتبر یا یکتا نیست؛ سایزهای تک‌عدد و مبهم وصل نمی‌شوند."}
     size=size_labels[0]
@@ -52,8 +57,11 @@ def sku_options(conn,scope):
     if "error" in scope:return []
     sql="""SELECT id,category,code,title,size,color,subtype
         FROM master_products
-        WHERE active=1 AND category=? AND size=?"""
-    params=[scope["category"],scope["size"]]
+        WHERE active=1 AND category=?"""
+    params=[scope["category"]]
+    if scope["size"]!="*":
+        sql+=" AND size=?"
+        params.append(scope["size"])
     if scope["subtype"]:
         sql+=" AND subtype=?"
         params.append(scope["subtype"])
