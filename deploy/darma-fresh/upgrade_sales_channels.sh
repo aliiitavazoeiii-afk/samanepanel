@@ -256,6 +256,21 @@ echo "SISTER_MASTER_CATALOG_READY"
 echo "BODY_XLSX_PRODUCT_DEFINITIONS_READY"
 echo "SISTER_PLATFORMS_AND_DATED_CAPITAL_READY"
 echo "SISTER_PLATFORM_PACKS_SIZE_PRICING_READY"
+echo "Verify existing production SQLite accepts signed physical stock without changing data"
+docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+import re,sqlite3
+conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
+ddl=conn.execute("SELECT sql FROM sqlite_master WHERE name='master_products' AND type='table'").fetchone()
+assert ddl is not None,"Missing master_products"
+for column in ("seller_stock","khorshid_stock","digikala_stock"):
+    blocked=re.search(r"\\b"+column+r"\\s+INTEGER\\s+NOT\\s+NULL\\s+DEFAULT\\s+0\\s+CHECK\\s*\\(\\s*"+column+r"\\s*>=\\s*0\\s*\\)",ddl[0],re.I)
+    assert not blocked,"Signed stock constraint remains: "+column
+shortages=conn.execute("""SELECT COUNT(*) FROM master_products
+  WHERE seller_stock<0 OR khorshid_stock<0 OR digikala_stock<0""").fetchone()[0]
+print("SISTER_SIGNED_STOCK_SCHEMA_READY","NEGATIVE_SKUS",shortages)
+conn.close()
+PY
+
 echo "Read-only verification of sale-derived claims and comprehensive capital"
 docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
 # Initialize the FastAPI application/router first. The finance and capital
