@@ -58,7 +58,7 @@ def ensure_v2(conn):
     if "subtype" not in fields:
         conn.execute("ALTER TABLE master_products ADD COLUMN subtype TEXT NOT NULL DEFAULT ''")
     if "khorshid_stock" not in fields:
-        conn.execute("ALTER TABLE master_products ADD COLUMN khorshid_stock INTEGER NOT NULL DEFAULT 0 CHECK(khorshid_stock>=0)")
+        conn.execute("ALTER TABLE master_products ADD COLUMN khorshid_stock INTEGER NOT NULL DEFAULT 0")
     # Historical 2026 body.xlsx imports carried slip/padar in the product
     # title/code but no subtype. Backfill only this classification, not balances.
     conn.execute("""UPDATE master_products SET subtype='اسلیپ'
