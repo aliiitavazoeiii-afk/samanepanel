@@ -266,8 +266,7 @@ def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref
             mid=sku["id"]
             if not sku["active"]:raise ImportErrorDetail("یکی از رنگ‌ها یا سایزهای داخل پک غیرفعال شده است.")
             amount=quantities[mid]*n
-            if int(sku[column])<amount:
-                raise ImportErrorDetail(f'موجودی رنگ {sku["color"]}، سایز {sku["size"]} برای {n} پک کافی نیست.')
+            # Allow stock to go negative for a valid, confirmed sale.
             unit=dated_cost(conn,dict(sku),day)
             all_costs[mid]=unit
             if unit is None:cost_total=None
@@ -284,8 +283,8 @@ def book_bundle_sale(conn,channel,variant_id,packs,warehouse,sale_date,order_ref
         for mid,qty_per_pack in quantities.items():
             amount=qty_per_pack*n
             old=conn.execute(f"SELECT {column} FROM master_products WHERE id=?",(mid,)).fetchone()
-            if old is None or int(old[0])<amount:
-                raise ImportErrorDetail("موجودی حین ثبت تغییر کرد؛ کل فروش لغو شد.")
+            if old is None:
+                raise ImportErrorDetail("موجودی کالای اصلی پیدا نشد؛ کل فروش لغو شد.")
             after=int(old[0])-amount
             conn.execute(f"UPDATE master_products SET {column}=?,updated_at=? WHERE id=?",(after,now(),mid))
             conn.execute("""INSERT INTO master_stock_events
