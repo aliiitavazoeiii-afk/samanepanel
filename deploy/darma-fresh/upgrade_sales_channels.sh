@@ -263,7 +263,7 @@ conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 ddl=conn.execute("SELECT sql FROM sqlite_master WHERE name='master_products' AND type='table'").fetchone()
 assert ddl is not None,"Missing master_products"
 for column in ("seller_stock","khorshid_stock","digikala_stock"):
-    blocked=re.search(r"\\b"+column+r"\\s+INTEGER\\s+NOT\\s+NULL\\s+DEFAULT\\s+0\\s+CHECK\\s*\\(\\s*"+column+r"\\s*>=\\s*0\\s*\\)",ddl[0],re.I)
+    blocked=re.search(r"\b"+column+r"\s+INTEGER\s+NOT\s+NULL\s+DEFAULT\s+0\s+CHECK\s*\(\s*"+column+r"\s*>=\s*0\s*\)",ddl[0],re.I)
     assert not blocked,"Signed stock constraint remains: "+column
 shortages=conn.execute("""SELECT COUNT(*) FROM master_products
   WHERE seller_stock<0 OR khorshid_stock<0 OR digikala_stock<0""").fetchone()[0]
