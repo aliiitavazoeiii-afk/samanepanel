@@ -88,3 +88,21 @@ document.querySelectorAll("[data-jal]").forEach(function(box){
   j=g2j(isoField.value);yy=j[0];mm=j[1];draw();panel.hidden=false;};
  box.jalClose=close;
 });
+
+"""
+JS3 = r"""
+document.querySelectorAll("[data-jal-label]").forEach(function(x){
+ try{x.textContent=display(x.dataset.jalLabel);}catch(err){}
+});
+document.addEventListener("pointerdown",function(ev){
+ document.querySelectorAll("[data-jal]").forEach(function(el){
+  if(!el.contains(ev.target)&&el.jalClose)el.jalClose();
+ });
+});
+document.addEventListener("keydown",function(ev){
+ if(ev.key==="Escape")document.querySelectorAll("[data-jal]").forEach(
+  function(el){if(el.jalClose)el.jalClose();});
+});
+})();
+"""
+ASSETS = CSS + JS1 + JS2 + JS3 + ("</scr" + "ipt>")
