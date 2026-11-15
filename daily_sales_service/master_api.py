@@ -193,9 +193,10 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     for r in rows:
         vid=int(r["variant_id"])
         title=r["display_title"] or r["title"]
-        price=(r["display_price_toman"] if r["display_price_toman"] is not None else
-               r["sale_price_toman"] if r["sale_price_toman"] is not None else
-               r["master_sale_price"] if r["master_id"] else r["list_price_rial"]//10)
+        from .master_engine import _daily_digikala_price
+        physical=({"id":r["master_id"],"sale_price_toman":r["master_sale_price"]}
+                  if r["master_id"] is not None else None)
+        price,price_source=_daily_digikala_price(conn,r,physical)
         mapping=""
         if status=="removed":
             mapping='<span class="faint">حذف‌شده از فهرست کاری</span>'
@@ -242,7 +243,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
             (e(title)+('<small class="faint" style="display:block">عنوان ویرایش‌شده</small>' if r["display_title"] else ""),"title"),
             (e(r["category"]),""),
             (mapping,""),
-            (fmt(price),"num"),
+            (fmt(price)+'<small class="faint" style="display:block">'+e(price_source)+'</small>',"num"),
             (f'<a href="{ROOT}/master/stock?q={quote(r["master_code"] or "")}">موجودی</a>' if r["master_id"] else "—",""),
             (action,""),
         ])
