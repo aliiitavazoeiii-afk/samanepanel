@@ -127,8 +127,8 @@ def book_sale(conn,channel,listing_id,packs,warehouse,sale_date,order_ref=""):
         per_unit_cost=dated_cost(conn,dict(row),date_key)
         units=n*int(row["pack_qty"])
         current=conn.execute(f"SELECT {col} FROM master_products WHERE id=?",(row["master_id"],)).fetchone()
-        if current is None or int(current[0])<units:
-            raise ImportErrorDetail("موجودی انبار انتخابی برای این تعداد بسته کافی نیست.")
+        if current is None:
+            raise ImportErrorDetail("کالای اصلی حذف شده است.")
         after=int(current[0])-units
         conn.execute(f"UPDATE master_products SET {col}=?,updated_at=? WHERE id=?",(after,now(),row["master_id"]))
         from .sister_finance_logic import commission_for
