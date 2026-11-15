@@ -142,6 +142,17 @@ class SalesChannelRoutesTest(SimpleTestCase):
             html=sister_sales.add_csrf(req,form)
             self.assertIn('name="csrfmiddlewaretoken"',html)
 
+    def test_delete_daily_report_route_has_auth_and_csrf(self):
+        self.assertIn("day/delete",sister_sales._ALLOWED)
+        self.assertIn("day/delete",sister_sales._POST)
+        self.assertEqual(self.client.post("/sales/digikala/day/delete").status_code,302)
+        req=RequestFactory().get("/sales/digikala/")
+        req.user=SimpleNamespace(is_authenticated=True)
+        form='<form method="post" action="/sales/digikala/day/delete"><button>حذف</button></form>'
+        rendered=sister_sales.add_csrf(req,form)
+        self.assertIn('name="csrfmiddlewaretoken"',rendered)
+        self.assertIn('action="/sales/digikala/day/delete"',rendered)
+
     def test_post_form_has_csrf_token(self):
         request = RequestFactory().get("/sales/digikala/")
         html = sister_sales.add_csrf(request,'<form action="/x" method="post"><button>ok</button></form>')
