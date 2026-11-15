@@ -146,14 +146,21 @@ def daily_page(conn,sale_date="",brand="",size="",saved="",deleted=""):
         body+='</div>'
         return page_with_style("فروش روزانه دیجی‌کالا",body+JALALI_ASSETS)
     body+=_cards(stats)
+    body+=(f'<form class="m2-dk-delete" method="post" action="{ROOT}/day/delete" '
+           'onsubmit="return confirm(&quot;صورت ثبت‌شده این روز حذف شود؟ موجودی و طلب روز برگشت می‌خورند و حذف در تاریخچه ثبت می‌شود.&quot;)">'
+           f'<input type="hidden" name="sale_date" value="{e(day)}">'
+           f'<input type="hidden" name="confirm_date" value="{e(day)}">'
+           '<small>حذف این صورت فقط فروش همین روز را برمی‌گرداند؛ سوابق حسابرسی محفوظ می‌مانند.</small>'
+           '<button type="submit">حذف صورت فروش این روز</button></form>')
     if stats["unknown"]:
-        body+=f'<div class="m2-msg">بهای تمام‌شده {stats["unknown"]} ردیف فروش مشخص نیست؛ سود روز تا تکمیل قیمت تمام‌شده قطعی نیست. مبلغ طلب مستقل از بهای کالا محاسبه شده است.</div>'
+        missing_codes="، ".join(str(r["code"]) for r in sold if r["cogs"] is None)
+        body+=f'<div class="m2-msg">بهای تمام‌شده {stats["unknown"]} ردیف فروش تعریف نشده (کدها: {e(missing_codes)})، بنابراین سود واقعی این صورت هنوز قابل محاسبه نیست. <a href="{ROOT}/pricing/cost">ثبت بهای تمام‌شده</a>. طلب دیجی‌کالا مستقل از این هزینه محاسبه می‌شود؛ برای بازحسابداری فروش ثبت‌شده، صورت را با دقت دوباره بارگذاری و تأیید کن.</div>'
     by_brand=_brand_rows(sold)
     body+='<section class="m2-card m2-dk-section"><h3>خلاصه برندهای فروخته‌شده</h3>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>برند</th><th>تعداد بسته</th><th>عدد کالا</th><th>فروش</th><th>هزینه دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>برند</th><th>تعداد فروش</th><th>فروش</th><th>هزینه دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
     for name,items in sorted(by_brand.items()):
         values=_summary(items)
-        body+=f'<tr><th><a href="{_selected_link(day,name)}">{e(name)}</a></th><td>{fmt(values["packs"])}</td><td>{fmt(values["units"])}</td><td>{fmt(values["gross"])}</td><td>{fmt(values["fee"])}</td><td>{_money(values["cogs_known"]) if not values["unknown"] else "نامشخص"}</td><td>{fmt(values["net"])}</td><td>{_money(values["profit"])}</td></tr>'
+        body+=f'<tr><th><a href="{_selected_link(day,name)}">{e(name)}</a></th><td>{fmt(values["packs"])}</td><td>{fmt(values["gross"])}</td><td>{fmt(values["fee"])}</td><td>{_money(values["cogs_known"]) if not values["unknown"] else "نامشخص"}</td><td>{fmt(values["net"])}</td><td>{_money(values["profit"])}</td></tr>'
     body+='</tbody></table></div></section>'
     if brand not in by_brand:brand=""
     current=by_brand[brand] if brand else sold
@@ -171,13 +178,12 @@ def daily_page(conn,sale_date="",brand="",size="",saved="",deleted=""):
     for s in sizes:
         body+=f'<a class="{"active" if s==size else ""}" href="{_selected_link(day,brand,s)}">{e(s)}</a>'
     body+='</div>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>مدل / رنگ</th><th>برند / سایز</th><th>تعداد بسته / عدد</th><th>قیمت واحد</th><th>مبنای قیمت</th><th>فروش</th><th>دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>مدل / رنگ</th><th>برند / سایز</th><th>قیمت فروش</th><th>فروش</th><th>هزینه دیجی‌کالا</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
     for r in visible:
         body+=(f'<tr><th><strong>{e(r["title"])}</strong>'
                f'<div class="m2-dk-color">{e(r["colors"])}</div>'
-               f'<div class="m2-dk-code">کد تنوع: {r["code"]} · انبار {_source_label(r["source"])}</div></th>'
+               f'<div class="m2-dk-code">کد تنوع: {r["code"]} · تعداد فروش: {fmt(r["qty"])} · انبار {_source_label(r["source"])}</div></th>'
                f'<td>{e(r["brand"])} / {e(r["size"])}</td>'
-               f'<td>{fmt(r["qty"])} بسته · {fmt(r["units"])} عدد</td>'
                f'<td>{fmt(r["unit_price"])}</td><td>{fmt(r["gross"])}</td>'
                f'<td>{fmt(r["fee"])}</td><td>{_money(r["cogs"])}</td>'
                f'<td>{fmt(r["net"])}</td><td>{_money(r["profit"])}</td></tr>')
@@ -208,11 +214,11 @@ def preview_page(data):
     if unknown:
         body+=f'<div class="m2-msg">{unknown} ردیف بهای تمام‌شده ندارد و سود قطعی آن‌ها هنوز نامشخص است.</div>'
     body+='<section class="m2-card m2-dk-section"><h3>ردیف‌های تجمیع‌شده از اکسل‌ها</h3>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>کد تنوع</th><th>مدل</th><th>برند</th><th>بسته</th><th>قیمت واحد</th><th>فروش</th><th>دیجی‌کالا</th><th>بهای کالا</th><th>طلب</th><th>سود</th></tr></thead><tbody>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>کد تنوع</th><th>مدل</th><th>برند</th><th>تعداد فروش</th><th>قیمت فروش</th><th>فروش</th><th>دیجی‌کالا</th><th>بهای کالا</th><th>طلب</th><th>سود</th></tr></thead><tbody>'
     for r in rows:
         qty=int(r["qty"]);gross_row=qty*int(r["price"]);fee_row=qty*int(r["fee"])
         cogs_row=qty*int(r["cost"]) if r["cost"] is not None else None
-        body+=f'<tr><th>{e(r["variant_id"])}</th><td>{e(r["title"])}</td><td>{e(r["category"])}</td><td>{fmt(qty)}</td><td>{fmt(r["price"])}</td><td>{e(r.get("price_source","قیمت داخل فایل"))}</td><td>{fmt(gross_row)}</td><td>{fmt(fee_row)}</td><td>{_money(cogs_row)}</td><td>{fmt(gross_row-fee_row)}</td><td>{_money(gross_row-fee_row-cogs_row if cogs_row is not None else None)}</td></tr>'
+        body+=f'<tr><th>{e(r["variant_id"])}</th><td>{e(r["title"])}</td><td>{e(r["category"])}</td><td>{fmt(qty)}</td><td>{fmt(r["price"])}</td><td>{fmt(gross_row)}</td><td>{fmt(fee_row)}</td><td>{_money(cogs_row)}</td><td>{fmt(gross_row-fee_row)}</td><td>{_money(gross_row-fee_row-cogs_row if cogs_row is not None else None)}</td></tr>'
     body+='</tbody></table></div></section>'
     if rows:
         body+=f'<form action="{ROOT}/commit" method="post" class="m2-dk-confirm"><input name="token" type="hidden" value="{e(data["token"])}"><button class="m2-btn" type="submit">تأیید نهایی صورت، کسر موجودی و ثبت طلب دیجی‌کالا</button></form>'
