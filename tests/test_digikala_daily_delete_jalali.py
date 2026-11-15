@@ -51,7 +51,6 @@ class DigiKalaDeleteJalaliTest(unittest.TestCase):
         self.assertIn('type="date"',html)
         self.assertIn("فروردین",html)
         self.assertIn("اسفند",html)
-        self.assertIn("1405",self.day.replace("2026","1405") if False else "1405")
         self.assertIn('/daily-sales/day/delete',app.openapi()["paths"])
         if shutil.which("node"):
             js=ASSETS.split("<script>",1)[1].split("</script>",1)[0]
