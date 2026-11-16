@@ -106,10 +106,12 @@ class DigiKalaAutoLinkTest(unittest.TestCase):
     from daily_sales_service.app import app  # Load FastAPI router before importing legacy helper directly.
     from daily_sales_service.master_api import catalog
     before=catalog(conn=self.conn).body.decode()
-    self.assertIn("همگام‌سازی هوشمند",before)
+    self.assertIn("قیمت‌گذاری",before)
+    self.assertNotIn("همگام‌سازی هوشمند",before)
+    self.assertIn("dk-bulk-form",before)
     apply_links(self.conn,dry_run=False)
     after=catalog(conn=self.conn).body.decode()
-    self.assertIn("اتصال خودکار",after)
+    self.assertIn("خودکار",after)
     self.assertIn("ترکیب اتصال به موجودی واقعی",after)
     self.assertIn("بدون اتصال",catalog(conn=self.conn,unmapped=1).body.decode())
     # Regression: the default page previously sorted every unlinked item
