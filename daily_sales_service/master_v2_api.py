@@ -17,7 +17,7 @@ from .master_v2_ui import (
 )
 from .master_api import (
     catalog as digikala_catalog, catalog_map as digikala_map, save_digikala_pack,
-    catalog_edit, catalog_archive, catalog_restore,
+    catalog_edit, catalog_archive, catalog_archive_bulk, catalog_restore,
 )
 from .master_v2_corrections import undo_adjustment, revise_transfer
 
@@ -373,6 +373,7 @@ router.add_api_route(ROOT+"/catalog/map",digikala_map,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/parts/save",save_digikala_pack,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/edit",catalog_edit,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/archive",catalog_archive,methods=["POST"])
+router.add_api_route(ROOT+"/catalog/archive-bulk",catalog_archive_bulk,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/restore",catalog_restore,methods=["POST"])
 
 from .dk_pricing_ui import router as digikala_pricing_router
