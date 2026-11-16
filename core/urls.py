@@ -159,6 +159,7 @@ urlpatterns = [
     path("settings/products/pricing/", sister_sales.digikala_proxy, {"tail": "pricing"}, name="sister_product_pricing"),
     path("settings/products/platforms/", sister_sales.digikala_proxy, {"tail": "platforms"}, name="sister_product_platforms"),
     path("settings/products/platforms/digikala/", sister_sales.digikala_proxy, {"tail": "catalog"}, name="sister_product_platforms_digikala"),
+    path("settings/products/platforms/digikala/pricing/", sister_sales.digikala_proxy, {"tail": "pricing/digikala"}, name="sister_digikala_pricing"),
     path("report/sister-capital/", sister_sales.digikala_proxy, {"tail": "capital-report"}, name="sister_capital_report"),
     path("settings/products/legacy/", product_center_v93.settings_products, name="legacy_settings_products"),
     path("settings/products/legacy/new/", settings_product_v60.settings_product_form, name="legacy_settings_product_new"),
