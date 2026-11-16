@@ -135,9 +135,9 @@ class DigiKalaDailyCapitalTest(unittest.TestCase):
         self._post_one()
         info=financial_capital(self.conn)
         html=capital_report(conn=self.conn).body.decode("utf-8")
-        for label in ("جمع سرمایه اصلی","ارزش موجودی انبارها",
-                      "طلب از پلتفرم‌ها","مانده حساب‌ها و صندوق",
-                      "سود فروش تحقق‌یافته","بدون دوباره‌شماری سود"):
+        for label in ("سرمایه کل ثبت‌شده","کالای آماده",
+                      "طلب از پلتفرم‌ها","حساب‌ها و صندوق",
+                      "سود فروش تحقق‌یافته","سود جداگانه به دارایی اضافه نمی‌شود"):
             self.assertIn(label,html)
         self.assertIn(f'{info["total_capital"]:,}',html)
         self.assertEqual(info["total_capital"],
