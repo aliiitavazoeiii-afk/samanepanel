@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from .app import ROOT, conn_dep, e, fail, fmt, notice, page, table, tr
 from .engine import ImportErrorDetail
 from .master_engine import CATEGORIES, add_master, update_master, adjust_master_stock, map_variant
+from .master_v2_ui import page_with_style
 
 router=APIRouter()
 
@@ -258,7 +259,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
         body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
     body+='''<script>document.addEventListener("change",function(ev){if(ev.target.id==="dk-check-all"){document.querySelectorAll(".dk-row-select").forEach(function(c){c.checked=ev.target.checked;});}});</script>'''
-    return page('کدهای دیجی‌کالا',body,'انتخاب، حذف گروهی و بازیابی کدها؛ بدون حذف سوابق فروش')
+    return page_with_style('کدهای دیجی‌کالا',body)
 
 
 @router.post(ROOT+"/catalog/edit")
