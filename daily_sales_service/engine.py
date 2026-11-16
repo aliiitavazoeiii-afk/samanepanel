@@ -78,6 +78,8 @@ def init_db(db_path, catalog_path=None):
   ensure_schema(conn)
   from .dk_dated_prices import ensure_dated_prices
   ensure_dated_prices(conn)
+  from .capital_components import ensure_capital_components
+  ensure_capital_components(conn)
   with conn:
    for key,value in DEFAULT_SETTINGS.items():
     conn.execute('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)',(key,value))
