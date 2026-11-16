@@ -51,14 +51,14 @@ _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/uploa
             "master", "master/add", "master/rename", "master/edit", "master/stock", "master/stock/adjust",
             "master/stock/operations", "master/stock/bulk-adjust", "master/stock/transfer",
             "master/stock/undo", "master/stock/transfer/revise",
-            "pricing", "pricing/cost", "pricing/sales", "pricing/digikala", "pricing/digikala/save", "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "pricing/digikala/save",
-            "catalog", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance", "finance/accounts", "finance/movements", "finance/sales", "api/sister-finance.json", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel", "capital-report/component/save", "platforms", "capital-report", "capital-report/component/save", "api/sister-capital.json",
+            "pricing", "pricing/cost", "pricing/sales", "pricing/digikala", "pricing/digikala/save", "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save",
+            "catalog", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance", "finance/accounts", "finance/movements", "finance/sales", "api/sister-finance.json", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel", "platforms", "capital-report", "capital-report/component/save", "api/sister-capital.json",
             "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add"}
 _POST = {"preview", "commit", "day/delete", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
-         "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel",
+         "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "pricing/digikala/save", "capital-report/component/save", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel",
          "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
