@@ -128,11 +128,11 @@ paths = app.openapi()["paths"]
 root = "/daily-sales"
 required = (
     "/master", "/master/stock", "/master/stock/operations",
-    "/pricing", "/pricing/cost", "/pricing/sales",
-    "/catalog", "/catalog/parts/save",
+    "/pricing", "/pricing/cost", "/pricing/sales", "/pricing/digikala", "/pricing/digikala/save",
+    "/catalog", "/catalog/parts/save", "/catalog/archive-bulk",
     "/platforms", "/platforms/{channel}", "/platforms/{channel}/sales",
     "/platforms/{channel}/add", "/pricing/sales/variants/save",
-    "/capital-report", "/api/sister-capital.json",
+    "/capital-report", "/capital-report/component/save", "/api/sister-capital.json",
     "/finance", "/finance/accounts", "/finance/movements", "/finance/sales",
     "/finance/accounts/add", "/finance/parties/add",
     "/finance/movements/add", "/finance/movements/cancel",
@@ -143,6 +143,8 @@ print("SISTER_MASTER_ROUTES_OPENAPI", len(paths))
 assert not missing, "Missing live API routes: " + repr(missing)
 assert "get" in paths[root + "/finance"]
 assert "post" in paths[root + "/finance/movements/add"]
+for route in ("/pricing/digikala/save", "/catalog/archive-bulk", "/capital-report/component/save"):
+    assert "post" in paths[root + route], "POST missing: "+route
 print("SISTER_MASTER_AND_FINANCE_ROUTES_OK")
 PY
 
@@ -219,6 +221,17 @@ docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sq
 
 echo "Checking effective-dated costing and linked platform tables"
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); names={x[0] for x in c.execute("SELECT name FROM sqlite_master WHERE type=\x27table\x27")}; required={"master_cost_history","platform_listings","platform_sales","platform_bundle_models","platform_bundle_variants","platform_bundle_parts","platform_bundle_sales","master_products","master_stock_events","sister_finance_parties","sister_finance_accounts","sister_finance_movements"}; assert required.issubset(names),required-names; print("SISTER_COST_HISTORY_AND_PLATFORMS_OK"); c.close()'
+
+echo "Verify new DigiKala dated-pricing and extra-capital tables in the isolated DB"
+docker compose -f compose.fresh.yml exec -T sister-digikala python - <<'PY'
+import sqlite3
+con=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
+tables={row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+need={"dk_dated_sale_prices","sister_capital_components","sister_capital_component_audit","dk_catalog_preferences"}
+assert need.issubset(tables),need-tables
+print("SISTER_DIGIKALA_DATED_PRICES_AND_CAPITAL_COMPONENTS_READY")
+con.close()
+PY
 
 echo "Checking canonical master without altering data"
 docker compose -f compose.fresh.yml exec -T sister-digikala python -c 'import sqlite3; c=sqlite3.connect("/data/sales.sqlite3"); c.execute("SELECT COUNT(*) FROM master_products"); count=c.execute("SELECT COUNT(*) FROM master_products").fetchone()[0]; unmapped=c.execute("SELECT COUNT(*) FROM products WHERE master_id IS NULL").fetchone()[0]; print("SISTER_MASTER_SKUS",count,"UNMAPPED_DIGIKALA",unmapped); c.close()'
