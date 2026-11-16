@@ -161,17 +161,8 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
         """+joins+"WHERE "+where+
         " ORDER BY (p.master_id IS NULL) ASC,p.category,p.title,p.variant_id LIMIT 50 OFFSET ?",
         args+[(page_no-1)*50]).fetchall()
-    body=STYLES+notice(
-        f'کاتالوگ اصلی دیجی‌کالا: {fmt(audit["total"])} تنوع؛ '
-        f'فهرست کاری: {fmt(visible_total)} تنوع، شامل {fmt(connected)} متصل. '
-        f'{fmt(removed_total)} تنوع تکی حذف شده و قابل بازیابی است. '
-        'قیمت ثبت‌شده در این صفحه، مبنای فروش‌های روزانه بعدی در پنل است؛ قیمت سایت دیجی‌کالا و اسناد فروش قبلی تغییر نمی‌کنند.')
-    body+='<div class="panel"><h3>همگام‌سازی هوشمند با موجودی کالا</h3>'
-    body+='<p>اتصال خودکار فقط برای رنگ، سایز، برند و تعداد قطعی انجام می‌شود؛ اتصال‌های دستی و فروش‌های قبلی حفظ می‌شوند.</p>'
-    body+=f'<p>تطبیق خودکار: {fmt(audit["automatic"])} · بدون اتصال اصلی: {fmt(audit["unmapped"])}</p></div>'
-    body+='<div class="panel"><h3>مدیریت تکی محصولات دیجی‌کالا</h3>'
-    body+='<p>برای هر محصول «ویرایش» یا «حذف» را بزن. حذف از فهرست این پنل است، نه پاک‌کردن فاکتور فروش، SKU اصلی یا انبار. در «حذف‌شده‌ها» می‌توانی محصول را بازیابی کنی.</p>'
-    body+='<p class="faint">۱۶ تنوع کنارگذاشته‌شده قبلی نیز بدون حذف داده‌ها کنار گذاشته شده‌اند.</p></div>'
+    body=STYLES
+    body+=f'<div class="m2-cards" style="margin-bottom:18px"><a class="m2-card" href="{ROOT}/pricing/digikala" style="text-decoration:none;border-color:#b77535"><h3>قیمت‌گذاری</h3><p class="m2-hint">قیمت فروش هر کد تنوع بر اساس دسته و تاریخ اجرا</p></a></div>'
     body+='<div class="panel"><h3>نمایش و جست‌وجوی تنوع‌ها</h3>'
     body+='<nav style="display:flex;gap:9px;flex-wrap:wrap;margin:16px 0">'
     for key,label,count in (
@@ -188,6 +179,12 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     body+=f'<input type="hidden" name="status" value="{e(status)}">'
     body+=f'<div><label>عنوان یا کد تنوع</label><input name="q" value="{e(q)}" placeholder="جست‌وجو در همین وضعیت"></div>'
     body+='<button>جست‌وجو</button></form></div>'
+    body+=f'<form id="dk-bulk-form" method="post" action="{ROOT}/catalog/archive-bulk">'
+    body+=f'<input type="hidden" name="status" value="{e(status)}"><input type="hidden" name="q" value="{e(q)}"><input type="hidden" name="page_no" value="{page_no}"></form>'
+    if status!="removed":
+        body+='<div class="m2-card" style="margin:12px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+        body+='<label><input type="checkbox" id="dk-check-all"> انتخاب همه کدهای همین صفحه</label>'
+        body+='<button type="submit" form="dk-bulk-form" class="m2-btn" style="background:#993c4a;color:white" onclick="return confirm(&quot;کدهای انتخاب‌شده از فهرست کاری حذف شوند؟ سوابق فروش و موجودی محفوظ می‌مانند.&quot;)">حذف کدهای انتخاب‌شده</button></div>'
     catalog_rows=""
     options_cache={}
     for r in rows:
@@ -232,13 +229,14 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
                 f'<form method="post" action="{ROOT}/catalog/edit" style="display:grid;gap:8px;margin-top:8px">'
                 +hidden_fields+
                 f'<label>عنوان نمایشی<input name="display_title" maxlength="220" value="{e(title)}" required style="width:100%"></label>'
-                f'<label>قیمت مبنای فروش روزانه (تومان؛ اختیاری)<input name="display_price" type="number" min="1" value="{e(r["display_price_toman"] if r["display_price_toman"] is not None else "")}" placeholder="قیمت اصلی" style="width:100%"></label>'
+                '<small class="faint">قیمت‌گذاری در صفحه مستقل انجام می‌شود.</small>'
                 '<button type="submit">ذخیره ویرایش</button></form></details>'
                 f'<form method="post" action="{ROOT}/catalog/archive" style="margin-top:8px" '
                 'onsubmit="return confirm(&quot;این محصول فقط از فهرست کاری حذف شود؟ سوابق و موجودی محفوظ می‌ماند.&quot;)">'
                 +hidden_fields+
                 '<button type="submit" style="background:#9d3345;border-color:#9d3345">حذف</button></form>')
         catalog_rows+=tr([
+            ((f'<input type="checkbox" class="dk-row-select" form="dk-bulk-form" name="variant_id" value="{vid}" aria-label="انتخاب کد {vid}">' if status!="removed" else "—"),""),
             (f'<a href="{ROOT}/catalog?q={vid}">{vid}</a>',"num"),
             (e(title)+('<small class="faint" style="display:block">عنوان ویرایش‌شده</small>' if r["display_title"] else ""),"title"),
             (e(r["category"]),""),
@@ -251,7 +249,7 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     descriptions={"all":"همه (متصل‌ها در ابتدا)","connected":"فقط متصل",
                   "unmapped":"فقط بدون اتصال","removed":"حذف‌شده‌های قابل بازیابی"}
     body+=f'<p class="faint">صفحه {fmt(page_no)} از {fmt(max(1,(total+49)//50))} · {e(descriptions[status])}</p>'
-    body+=table(["کد تنوع","عنوان در پنل","گروه ارسالی",
+    body+=table(["انتخاب","کد تنوع","عنوان در پنل","گروه ارسالی",
                  "ترکیب اتصال به موجودی واقعی","قیمت مبنای فروش روزانه (تومان)",
                  "موجودی","عملیات"],catalog_rows)+'</div>'
     if total>page_no*50:
@@ -259,7 +257,8 @@ def catalog(q:str="",unmapped:int=0,status:str="all",page_no:int=1,conn=Depends(
     if page_no>1:
         body+=f' <a class="button" href="{ROOT}/catalog?page_no={page_no-1}&q={quote(q)}&status={status}">صفحه قبل</a>'
     body+=f'<p><a href="{ROOT}/master">تعریف محصولات اصلی</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
-    return page('محصولات دیجی‌کالا',body,'ویرایش و حذف تکی؛ با امکان بازیابی و حفظ سوابق')
+    body+='''<script>document.addEventListener("change",function(ev){if(ev.target.id==="dk-check-all"){document.querySelectorAll(".dk-row-select").forEach(function(c){c.checked=ev.target.checked;});}});</script>'''
+    return page('کدهای دیجی‌کالا',body,'انتخاب، حذف گروهی و بازیابی کدها؛ بدون حذف سوابق فروش')
 
 
 @router.post(ROOT+"/catalog/edit")
@@ -267,7 +266,9 @@ def catalog_edit(variant_id:int=Form(...),display_title:str=Form(...),display_pr
                  status:str=Form("all"),q:str=Form(""),page_no:int=Form(1),conn=Depends(conn_dep)):
     from .dk_catalog_preferences import update_display,catalog_redirect
     try:
-        update_display(conn,variant_id,display_title,display_price)
+        current=conn.execute("SELECT display_price_toman FROM dk_catalog_preferences WHERE variant_id=?",(variant_id,)).fetchone()
+        oldprice=current["display_price_toman"] if current else None
+        update_display(conn,variant_id,display_title,str(oldprice) if oldprice is not None else "")
     except (ImportErrorDetail,ValueError) as ex:
         return fail(ex)
     return RedirectResponse(catalog_redirect(status,q,page_no),status_code=303)
@@ -282,6 +283,19 @@ def catalog_archive(variant_id:int=Form(...),status:str=Form("all"),
     except (ImportErrorDetail,ValueError) as ex:
         return fail(ex)
     return RedirectResponse(catalog_redirect(status,q,page_no),status_code=303)
+
+
+@router.post(ROOT+"/catalog/archive-bulk")
+async def catalog_archive_bulk(request:Request,conn=Depends(conn_dep)):
+    from .dk_catalog_preferences import bulk_archive,catalog_redirect
+    try:
+        form=await request.form()
+        bulk_archive(conn,form.getlist("variant_id"))
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return fail(exc)
+    return RedirectResponse(catalog_redirect(form.get("status","all"),
+                                            form.get("q",""),
+                                            form.get("page_no",1)),status_code=303)
 
 
 @router.post(ROOT+"/catalog/restore")
