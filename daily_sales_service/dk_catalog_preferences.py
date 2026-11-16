@@ -94,3 +94,32 @@ def catalog_redirect(status, q, page_no):
     try: page = max(1, min(int(page_no), 10000))
     except (ValueError, TypeError): page = 1
     return "/daily-sales/catalog?" + urlencode({"status": state, "q": query, "page_no": page})
+
+def bulk_archive(conn,variant_ids):
+    """Atomic reversible archive, never DELETE a product or its sales history."""
+    raw=list(variant_ids)
+    if not raw or len(raw)>50:
+        raise ImportErrorDetail("در هر نوبت بین ۱ تا ۵۰ کد را انتخاب کن.")
+    try:ids=[int(v) for v in raw]
+    except (TypeError,ValueError):raise ImportErrorDetail("کد تنوع انتخابی نامعتبر است.")
+    if len(ids)!=len(set(ids)):
+        raise ImportErrorDetail("یک کد تنوع چند بار ارسال شده است.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        rows=conn.execute("SELECT variant_id FROM products WHERE variant_id IN ("+
+                          ",".join("?" for _ in ids)+")",ids).fetchall()
+        if len(rows)!=len(ids):
+            raise ImportErrorDetail("یک یا چند کد تنوع در فهرست وجود ندارد.")
+        for vid in ids:
+            pref=conn.execute("""SELECT display_title,display_price_toman,archived
+                   FROM dk_catalog_preferences WHERE variant_id=?""",(vid,)).fetchone()
+            if pref and pref["archived"]:
+                raise ImportErrorDetail("یک یا چند کد قبلاً حذف شده‌اند؛ صفحه را تازه کن.")
+            _save(conn,vid,
+                  pref["display_title"] if pref else None,
+                  pref["display_price_toman"] if pref else None,1)
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    return len(ids)
