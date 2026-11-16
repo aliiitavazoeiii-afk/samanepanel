@@ -152,12 +152,16 @@ def map_variant(conn, variant_id, master_id, sale_price):
     except Exception:
         conn.execute("ROLLBACK");raise
 
-def _daily_digikala_price(conn, variant, master):
+def _daily_digikala_price(conn, variant, master, as_of=None):
     """Price of ONE DigiKala listing/pack, never the sum of physical SKU prices.
 
     Sources are ordered by explicit operator configuration, then the existing
     imported marketplace catalog. Historical sales keep their frozen price.
     """
+    from .dk_dated_prices import effective_price
+    dated=effective_price(conn,variant["variant_id"],as_of)
+    if dated is not None:
+        return dated[0],"قیمت تاریخ‌دار دیجی‌کالا از "+dated[1]
     pref=conn.execute(
         "SELECT display_price_toman FROM dk_catalog_preferences WHERE variant_id=?",
         (int(variant["variant_id"]),)).fetchone()
@@ -215,7 +219,7 @@ def strict_preview(conn,sale_date,source,files):
             price=row["price"]
             price_source="قیمت داخل فایل اکسل"
             if price is None:
-                price,price_source=_daily_digikala_price(conn,var,master)
+                price,price_source=_daily_digikala_price(conn,var,master,sale_date)
                 fallback+=1
             if price is None or price<=0:
                 errors.append(f"کد {var['variant_id']}: قیمت فروش معتبر در پنل یا کاتالوگ دیجی‌کالا وجود ندارد.")
