@@ -1,16 +1,17 @@
-"""Sister-only comprehensive capital: physical stock + earned receivables + cash.
+"""Sister comprehensive capital: connected goods, accounts, receivables, extras.
 
-Recording a sale withdraws stock at COGS and creates an asset (platform net
-receivable). Their net asset change equals recognized sale profit; do NOT add
-profit again to total capital. Receipt moves a receivable into a cash account
-with zero effect on total capital. No legacy Darma/Dia balances are imported.
+Stock is from master SKU counts and dated COGS; marketplace claims are derived
+from confirmed sales net of fees and receipts. Never count sale profit again.
+Unpriced stock remains explicitly unvalued rather than falsely shown as zero.
 """
-from fastapi import APIRouter,Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter,Depends,Form
+from fastapi.responses import JSONResponse,RedirectResponse
+
 from .app import ROOT,conn_dep,e,fmt
 from .effective_costs import capital_snapshot,today
 from .platform_catalog import PLATFORMS
-from .sister_finance_logic import overview
+from .sister_finance_logic import overview,accounts
+from .capital_components import TYPES,components,save_component
 from .master_v2_ui import page_with_style
 
 router=APIRouter()
@@ -18,14 +19,24 @@ router=APIRouter()
 def financial_capital(conn,as_of=None):
     stock=capital_snapshot(conn,as_of)
     finance=overview(conn)
+    extras=components(conn)
+    cash=int(finance["cash_balance"])
+    claim=int(finance["total_receivable"])
+    equipment=sum(int(extras.get(k) or 0) for k in ("raw_materials","equipment","other_assets"))
+    liabilities=int(extras.get("other_liabilities") or 0)
     inventory=stock["total_value"]
-    cash=finance["cash_balance"]
-    outstanding=finance["total_receivable"]
+    known_total=int(stock["known_value"])+cash+claim+equipment-liabilities
     result={**stock,
             "cash_balance":cash,
             "platform_receivables":finance["platforms"],
-            "total_receivable":outstanding,
-            "total_capital":(inventory+cash+outstanding) if inventory is not None else None,
+            "total_receivable":claim,
+            "manual_balances":extras,
+            "raw_materials":extras.get("raw_materials"),
+            "equipment":extras.get("equipment"),
+            "other_assets":extras.get("other_assets"),
+            "liabilities":extras.get("other_liabilities"),
+            "known_components_total":known_total,
+            "total_capital":known_total if inventory is not None else None,
             "sales_profit":finance["sales"]["profit"],
             "sales_gross":finance["sales"]["gross"],
             "sales_fees":finance["sales"]["fees"],
@@ -39,44 +50,83 @@ def capital_data(as_of:str="",conn=Depends(conn_dep)):
     return JSONResponse(financial_capital(conn,as_of or None))
 
 @router.get(ROOT+"/capital-report")
-def capital_report(as_of:str="",conn=Depends(conn_dep)):
+def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
     try:stat=financial_capital(conn,as_of or None)
     except ValueError as exc:
         return page_with_style("تاریخ نامعتبر",f'<div class="m2-msg">{e(exc)}</div>')
-    current=today()
-    body='<h1>گزارش جامع سرمایه · پنل مستقل</h1>'
-    body+='<p class="m2-hint">جمع واقعی دارایی‌های این پنل از ارزش موجودی فیزیکی، طلب خالص پلتفرم‌ها و مانده حساب‌های ثبت‌شده ساخته می‌شود.</p>'
-    body+=f'<div class="m2-filters"><form action="{ROOT}/capital-report" method="get"><div><label>تاریخ نرخ بهای تمام‌شده</label><input type="date" name="as_of" value="{e(stat["as_of"])}"></div><div><button class="m2-btn" type="submit">محاسبه</button></div></form></div>'
+    body='<h1>گزارش جامع سرمایه</h1>'
+    body+='<p class="m2-hint">خلاصه دارایی‌های ثبت‌شده، طلب پلتفرم‌ها، مانده حساب‌ها و ارزش کالای آماده. هیچ بدهی تأمین‌کننده‌ای از پنل‌های دیگر وارد نمی‌شود.</p>'
+    if saved=="1":body+='<div class="m2-dk-success">مانده دارایی یا بدهی تکمیلی ذخیره شد.</div>'
+    if stat["unknown_units"]:
+        body+=f'<div class="m2-msg"><strong>ارزش کل موجودی هنوز کامل نیست.</strong> {fmt(stat["unknown_units"])} عدد کالا بهای تمام‌شده ندارد. رقم «جمع اقلام ارزش‌گذاری‌شده» فقط قسمت قابل محاسبه را نشان می‌دهد و سرمایه کل قطعی نیست. <a href="{ROOT}/pricing/cost">تکمیل بهای تمام‌شده</a></div>'
+    card_total=stat["total_capital"] if stat["total_capital"] is not None else stat["known_components_total"]
+    total_title="سرمایه کل ثبت‌شده" if stat["total_capital"] is not None else "جمع اقلام ارزش‌گذاری‌شده (ناقص)"
     cards=[
-      ("جمع سرمایه اصلی",stat["total_capital"],"تومان · بدون دوباره‌شماری سود"),
-      ("ارزش موجودی انبارها",stat["total_value"],"تومان · خانه و خورشید"),
-      ("طلب از پلتفرم‌ها",stat["total_receivable"],"تومان · پس از کارمزد و دریافتی"),
-      ("مانده حساب‌ها و صندوق",stat["cash_balance"],"تومان · مانده افتتاحیه و گردش"),
-      ("سود فروش تحقق‌یافته",stat["sales_profit"],"تومان · سهم سود در سرمایه، نه دارایی مجزا"),
-      ("فروش کل ثبت‌شده",stat["sales_gross"],"تومان · همه پلتفرم‌ها"),
+      (total_title,card_total,"تومان · دارایی‌ها منهای بدهی‌ها"),
+      ("کالای آماده",stat["total_value"] if stat["total_value"] is not None else stat["known_value"],
+       "تومان · "+fmt(stat["units"])+" عدد کالا"+(" · ارزش ناقص" if stat["unknown_units"] else "")),
+      ("حساب‌ها و صندوق",stat["cash_balance"],"تومان · مانده واقعی حساب‌های ثبت‌شده"),
+      ("طلب از پلتفرم‌ها",stat["total_receivable"],"تومان · پس از کارمزد و دریافتی‌ها"),
+      ("مواد اولیه",stat["raw_materials"],"تومان · مانده ثبت‌شده مستقل"),
+      ("اموال و تجهیزات",stat["equipment"],"تومان · دارایی سرمایه‌ای"),
+      ("سایر دارایی‌ها",stat["other_assets"],"تومان · مانده ثبت‌شده"),
+      ("بدهی‌ها",stat["liabilities"],"تومان · صرفاً بدهی‌های همین پنل"),
     ]
     body+='<div class="m2-finance-cards">'
     for title,value,subtitle in cards:
+        display=fmt(value) if value is not None else "ثبت نشده"
         body+='<div class="m2-card m2-finance-tile"><small>'+e(title)+'</small>'
-        body+='<strong class="m2-finance-value">'+(fmt(value) if value is not None else "نامشخص")+'</strong>'
+        body+='<strong class="m2-finance-value">'+display+'</strong>'
         body+='<span class="m2-unit">'+e(subtitle)+'</span></div>'
     body+='</div>'
-    body+='<div class="m2-card m2-finance-section"><h3>فرمول محاسبه سرمایه</h3>'
-    body+='<p class="m2-hint">سرمایه = موجودی کالا به قیمت تمام‌شده + طلب تسویه‌نشده از پلتفرم‌ها + مانده حساب‌های بانکی/صندوق.</p>'
-    body+='<p class="m2-hint">هنگام فروش، بهای کالا از موجودی کم می‌شود و مبلغ قابل‌دریافت بعد از کارمزد به طلب افزوده می‌شود؛ تفاوت این دو همان سود فروش است. دریافت پول صرفاً طلب را به مانده بانک منتقل می‌کند؛ سرمایه دوباره زیاد نمی‌شود.</p></div>'
-    if stat["unknown_units"]:
-        body+=f'<div class="m2-msg">برای {fmt(stat["unknown_units"])} عدد موجودی نرخ تمام‌شده مشخص نیست؛ جمع نهایی سرمایه تا تکمیل نرخ‌ها نامشخص است. ارزش شناخته‌شده موجودی: {fmt(stat["known_value"])} تومان.</div>'
+    body+='<div class="m2-card m2-finance-section"><h3>فروش و سود</h3>'
+    body+='<div class="m2-finance-cards" style="margin-bottom:0">'
+    for title,key in (("فروش کل ثبت‌شده","sales_gross"),
+                      ("هزینه پلتفرم‌ها","sales_fees"),
+                      ("سود فروش تحقق‌یافته","sales_profit")):
+        value=stat[key]
+        body+='<div class="m2-card m2-finance-tile"><small>'+e(title)+'</small>'
+        body+='<strong class="m2-finance-value">'+(fmt(value) if value is not None else "نامشخص")+'</strong></div>'
+    body+='</div><p class="m2-hint">سود از فروش، پس از هزینه پلتفرم و بهای کالا محاسبه می‌شود و دوباره به ارزش سرمایه اضافه نمی‌شود.</p></div>'
     if stat["unknown_sold_cost_lines"]:
-        body+=f'<div class="m2-msg">{fmt(stat["unknown_sold_cost_lines"])} ردیف فروش بهای تمام‌شده ندارد؛ محاسبه سود کل قطعی نیست. مبلغ طلب این ردیف‌ها همچنان درست و مستقل از هزینه کالا است.</div>'
-    if stat["as_of"]!=current:
-        body+='<div class="m2-msg">تاریخ گذشته فقط برای انتخاب نرخ بهای تمام‌شده موجودی فعلی است. این صفحه گردش تاریخی موجودی و حساب‌های بانکی در آن تاریخ را بازسازی نمی‌کند.</div>'
-    body+='<div class="m2-section"><h3>موجودی به تفکیک کالا</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>دسته کالا</th><th>تعداد موجودی فیزیکی</th><th>ارزش شناخته‌شده</th><th>کالای فاقد نرخ</th></tr></thead><tbody>'
-    for cat,row in stat["categories"].items():
-        body+=f'<tr><th>{e(cat)}</th><td>{fmt(row["quantity"])}</td><td>{fmt(row["known_value"])}</td><td>{fmt(row["missing_cost_units"])}</td></tr>'
-    body+='</tbody></table></div></div>'
-    body+='<div class="m2-section"><h3>طلب هر پلتفرم</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>پلتفرم</th><th>فروش پس از کارمزد</th><th>دریافت‌ها</th><th>طلب</th></tr></thead><tbody>'
+        body+=f'<div class="m2-msg">{fmt(stat["unknown_sold_cost_lines"])} ردیف فروش بهای تمام‌شده ثبت‌شده ندارد؛ سود فروش قطعی نیست. طلب از پلتفرم همچنان از فروش و کارمزد واقعی محاسبه می‌شود.</div>'
+    body+='<div class="m2-card m2-finance-section"><h3>طلب پلتفرم‌های فروش</h3>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>پلتفرم</th><th>فروش خالص پس از هزینه</th><th>دریافتی</th><th>طلب مانده</th></tr></thead><tbody>'
     for code,row in stat["platform_receivables"].items():
-        body+=f'<tr><th>{e(PLATFORMS.get(code,row["title"]))}</th><td>{fmt(row["sales_net"])}</td><td>{fmt(row["received"])}</td><td>{fmt(row["outstanding"])}</td></tr>'
+        body+=(f'<tr><th>{e(PLATFORMS.get(code,row["title"]))}</th><td>{fmt(row["sales_net"])}</td>'
+               f'<td>{fmt(row["received"])}</td><td>{fmt(row["outstanding"])}</td></tr>')
     body+='</tbody></table></div></div>'
-    body+=f'<p><a href="{ROOT}/finance/accounts">حساب‌ها و طلب‌ها</a> · <a href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a> · <a href="{ROOT}/">فروش روزانه دیجی‌کالا</a> · <a href="{ROOT}/master/stock">موجودی کالا</a></p>'
+    active_accounts=accounts(conn)
+    body+='<div class="m2-card m2-finance-section"><h3>حساب‌ها و صندوق</h3>'
+    if active_accounts:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>حساب</th><th>مانده (تومان)</th></tr></thead><tbody>'
+        for bank in active_accounts:
+            body+=f'<tr><th>{e(bank["title"])}</th><td>{fmt(bank["balance"])}</td></tr>'
+        body+='</tbody></table></div>'
+    else:
+        body+=f'<p class="m2-hint">هنوز حسابی ثبت نشده است. <a href="{ROOT}/finance/accounts">تعریف حساب و مانده اولیه</a></p>'
+    body+='</div>'
+    body+='<details class="m2-card m2-finance-section"><summary style="cursor:pointer;font-weight:800">ثبت یا اصلاح مواد اولیه، تجهیزات و سایر دارایی‌ها/بدهی‌ها</summary>'
+    body+='<p class="m2-hint">فقط مبالغی را وارد کن که در موجودی کالای آماده، حساب‌های بانکی یا طلب پلتفرم‌ها حساب نشده‌اند. ثبت تکراری، سرمایه را بیش از واقعیت نشان می‌دهد.</p>'
+    for key,label in TYPES.items():
+        existing=stat["manual_balances"][key]
+        body+=f'<form method="post" action="{ROOT}/capital-report/component/save" class="m2-fields" style="margin:12px 0">'
+        body+=f'<input type="hidden" name="kind" value="{e(key)}">'
+        body+=f'<div><label>{e(label)} (تومان)</label><input type="number" name="amount" min="0" value="{e(existing if existing is not None else "")}" required></div>'
+        body+='<div><button class="m2-btn" type="submit">ثبت مبلغ</button></div></form>'
+    body+='</details>'
+    body+='<details class="m2-card m2-finance-section"><summary style="cursor:pointer">نحوه محاسبه و تاریخ ارزش‌گذاری</summary>'
+    body+='<p class="m2-hint">سرمایه = ارزش کالای آماده + مواد اولیه + تجهیزات + سایر دارایی‌ها + مانده حساب‌ها + طلب خالص پلتفرم‌ها − بدهی‌ها. فروش‌ها به میزان سود سرمایه را افزایش می‌دهند، اما سود جداگانه به دارایی اضافه نمی‌شود.</p>'
+    body+=f'<form action="{ROOT}/capital-report" method="get" class="m2-fields"><div><label>تاریخ نرخ بهای تمام‌شده</label><input type="date" name="as_of" value="{e(stat["as_of"])}"></div><div><button class="m2-btn">محاسبه</button></div></form>'
+    if stat["as_of"]!=today():
+        body+='<p class="m2-msg">تاریخ گذشته فقط نرخ بهای تمام‌شده موجودی فعلی را تغییر می‌دهد؛ گردش موجودی و حساب در آن تاریخ بازسازی نشده است.</p>'
+    body+='</details>'
     return page_with_style("گزارش جامع سرمایه",body)
+
+@router.post(ROOT+"/capital-report/component/save")
+def save_capital_component(kind:str=Form(...),amount:str=Form(...),conn=Depends(conn_dep)):
+    from .app import fail
+    from .engine import ImportErrorDetail
+    try:save_component(conn,kind,amount)
+    except (ValueError,ImportErrorDetail) as exc:return fail(exc)
+    return RedirectResponse(ROOT+"/capital-report?saved=1",status_code=303)
