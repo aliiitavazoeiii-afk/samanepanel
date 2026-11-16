@@ -289,7 +289,7 @@ def revise_stock_transfer(transfer_id:int=Form(...),target_qty:str=Form(...),cat
 def _price_tiles():
     return (f'<div class="m2-cards">'
       f'<a class="m2-card" href="{ROOT}/pricing/cost" style="text-decoration:none"><h3>بهای تمام‌شده</h3><p class="m2-hint">تعریف هزینه تولید بر اساس نوع کالا؛ بادیگارد اسلیپ/پادار و قالب کوچک/متوسط/بزرگ.</p></a>'
-      f'<a class="m2-card" href="{ROOT}/pricing/sales" style="text-decoration:none"><h3>قیمت فروش</h3><p class="m2-hint">قیمت‌گذاری گروهی فروش سایت، باسلام و قالب؛ مستقل از دیجی‌کالا.</p></a></div>')
+      f'<a class="m2-card" href="{ROOT}/pricing/sales" style="text-decoration:none"><h3>قیمت فروش</h3><p class="m2-hint">قیمت‌گذاری گروهی فروش سایت، باسلام و قالب.</p></a><a class="m2-card" href="{ROOT}/pricing/digikala" style="text-decoration:none"><h3>قیمت فروش دیجی‌کالا</h3><p class="m2-hint">قیمت هر کد تنوع با تاریخ اجرا، مستقل از سایر پلتفرم‌ها.</p></a></div>')
 
 @router.get(ROOT+"/pricing")
 def pricing(conn=Depends(conn_dep)):
@@ -375,6 +375,8 @@ router.add_api_route(ROOT+"/catalog/edit",catalog_edit,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/archive",catalog_archive,methods=["POST"])
 router.add_api_route(ROOT+"/catalog/restore",catalog_restore,methods=["POST"])
 
+from .dk_pricing_ui import router as digikala_pricing_router
+router.include_router(digikala_pricing_router)
 from .platform_api import router as platform_router
 from .capital_api import router as capital_router
 router.include_router(platform_router)
