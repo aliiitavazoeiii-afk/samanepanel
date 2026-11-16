@@ -153,6 +153,29 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertIn('name="csrfmiddlewaretoken"',rendered)
         self.assertIn('action="/sales/digikala/day/delete"',rendered)
 
+    def test_digikala_pricing_bulk_archive_and_extra_assets_routes(self):
+        self.assertEqual(reverse("sister_digikala_pricing"),
+                         "/settings/products/platforms/digikala/pricing/")
+        self.assertEqual(resolve("/settings/products/platforms/digikala/pricing/").func,
+                         sister_sales.digikala_proxy)
+        self.assertEqual(self.client.get("/settings/products/platforms/digikala/pricing/").status_code,302)
+        self.assertEqual(sister_sales.public_redirect_location(
+            "/daily-sales/pricing/digikala?category=bodyguard"),
+            "/settings/products/platforms/digikala/pricing/?category=bodyguard")
+        for route in ("pricing/digikala/save","catalog/archive-bulk",
+                      "capital-report/component/save"):
+            self.assertIn(route,sister_sales._ALLOWED)
+            self.assertIn(route,sister_sales._POST)
+            self.assertEqual(self.client.post("/sales/digikala/"+route).status_code,302)
+        req=RequestFactory().get("/settings/products/platforms/digikala/")
+        req.user=SimpleNamespace(is_authenticated=True)
+        for route in ("catalog/archive-bulk","pricing/digikala/save",
+                      "capital-report/component/save"):
+            html=sister_sales.add_csrf(req,
+                 '<form method="post" action="/sales/digikala/'+route+'">'
+                 '<button>ذخیره</button></form>')
+            self.assertIn('name="csrfmiddlewaretoken"',html)
+
     def test_post_form_has_csrf_token(self):
         request = RequestFactory().get("/sales/digikala/")
         html = sister_sales.add_csrf(request,'<form action="/x" method="post"><button>ok</button></form>')
