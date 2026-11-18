@@ -169,6 +169,17 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertEqual(cap["mehr_payable"],130000)
         self.assertIsNone(cap["total_capital"])  # historical opening balance not reconciled
 
+    def test_mold_daily_sales_summary_includes_invoice_profit_but_hides_customer_details(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.platform_packs_ui import daily_sales_page
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        html=daily_sales_page(self.db,"mold",self.day).body.decode("utf-8")
+        self.assertIn("فروش خالص",html)
+        self.assertIn("سود فروش",html)
+        self.assertIn("جزئیات فاکتورها",html)
+        self.assertNotIn("فاکتور #"+str(iid)+" · مشتری تست</th>",html)
+
     def test_draft_advances_are_customer_liabilities_not_sale_profit(self):
         from daily_sales_service.app import app
         from daily_sales_service.sister_finance_logic import overview
