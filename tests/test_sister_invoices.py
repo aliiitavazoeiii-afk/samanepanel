@@ -115,5 +115,75 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertTrue(stat["invoice_accounting_pending"])
         self.assertIsNone(stat["total_capital"])
 
+
+    def test_dispatched_mold_invoice_profit_combines_with_platform_sales_once(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_finance_logic import sales_report, platform_balances
+        from daily_sales_service.master_engine import now
+        iid=self._invoice("factory")
+        self.assertEqual(sales_report(self.db,"mold")["gross"],0)  # draft is not a sale
+        dispatch_invoice(self.db,iid)
+        mold=sales_report(self.db,"mold")
+        self.assertEqual((mold["gross"],mold["cogs_known"],mold["profit"]),(220000,130000,90000))
+        self.assertEqual((mold["mold_gross"],mold["mold_profit"],mold["mold_invoice_count"]),
+                         (220000,90000,1))
+        self.assertEqual(platform_balances(self.db)["mold"]["outstanding"],0)
+        now_iso=now()
+        cur=self.db.execute("""INSERT INTO platform_listings
+            (channel,listing_code,title,master_id,pack_qty,created_at,updated_at)
+            VALUES ('mold','test-mold-listing','قالب تست',?,1,?,?)""",
+            (self.skus["کوچک"],now_iso,now_iso))
+        self.db.execute("""INSERT INTO platform_sales
+            (channel,listing_id,sale_date,packs,units,warehouse,unit_sale_price,
+            cost_per_unit,gross_toman,cogs_toman,commission_toman,created_at)
+            VALUES ('mold',?,?,1,1,'home',150000,80000,150000,80000,0,?)""",
+            (cur.lastrowid,self.day,now_iso))
+        mold=sales_report(self.db,"mold")
+        self.assertEqual((mold["orders"],mold["gross"],mold["profit"],mold["mold_profit"]),
+                         (2,370000,160000,160000))
+        self.assertEqual(platform_balances(self.db)["mold"]["outstanding"],150000)
+        self.assertEqual(sales_report(self.db)["gross"],370000)
+        self.assertEqual(sales_report(self.db)["profit"],160000)
+
+    def test_invoice_cash_and_mehr_claims_feed_finance_and_capital_without_double_counting(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_finance_logic import overview,platform_balances
+        from daily_sales_service.capital_api import financial_capital
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,100000,"mehr",self.day,"rm-1")
+        record_receipt(self.db,iid,50000,"mine",self.day,"rme-2",account_id=self.account)
+        info=overview(self.db)
+        self.assertEqual(info["invoice_receivable"],70000)
+        self.assertEqual(info["mehr_receivable"],100000)
+        self.assertEqual(info["mehr_payable"],130000)
+        self.assertEqual(info["total_receivables_including_mehr"],170000)
+        self.assertEqual(info["total_liabilities_recorded"],130000)
+        self.assertEqual(info["cash_balance"],50000)
+        self.assertEqual(info["sales"]["mold_profit"],90000)
+        self.assertEqual(info["total_receivable"],0)  # Not a platform payout
+        self.assertEqual(platform_balances(self.db)["mold"]["outstanding"],0)
+        cap=financial_capital(self.db)
+        self.assertEqual(cap["known_components_total"],90000)
+        self.assertEqual(cap["all_recorded_receivables"],170000)
+        self.assertEqual(cap["mehr_payable"],130000)
+        self.assertIsNone(cap["total_capital"])  # historical opening balance not reconciled
+
+    def test_draft_advances_are_customer_liabilities_not_sale_profit(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_finance_logic import overview
+        from daily_sales_service.capital_api import financial_capital
+        iid=self._invoice("factory")
+        record_receipt(self.db,iid,30000,"mine",self.day,"draft-money",account_id=self.account)
+        record_receipt(self.db,iid,40000,"mehr",self.day,"draft-mehr")
+        report=overview(self.db)
+        self.assertEqual(report["sales"]["gross"],0)
+        self.assertEqual(report["sales"]["profit"],0)
+        self.assertEqual(report["invoice_receivable"],0)
+        self.assertEqual(report["customer_advances"],70000)
+        self.assertEqual(report["cash_balance"],30000)
+        self.assertEqual(report["mehr_receivable"],40000)
+        self.assertEqual(financial_capital(self.db)["known_components_total"],0)
+
 if __name__=="__main__":
     unittest.main()
