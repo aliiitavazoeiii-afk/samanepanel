@@ -6,6 +6,10 @@
   const fmt=new Intl.DateTimeFormat("fa-IR-u-ca-persian", {year:"numeric",month:"numeric",day:"numeric",timeZone:"UTC"});
   function en(s){return String(s).replace(/[۰-۹٠-٩]/g,c=>{let n=digits.indexOf(c);return String(n<0?"٠١٢٣٤٥٦٧٨٩".indexOf(c):n);});}
   function fa(s){return String(s).replace(/[0-9]/g,d=>digits[Number(d)]);}
+  function tehranToday(){
+    const p={};new Intl.DateTimeFormat("en-US",{year:"numeric",month:"2-digit",day:"2-digit",timeZone:"Asia/Tehran"}).formatToParts(new Date()).forEach(v=>{p[v.type]=v.value;});
+    return p.year+"-"+p.month+"-"+p.day;
+  }
   function isoToParts(value){
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
     const date=new Date(value+"T12:00:00Z");
@@ -33,7 +37,7 @@
   function picker(field,trigger){
     const overlay=document.createElement("div");overlay.className="sg-jal-overlay";
     const panel=document.createElement("section");panel.className="sg-jal-panel";panel.setAttribute("role","dialog");panel.setAttribute("aria-label","تقویم شمسی");overlay.appendChild(panel);
-    const original=isoToParts(field.value)||isoToParts(new Date().toISOString().slice(0,10));
+    const original=isoToParts(field.value)||isoToParts(tehranToday());
     let y=original[0],m=original[1];
     function close(){overlay.remove();trigger.focus();}
     overlay.addEventListener("click",e=>{if(e.target===overlay)close();});
@@ -66,7 +70,7 @@
       }
       const footer=add(panel,"div","");footer.className="sg-jal-footer";
       add(footer,"button","امروز",()=>{
-        const day=new Date().toISOString().slice(0,10);
+        const day=tehranToday();
         if((!field.min||day>=field.min)&&(!field.max||day<=field.max)){
           field.value=day;field.dispatchEvent(new Event("change",{bubbles:true}));trigger.textContent=show(day)+" ▾";
         }
