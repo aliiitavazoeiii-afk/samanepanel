@@ -107,6 +107,26 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertIn('action="/sales/digikala/finance/movements/add"',html)
         self.assertIn("دریافتی‌ها",html)
 
+    def test_customer_invoice_urls_are_authenticated_and_protected(self):
+        for route,expected in (
+            ("sister_invoices","/invoices/"),
+            ("sister_invoice_new","/invoices/new/"),
+            ("sister_invoice_mehr","/invoices/mehr/"),
+            ("sister_invoice_purchases","/invoices/purchases/"),
+        ):
+            self.assertEqual(reverse(route),expected)
+            self.assertEqual(resolve(expected).func,sister_sales.digikala_proxy)
+            self.assertEqual(self.client.get(expected).status_code,302)
+        self.assertEqual(resolve("/invoices/15/").func,sister_sales.invoice_proxy)
+        self.assertEqual(resolve("/invoices/15/receipt/").func,sister_sales.invoice_proxy)
+        self.assertEqual(self.client.get("/invoices/15/").status_code,302)
+        self.assertEqual(self.client.post("/invoices/15/receipt/").status_code,302)
+        self.assertIn("invoices/mehr/settle",sister_sales._POST)
+        self.assertIn("invoices/purchases/add",sister_sales._POST)
+        self.assertIn("invoices/create",sister_sales._POST)
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/invoices/15"),
+                         "/invoices/15/")
+
     def test_master_proxy_requires_auth(self):
         for url in ("/settings/products/new/", "/settings/products/digikala/",
                     "/settings/products/platforms/", "/report/sister-capital/",
