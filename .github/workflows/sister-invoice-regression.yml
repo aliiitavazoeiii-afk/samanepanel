@@ -1,0 +1,25 @@
+name: Sister invoices regression tests
+on:
+  push:
+    branches: [dia-darma-fresh]
+    paths:
+      - 'daily_sales_service/**'
+      - 'tests/test_sister_invoices.py'
+      - '.github/workflows/sister-invoice-regression.yml'
+  workflow_dispatch:
+jobs:
+  invoice-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install sister engine dependencies
+        run: python -m pip install -r deploy/darma-fresh/requirements.sister-sales.txt
+      - name: Compile business modules
+        run: python -m compileall -q daily_sales_service tests/test_sister_invoices.py
+      - name: Run invoice ledger regression
+        run: python -m unittest discover -s tests -p 'test_sister_invoices.py' -v
