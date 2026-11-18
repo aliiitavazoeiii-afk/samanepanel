@@ -211,11 +211,13 @@ def all_sales(channel:str="",from_date:str="",to_date:str="",conn=Depends(conn_d
                  ("بهای تمام‌شده",report["cogs_known"],"تومان · ثبت‌شده"),
                  ("سود",report["profit"],"تومان · پس از کارمزد و بهای کالا")])
     if report["unknown_cost_lines"]:body+=f'<div class="m2-msg">{report["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل نامشخص است.</div>'
-    body+='<p class="m2-hint">فاکتورهای ارسال‌شده قالب در جمع فروش و سود لحاظ می‌شوند؛ دریافت مشتری از فاکتور فقط مانده طلب را کاهش می‌دهد و فروش تازه نیست.</p>'
+    body+='<p class="m2-hint">فاکتورهای ارسال‌شده قالب در جمع فروش و سود لحاظ می‌شوند؛ ریز فاکتور و مشتری فقط در صفحه فاکتورهاست. دریافت مشتری فروش تازه نیست.</p>'
     body+='<section class="m2-card m2-finance-section"><h3>ریز فروش‌ها</h3>'
     if report["lines"]:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>پلتفرم</th><th>محصول</th><th>بسته</th><th>عدد کالا</th><th>فروش</th><th>هزینه پلتفرم</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
         for r in report["lines"]:
+            if r["kind"]=="invoice":
+                continue  # Customer/Mehr detail remains on its own invoice pages.
             body+=f'<tr><th>{e(r["sale_date"])}</th><td>{e(PLATFORMS.get(r["source"],r["source"]))}</td><td>{e(r["title"])}</td>'
             body+=f'<td>{fmt(r["packs"])}</td><td>{fmt(r["units"])}</td><td>{fmt(r["gross"])}</td><td>{fmt(r["fees"])}</td><td>{fmt(r["cogs"])}</td><td>{fmt(r["net"])}</td><td>{fmt(r["profit"])}</td></tr>'
         body+='</tbody></table></div>'
