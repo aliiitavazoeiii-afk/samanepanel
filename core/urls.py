@@ -65,6 +65,7 @@ urlpatterns = [
     path("invoices/", sister_sales.digikala_proxy, {"tail": "invoices"}, name="sister_invoices"),
     path("invoices/new/", sister_sales.digikala_proxy, {"tail": "invoices/new"}, name="sister_invoice_new"),
     path("invoices/mehr/", sister_sales.digikala_proxy, {"tail": "invoices/mehr"}, name="sister_invoice_mehr"),
+    path("finance/mehr/", sister_sales.digikala_proxy, {"tail": "invoices/mehr"}, name="sister_finance_mehr"),
     path("invoices/purchases/", sister_sales.digikala_proxy, {"tail": "invoices/purchases"}, name="sister_invoice_purchases"),
     path("invoices/<int:invoice_id>/", sister_sales.invoice_proxy, name="sister_invoice_detail"),
     path("invoices/<int:invoice_id>/<str:action>/", sister_sales.invoice_proxy, name="sister_invoice_action"),
