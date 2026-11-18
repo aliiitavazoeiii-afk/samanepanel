@@ -113,8 +113,8 @@ def register_purchase(conn,supplier,purchase_date,warehouse,items,request_key,
     if warehouse not in ("home","khorshid"):raise ImportErrorDetail("انبار مقصد نامعتبر است.")
     key=_clean(request_key,100)
     if not key:raise ImportErrorDetail("شناسه درخواست خرید الزامی است.")
-    if not isinstance(items,(list,tuple)) or not items or len(items)>20:
-        raise ImportErrorDetail("بین ۱ تا ۲۰ ردیف کالای خریداری‌شده وارد کن.")
+    if not isinstance(items,(list,tuple)) or not items or len(items)>120:
+        raise ImportErrorDetail("بین ۱ تا ۱۲۰ ردیف کالای خریداری‌شده وارد کن.")
     try:
         discount=Decimal(str(discount_percent or "0").strip().replace("٫",".").replace(",","."))
     except InvalidOperation:
