@@ -72,9 +72,8 @@ class SupplierPurchasesTest(unittest.TestCase):
         self.assertEqual(self.count_stock("BG-P","khorshid_stock"),3)
         self.assertEqual(self.count_stock("BG-P"),0)
         self.assertEqual(self.conn.execute("SELECT delta FROM master_stock_events WHERE reference='supplier-purchase:1'").fetchone()[0],3)
-    def test_reject_mold_and_duplicate_or_invalid_rows_without_any_stock_writes(self):
+    def test_reject_duplicate_or_invalid_rows_without_any_stock_writes(self):
         for rows in (
-            [(self.ids["MOLD-P"],1,1000)],
             [(self.ids["DIA-P"],2,58000),(self.ids["DIA-P"],1,58000)],
             [(self.ids["DIA-P"],-1,58000)],
             [(self.ids["DIA-P"],1,0)]):
@@ -82,12 +81,36 @@ class SupplierPurchasesTest(unittest.TestCase):
                 register_purchase(self.conn,"دیا",self.day,"home",rows,"bad-"+str(len(rows))+str(rows[0][1]))
         self.assertEqual(self.count_stock("DIA-P"),0)
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0],0)
+    def test_mold_purchase_routes_to_existing_mehr_debt_without_double_posting(self):
+        from daily_sales_service.sister_invoices import mehr_balance
+        pid=register_purchase(self.conn,"مه هر",self.day,"home",[
+            (self.ids["MOLD-P"],5,90000)],"mehr-one",discount_percent="10")
+        self.assertEqual(self.count_stock("MOLD-P"),5)
+        self.assertEqual(mehr_balance(self.conn)["debt"],405000)
+        self.assertEqual(len(suppliers(self.conn)),0)
+        p,lines=purchase_detail(self.conn,pid)
+        self.assertEqual((p["subtotal_toman"],p["total_toman"]), (450000,405000))
+        self.assertEqual((lines[0]["list_unit_cost_toman"],lines[0]["unit_cost_toman"]), (90000,81000))
+        with self.assertRaises(ImportErrorDetail):
+            register_purchase(self.conn,"مه هر",self.day,"home",[(self.ids["MOLD-P"],5,90000)],"mehr-one")
+        self.assertEqual(mehr_balance(self.conn)["debt"],405000)
+        self.assertEqual(self.count_stock("MOLD-P"),5)
+
+    def test_mixed_exact_skus_under_single_supplier_purchase(self):
+        register_purchase(self.conn,"دیا",self.day,"home",[
+            (self.ids["DIA-P"],3,58000),
+            (self.ids["DARMA-P"],2,80000),
+            (self.ids["BG-P"],1,85000),
+        ],"mixed-buy",discount_percent="12.5")
+        self.assertEqual(self.count_stock("DIA-P"),3)
+        self.assertEqual(self.count_stock("DARMA-P"),2)
+        self.assertEqual(self.count_stock("BG-P"),1)
+        self.assertEqual(suppliers(self.conn)[0]["purchased"],366625)
+
     def test_does_not_auto_import_existing_stock_as_new_purchase(self):
         self.conn.execute("UPDATE master_products SET seller_stock=50 WHERE id=?",(self.ids["DIA-P"],))
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0],0)
         self.assertEqual(len(suppliers(self.conn)),0)
-        with self.assertRaises(ImportErrorDetail):
-            register_purchase(self.conn,"مه هر",self.day,"home",[(self.ids["DIA-P"],1,58000)],"invalid-mehr")
         self.assertEqual(self.count_stock("DIA-P"),50)
 
 if __name__=="__main__":
