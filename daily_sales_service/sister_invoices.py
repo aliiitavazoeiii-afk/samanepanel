@@ -155,6 +155,7 @@ def dispatch_invoice(conn,invoice_id):
 def receive_purchase(conn,master_id,quantity,unit_cost,purchase_date,request_key,notes=""):
     day=_date(purchase_date);qty=money(quantity);cost=money(unit_cost)
     if qty<1 or qty>100000:raise ImportErrorDetail("تعداد خرید باید مثبت باشد.")
+    if cost<=0:raise ImportErrorDetail("قیمت خرید هر قالب از مه هر باید مثبت باشد.")
     key=_text(request_key,100)
     if not key:raise ImportErrorDetail("شناسه ثبت خرید لازم است.")
     conn.execute("BEGIN IMMEDIATE")
