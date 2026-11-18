@@ -124,6 +124,7 @@ def finance_movements(section:str="receipt",conn=Depends(conn_dep)):
     prompt="دریافت از" if kind=="receipt" else "پرداخت به"
     source_label="واریز به حساب" if kind=="receipt" else "پرداخت از حساب"
     body=f'<h1>{heading}</h1><p class="m2-hint">هر انتقال وجه فقط یک بار در دفتر ثبت می‌شود. شماره پیگیری برای جلوگیری از تکرار قابل استفاده است.</p>'
+    body+='<div class="m2-msg">دریافت مربوط به فاکتور مشتری را فقط داخل همان فاکتور ثبت کن؛ پرداخت یا تهاتر مه هر را فقط از «حساب مه هر» انجام بده. آن گردش‌ها خودکار در بانک ثبت می‌شوند و نباید دوباره اینجا وارد شوند.</div>'
     body+=nav("finance/movements?section="+kind)
     body+=f'<section class="m2-card m2-finance-section"><h3>ثبت {e(heading[:-1])}</h3>'
     if not banks:
