@@ -127,6 +127,14 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(sister_sales.public_redirect_location("/daily-sales/invoices/15"),
                          "/invoices/15/")
 
+    def test_new_purchasing_replaces_old_takvin_menu_but_preserves_old_route(self):
+        from django.template.loader import get_template
+        raw=get_template("base.html").template.source
+        self.assertIn('title="خرید کالا"',raw)
+        self.assertNotIn('title="خرید تکوین"',raw)
+        self.assertEqual(resolve("/takvin/").url_name,"takvin")
+        self.assertEqual(resolve("/purchases/").url_name,"sister_purchases")
+
     def test_supplier_purchasing_routes_are_authenticated_and_csrf_protected(self):
         self.assertEqual(reverse("sister_purchases"),"/purchases/")
         self.assertEqual(resolve("/purchases/").func,sister_sales.digikala_proxy)
