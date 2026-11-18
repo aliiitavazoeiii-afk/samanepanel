@@ -155,6 +155,8 @@ def public_redirect_location(location):
     pieces = parse.urlsplit(location)
     tail = pieces.path[len(_API) + 1:]
     target = _CANONICAL_PAGES.get(tail, _ROOT + "/" + tail)
+    if re.fullmatch(r"invoices/\d+", tail):
+        target = "/" + tail + "/"
     return target + ("?" + pieces.query if pieces.query else "")
 
 
@@ -211,6 +213,13 @@ def add_csrf(request, html):
             return tag + '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrf + '">'
         return tag
     return re.sub(r"<form\b[^>]*>", substitute, html, flags=re.I)
+
+
+@login_required
+def invoice_proxy(request, invoice_id, action=""):
+    if action and action not in ("dispatch", "receipt"):
+        return HttpResponse("مسیر نامعتبر است.", status=404)
+    return digikala_proxy(request, "invoices/" + str(invoice_id) + ("/" + action if action else ""))
 
 
 @login_required
