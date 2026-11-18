@@ -94,6 +94,61 @@ class SupplierPurchasesTest(unittest.TestCase):
         self.assertIn("DIA-P",page)
         self.assertIn("BG-P",page)
 
+    def test_category_view_lists_every_model_and_separates_bodyguard_subtypes(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_purchase_grid import purchase_catalog, purchase_grid
+        from daily_sales_service.master_engine import now
+        from daily_sales_service.master_v2_logic import SIZES
+        stamp=now()
+        extra=[
+          ("زیرپوش دارما","UP-SECOND","زیرپوش دارما - سفید","سفید","M",""),
+          ("زیرپوش دارما","UP-THIRD","زیرپوش دارما - مشکی","مشکی","L",""),
+          ("شورت زنانه دیا","DIA-SECOND","دیا مدل دوم","مشکی","L",""),
+          ("شورت زنانه دیا","DIA-THIRD","دیا مدل سوم","سفید","XL",""),
+          ("شورت زنانه دیا","DIA-FOURTH","دیا مدل چهارم","سرمه‌ای","M",""),
+          ("بادیگارد","BG-SL-OTHER","بادیگارد اسلیپ","مشکی","M","اسلیپ"),
+          ("بادیگارد","BG-PA-OTHER","بادیگارد پادار","سرمه‌ای","L","پادار"),
+        ]
+        for cat,code,title,color,size,subtype in extra:
+            self.conn.execute("""INSERT INTO master_products
+               (category,code,title,color,size,subtype,active,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,1,?,?)""",
+               (cat,code,title,color,size,subtype,stamp,stamp))
+        groups=purchase_catalog(self.conn)
+        dia=[g for g in groups if g["category"]=="شورت زنانه دیا"]
+        self.assertEqual(len(dia),4)
+        self.assertEqual(len([g for g in groups if g["category"]=="زیرپوش دارما"]),2)
+        slips=[g for g in groups if g["category"]=="بادیگارد" and g["subtype"]=="اسلیپ"]
+        padars=[g for g in groups if g["category"]=="بادیگارد" and g["subtype"]=="پادار"]
+        self.assertEqual(len(slips),1)
+        self.assertEqual(len(padars),1)
+        self.assertEqual(len({s["id"] for g in groups for s in g["rows"]}),
+                         sum(len(g["rows"]) for g in groups))
+        page=purchase_grid(self.conn)
+        self.assertIn('id="purchase-grids"',page)
+        self.assertNotIn('id="purchase-model"',page)
+        self.assertIn("بادیگارد — ",page)
+        for code in ("DIA-SECOND","DIA-THIRD","DIA-FOURTH","BG-PA-OTHER"):
+            self.assertIn(code,page)
+
+    def test_purchase_accepts_many_exact_skus_in_one_atomic_order(self):
+        from daily_sales_service.master_engine import now
+        stamp=now()
+        items=[]
+        for i in range(24):
+            code="CASE-MULTI-"+str(i)
+            cur=self.conn.execute("""INSERT INTO master_products
+                 (category,code,title,size,color,active,created_at,updated_at)
+                 VALUES ('شورت زنانه دیا',?, 'مدل تست', 'M', ?,1,?,?)""",
+                 (code,"رنگ"+str(i),stamp,stamp))
+            items.append((cur.lastrowid,1,58000))
+        pid=register_purchase(self.conn,"دیا",self.day,"home",items,"many-24")
+        detail,lines=purchase_detail(self.conn,pid)
+        self.assertEqual(len(lines),24)
+        self.assertEqual(detail["total_toman"],24*58000)
+        self.assertEqual(sum(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                           (mid,)).fetchone()[0] for mid,_,_ in items),24)
+
     def test_mold_purchase_routes_to_existing_mehr_debt_without_double_posting(self):
         from daily_sales_service.sister_invoices import mehr_balance
         pid=register_purchase(self.conn,"مه هر",self.day,"home",[
