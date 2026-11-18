@@ -51,4 +51,4 @@ document.body.classList.toggle('sidebar-collapsed',desktop.matches);
 document.addEventListener('focusin',e=>{
   if((e.target.matches('input[type="number"]')||e.target.classList.contains('money'))&&e.target.value==='0')e.target.value='';
 });
-})();</script>{% block scripts %}{% endblock %}</body></html>
+})();</script><script src="{% static 'core/jalali-global.js' %}?v=1" defer></script>{% block scripts %}{% endblock %}</body></html>
