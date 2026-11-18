@@ -238,6 +238,14 @@ def cancel_movement(conn,identifier):
     except (TypeError,ValueError):raise ImportErrorDetail("شناسه تراکنش معتبر نیست.")
     conn.execute("BEGIN IMMEDIATE")
     try:
+        linked=conn.execute("SELECT reference FROM sister_finance_movements WHERE id=? AND cancelled_at IS NULL",(mid,)).fetchone()
+        if linked is not None and str(linked["reference"] or "").startswith(("invoice-receipt:","receive-mehr:", "mehr-settlement:")):
+            raise ImportErrorDetail("این گردش به فاکتور یا حساب مه هر متصل است؛ ابطال جداگانه باعث مغایرت می‌شود.")
+        # Supplier settlement cash movements end with ':bank' and are paired with a Mehr ledger entry.
+        if linked is not None and str(linked["reference"] or "").endswith(":bank"):
+            pair=str(linked["reference"])[:-5]
+            if conn.execute("SELECT 1 FROM sister_mehr_ledger WHERE reference=?",(pair,)).fetchone():
+                raise ImportErrorDetail("این گردش به تسویه مه هر متصل است؛ ابطال جداگانه مجاز نیست.")
         row=conn.execute("""UPDATE sister_finance_movements
           SET cancelled_at=? WHERE id=? AND cancelled_at IS NULL""",(now(),mid))
         if not row.rowcount:raise ImportErrorDetail("تراکنش پیدا نشد یا قبلاً ابطال شده است.")
