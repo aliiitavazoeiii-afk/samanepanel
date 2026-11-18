@@ -117,7 +117,9 @@ class SupplierPurchasesTest(unittest.TestCase):
         groups=purchase_catalog(self.conn)
         dia=[g for g in groups if g["category"]=="شورت زنانه دیا"]
         self.assertEqual(len(dia),4)
-        self.assertEqual(len([g for g in groups if g["category"]=="زیرپوش دارما"]),2)
+        undershirts=[g for g in groups if g["category"]=="زیرپوش دارما"]
+        self.assertEqual(len(undershirts),1)
+        self.assertEqual(len(undershirts[0]["rows"]),2)
         slips=[g for g in groups if g["category"]=="بادیگارد" and g["subtype"]=="اسلیپ"]
         padars=[g for g in groups if g["category"]=="بادیگارد" and g["subtype"]=="پادار"]
         self.assertEqual(len(slips),1)
