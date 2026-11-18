@@ -86,7 +86,7 @@ class SupplierPurchasesTest(unittest.TestCase):
         from daily_sales_service.sister_purchase_grid import purchase_grid
         page=purchase_grid(self.conn)
         self.assertIn('id="purchase-category"',page)
-        self.assertIn('id="purchase-grid-body"',page)
+        self.assertIn('id="purchase-grids"',page)
         self.assertIn('purchase-discount-percent',page)
         for label in ("قالب","شورت زنانه دیا","شورت زنانه دارما","بادیگارد"):
             self.assertIn(label,page)
