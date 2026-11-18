@@ -298,7 +298,14 @@ db=dbconnect("/data/sales.sqlite3")
 totals=financial_capital(db)
 assert totals["total_receivable"]==sum(x["outstanding"] for x in totals["platform_receivables"].values())
 if totals["total_value"] is not None:
-    assert totals["total_capital"]==totals["total_value"]+totals["total_receivable"]+totals["cash_balance"]
+    extras=totals["manual_balances"]
+    expected=(totals["total_value"]+totals["total_receivable"]+totals["cash_balance"]
+             +sum(int(extras.get(key) or 0) for key in ("raw_materials","equipment","other_assets"))
+             -int(extras.get("other_liabilities") or 0))
+    assert totals["total_capital"]==expected==totals["known_components_total"], (
+        "Sister capital reconciliation failed",totals["total_capital"],expected)
+else:
+    assert totals["total_capital"] is None,"Unknown-cost inventory must not show complete capital"
 page=daily_page(db,today()).body.decode("utf-8")
 assert 'بارگذاری اکسل دیجی‌کالا' in page
 assert 'فروش ثبت‌شده پلتفرم‌های دیگر' not in page
