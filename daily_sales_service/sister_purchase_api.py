@@ -1,4 +1,4 @@
-"""Simple procurement pages for Dia / Darma / Bodyguard physical SKUs."""
+"""Excel-style physical purchasing for mold, Dia, Darma and Bodyguard."""
 import uuid
 from fastapi import APIRouter,Depends,Form,Request
 from fastapi.responses import RedirectResponse
@@ -8,6 +8,7 @@ from .effective_costs import today
 from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .sister_finance_logic import accounts
+from .sister_purchase_grid import purchase_grid
 from .sister_purchases import (CATEGORIES,register_purchase,register_supplier_payment,
     suppliers,supplier_totals,purchase_history,purchase_detail,supplier_history)
 
@@ -39,24 +40,19 @@ def _account_options(conn):
 
 @router.get(ROOT+"/purchases")
 def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
-    body='<h1>خرید کالا</h1><p class="m2-hint">مخصوص خرید واقعی دیا، دارما و بادیگارد. ثبت خرید، موجودی فیزیکی را افزایش می‌دهد و بدهی تأمین‌کننده را ایجاد می‌کند؛ اصلاح شمارش موجودی این کار را نمی‌کند.</p>'
+    body='<h1>خرید کالا</h1><p class="m2-hint">ثبت خرید قالب، دیا، دارما، بادیگارد و زیرپوش؛ به سبک جدول خرید تکوین. خرید قطعی به موجودی فیزیکی اضافه می‌شود و بدهی تأمین‌کننده را ثبت می‌کند.</p>'
     body+='<p class="m2-msg">مانده این قسمت از خریدهای جدید محاسبه می‌شود؛ بدهی‌های قدیمی تأمین‌کنندگان هنوز وارد نشده‌اند. خرید یا افزایش موجودی قدیمی را دوباره ثبت نکن.</p>'
-    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/purchases">خرید قالب از مه هر</a><a href="'+ROOT+'/finance/accounts">حساب‌ها و صندوق</a></div>'
-    body+='<section class="m2-card"><h3>ثبت خرید جدید</h3><form method="post" action="'+ROOT+'/purchases/add"><input type="hidden" name="request_key" value="'+_token()+'">'
+    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/finance/accounts">حساب‌ها و صندوق</a></div>'
+    body+='<section class="m2-card"><h3>ثبت خرید جدید</h3><form id="purchase-entry-form" method="post" action="'+ROOT+'/purchases/add"><input type="hidden" name="request_key" value="'+_token()+'">'
     body+='<div class="m2-fields"><div><label>تأمین‌کننده</label><input list="sister-suppliers" name="supplier" maxlength="120" required placeholder="مثلاً دیا یا دارما"></div>'
-    body+='<datalist id="sister-suppliers">'+''.join('<option value="'+e(s["name"])+'"></option>' for s in suppliers(conn))+'</datalist>'
+    body+='<datalist id="sister-suppliers"><option value="مه هر"></option>'+''.join('<option value="'+e(s["name"])+'"></option>' for s in suppliers(conn))+'</datalist>'
     body+='<div><label>تاریخ خرید</label><input type="date" name="purchase_date" value="'+today()+'" required></div>'
     body+='<div><label>موجودی کجا اضافه شود؟</label><select name="warehouse"><option value="home">خانه</option><option value="khorshid">خورشید</option></select></div>'
     body+='<div><label>شماره فاکتور تأمین‌کننده (اختیاری)</label><input name="supplier_invoice" maxlength="100"></div></div>'
-    body+='<h3>کالاهای خریداری‌شده</h3><p class="m2-hint">هر سایز و رنگ را جدا انتخاب کن. مبلغ خرید بر اساس قیمت یک عدد است. ردیف‌های خالی ثبت نمی‌شوند.</p>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>ردیف</th><th>کالا / مدل / رنگ / سایز</th><th>تعداد</th><th>قیمت خرید هر عدد (تومان)</th></tr></thead><tbody>'
-    for index in range(1,7):
-        body+='<tr><th>'+str(index)+'</th><td>'+_product_select(conn,index)+'</td>'
-        body+='<td><input type="number" name="qty_'+str(index)+'" min="1" max="100000" placeholder="تعداد"></td>'
-        body+='<td><input type="number" name="cost_'+str(index)+'" min="1" placeholder="تومان"></td></tr>'
-    body+='</tbody></table></div><div class="m2-fields"><div><label>توضیحات</label><textarea name="notes" maxlength="500"></textarea></div></div>'
+    body+='<div class="m2-fields"><div><label>تخفیف کل خرید (%)</label><input id="purchase-discount-percent" name="discount_percent" type="number" step="0.01" min="0" max="99.99" value="0" required></div><div><label>توضیحات خرید (اختیاری)</label><input name="notes" maxlength="500"></div></div>'
+    body+=purchase_grid(conn)
     body+='<button type="submit" class="m2-btn">ثبت قطعی خرید و افزایش موجودی</button></form></section>'
-    body+='<section class="m2-card"><h3>حساب تأمین‌کنندگان (تومان)</h3>'
+    body+='<section class="m2-card"><h3>حساب تأمین‌کنندگان (تومان)</h3><p class="m2-hint">حساب «مه هر» جداگانه ثبت می‌شود؛ مانده او را از صفحه مخصوص مه هر ببین.</p>'
     body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تأمین‌کننده</th><th>جمع خرید</th><th>جمع پرداخت</th><th>مانده بدهی</th><th></th></tr></thead><tbody>'
     existing=suppliers(conn)
     for s in existing:
@@ -85,7 +81,7 @@ def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
         try:p,lines=purchase_detail(conn,int(receipt_id))
         except (ValueError,TypeError,ImportErrorDetail) as exc:return _error(exc)
         body+='<section class="m2-card"><h3>رسید خرید #'+str(p["id"])+' از '+e(p["supplier_name"])+'</h3>'
-        body+='<p>تاریخ: '+jal_label(p["purchase_date"])+' — مقصد: '+("خانه" if p["warehouse"]=="home" else "خورشید")+' — جمع: '+fmt(p["total_toman"])+' تومان</p>'
+        body+='<p>تاریخ: '+jal_label(p["purchase_date"])+' — مقصد: '+("خانه" if p["warehouse"]=="home" else "خورشید")+' — قبل تخفیف: '+fmt(p["subtotal_toman"] or p["total_toman"])+' تومان — تخفیف: '+e(p["discount_percent"])+'٪ — جمع نهایی: '+fmt(p["total_toman"])+' تومان</p>'
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>کالا</th><th>تعداد</th><th>بهای هر عدد</th><th>جمع</th></tr></thead><tbody>'
         for l in lines:
             body+='<tr><td>'+e(" / ".join(x for x in (l["category"],l["title"],l["subtype"],l["color"],l["size"]) if x and x!="-"))+'</td><td>'+fmt(l["quantity"])+'</td><td>'+fmt(l["unit_cost_toman"])+'</td><td>'+fmt(l["quantity"]*l["unit_cost_toman"])+'</td></tr>'
@@ -100,14 +96,14 @@ def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
 async def add_purchase(request:Request,conn=Depends(conn_dep)):
     form=await request.form()
     items=[]
-    for index in range(1,7):
+    for index in range(1,21):
         mid=form.get("master_"+str(index),"")
         if not mid:continue
         items.append((mid,form.get("qty_"+str(index),""),form.get("cost_"+str(index),"")))
     try:
         register_purchase(conn,form.get("supplier"),form.get("purchase_date"),
                           form.get("warehouse"),items,form.get("request_key"),
-                          form.get("supplier_invoice"),form.get("notes"))
+                          form.get("supplier_invoice"),form.get("notes"),form.get("discount_percent","0"))
     except (ImportErrorDetail,ValueError,TypeError) as ex:return _error(ex)
     return RedirectResponse(ROOT+"/purchases",status_code=303)
 
