@@ -97,5 +97,23 @@ class SisterInvoiceTests(unittest.TestCase):
                 "کوچک":{"qty":1,"purchase":10000,"sale":20000}})
         self.assertTrue(iid)
 
+
+    def test_linked_bank_movement_cannot_be_cancelled_outside_invoice(self):
+        from daily_sales_service.sister_finance_logic import cancel_movement
+        invoice=self._invoice()
+        record_receipt(self.db,invoice,50000,"mine",self.day,"bank-safe",account_id=self.account)
+        movement_id=self.db.execute("SELECT id FROM sister_finance_movements WHERE reference LIKE 'invoice-receipt:%'").fetchone()[0]
+        with self.assertRaises(ImportErrorDetail):
+            cancel_movement(self.db,movement_id)
+        self.assertIsNone(self.db.execute("SELECT cancelled_at FROM sister_finance_movements WHERE id=?",(movement_id,)).fetchone()[0])
+
+    def test_comprehensive_capital_never_claims_known_total_when_new_invoice_present(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.capital_api import financial_capital
+        self._invoice()
+        stat=financial_capital(self.db)
+        self.assertTrue(stat["invoice_accounting_pending"])
+        self.assertIsNone(stat["total_capital"])
+
 if __name__=="__main__":
     unittest.main()
