@@ -4,12 +4,13 @@ Separate from Mehr's mold ledger. Purchases and payments are atomic and
 idempotent; correcting stock counts does not create supplier obligations.
 All amounts are integer Toman; persisted dates use ISO Gregorian.
 """
-import uuid
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from .engine import ImportErrorDetail, money
 from .effective_costs import today, valid_date
 from .master_engine import now
 
-CATEGORIES = ("زیرپوش دارما", "شورت زنانه دارما", "شورت زنانه دیا", "بادیگارد")
+CATEGORIES = ("قالب", "زیرپوش دارما", "شورت زنانه دارما", "شورت زنانه دیا", "بادیگارد")
+MEHR = "مه هر"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sister_purchase_suppliers (
  id INTEGER PRIMARY KEY,
@@ -24,6 +25,8 @@ CREATE TABLE IF NOT EXISTS sister_purchase_orders (
  supplier_invoice TEXT NOT NULL DEFAULT '',
  notes TEXT NOT NULL DEFAULT '',
  total_toman INTEGER NOT NULL CHECK(total_toman>0),
+ subtotal_toman INTEGER NOT NULL DEFAULT 0,
+ discount_percent TEXT NOT NULL DEFAULT '0',
  request_key TEXT NOT NULL UNIQUE,
  created_at TEXT NOT NULL
 );
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS sister_purchase_lines (
  master_id INTEGER NOT NULL REFERENCES master_products(id),
  quantity INTEGER NOT NULL CHECK(quantity>0),
  unit_cost_toman INTEGER NOT NULL CHECK(unit_cost_toman>0),
+ list_unit_cost_toman INTEGER,
  UNIQUE(purchase_id,master_id)
 );
 CREATE TABLE IF NOT EXISTS sister_purchase_payments (
@@ -53,6 +57,14 @@ CREATE INDEX IF NOT EXISTS idx_sister_purchase_payment_supplier
 
 def ensure_schema(conn):
     conn.executescript(SCHEMA)
+    fields={row["name"] for row in conn.execute("PRAGMA table_info(sister_purchase_orders)")}
+    if "subtotal_toman" not in fields:
+        conn.execute("ALTER TABLE sister_purchase_orders ADD COLUMN subtotal_toman INTEGER NOT NULL DEFAULT 0")
+    if "discount_percent" not in fields:
+        conn.execute("ALTER TABLE sister_purchase_orders ADD COLUMN discount_percent TEXT NOT NULL DEFAULT '0'")
+    fields={row["name"] for row in conn.execute("PRAGMA table_info(sister_purchase_lines)")}
+    if "list_unit_cost_toman" not in fields:
+        conn.execute("ALTER TABLE sister_purchase_lines ADD COLUMN list_unit_cost_toman INTEGER")
 
 def _clean(value,limit=300):
     result=str(value or "").strip()
@@ -75,20 +87,21 @@ def supplier_totals(conn,supplier_id):
     return {"id":sid,"name":row["name"],"purchased":purchased,"paid":paid,"due":purchased-paid}
 
 def suppliers(conn):
+    # Mehr has a separate gross debt/credit ledger; never show another incomplete payable.
     return [supplier_totals(conn,r["id"]) for r in conn.execute(
-        "SELECT id FROM sister_purchase_suppliers ORDER BY name")]
+        "SELECT id FROM sister_purchase_suppliers WHERE name<>? ORDER BY name",(MEHR,))]
 
 def _supplier_id(conn,name):
     name=_clean(name,120)
     if len(name)<2:raise ImportErrorDetail("نام تأمین‌کننده را وارد کن.")
     if "".join(name.split()).replace("ي","ی").replace("ك","ک")=="مهر":
-        raise ImportErrorDetail("خرید قالب از «مه هر» فقط در بخش خرید مخصوص مه هر ثبت می‌شود.")
+        name=MEHR
     conn.execute("""INSERT INTO sister_purchase_suppliers(name,created_at)
       VALUES (?,?) ON CONFLICT(name) DO NOTHING""",(name,now()))
     return conn.execute("SELECT id FROM sister_purchase_suppliers WHERE name=?",(name,)).fetchone()[0]
 
 def register_purchase(conn,supplier,purchase_date,warehouse,items,request_key,
-                      supplier_invoice="",notes=""):
+                      supplier_invoice="",notes="",discount_percent="0"):
     """Each row: (exact master SKU id, quantity, purchase cost per physical unit).
 
     Does not schedule/rewrite dated COGS rules: historical sales retain their
@@ -100,6 +113,12 @@ def register_purchase(conn,supplier,purchase_date,warehouse,items,request_key,
     if not key:raise ImportErrorDetail("شناسه درخواست خرید الزامی است.")
     if not isinstance(items,(list,tuple)) or not items or len(items)>20:
         raise ImportErrorDetail("بین ۱ تا ۲۰ ردیف کالای خریداری‌شده وارد کن.")
+    try:
+        discount=Decimal(str(discount_percent or "0").strip().replace("٫",".").replace(",","."))
+    except InvalidOperation:
+        raise ImportErrorDetail("درصد تخفیف معتبر نیست.")
+    if not discount.is_finite() or not (0 <= discount < 100):
+        raise ImportErrorDetail("درصد تخفیف باید از صفر تا کمتر از صد باشد.")
     normalized=[];seen=set()
     for item in items:
         try:master_id,quantity,unit_cost=item
@@ -110,7 +129,9 @@ def register_purchase(conn,supplier,purchase_date,warehouse,items,request_key,
         if qty<1 or qty>100000:raise ImportErrorDetail("تعداد هر ردیف باید بین ۱ تا ۱۰۰٬۰۰۰ باشد.")
         if cost<1:raise ImportErrorDetail("قیمت خرید هر عدد باید بزرگ‌تر از صفر باشد.")
         if mid in seen:raise ImportErrorDetail("کالای تکراری را در یک ردیف با تعداد جمع‌شده ثبت کن.")
-        seen.add(mid);normalized.append((mid,qty,cost))
+        effective=int((Decimal(cost)*(Decimal("1")-discount/100)).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
+        if effective<1:raise ImportErrorDetail("قیمت خرید بعد از تخفیف باید مثبت باشد.")
+        seen.add(mid);normalized.append((mid,qty,cost,effective))
     reference=_clean(supplier_invoice,100)
     notes=_clean(notes,500)
     column="seller_stock" if warehouse=="home" else "khorshid_stock"
@@ -119,30 +140,34 @@ def register_purchase(conn,supplier,purchase_date,warehouse,items,request_key,
         if conn.execute("SELECT 1 FROM sister_purchase_orders WHERE request_key=?",(key,)).fetchone():
             raise ImportErrorDetail("این خرید قبلاً ثبت شده است؛ موجودی دوباره اضافه نشد.")
         selected=[]
-        for mid,qty,cost in normalized:
+        for mid,qty,cost,effective in normalized:
             sku=conn.execute("""SELECT id,category,active,seller_stock,khorshid_stock
                     FROM master_products WHERE id=?""",(mid,)).fetchone()
             if sku is None or not sku["active"] or sku["category"] not in CATEGORIES:
-                raise ImportErrorDetail("فقط کالای فعال دیا، دارما و بادیگارد را با کد فیزیکی دقیق انتخاب کن.")
-            selected.append((sku,qty,cost))
+                raise ImportErrorDetail("فقط کالای فعال قالب، دیا، دارما و بادیگارد را با کد فیزیکی دقیق انتخاب کن.")
+            selected.append((sku,qty,cost,effective))
         sid=_supplier_id(conn,supplier)
-        total=sum(qty*cost for _,qty,cost in selected)
+        total=sum(qty*effective for _,qty,cost,effective in selected)
+        subtotal=sum(qty*cost for _,qty,cost,effective in selected)
         cur=conn.execute("""INSERT INTO sister_purchase_orders
-          (supplier_id,purchase_date,warehouse,supplier_invoice,notes,total_toman,request_key,created_at)
-          VALUES (?,?,?,?,?,?,?,?)""",(sid,day,warehouse,reference,notes,total,key,now()))
+          (supplier_id,purchase_date,warehouse,supplier_invoice,notes,total_toman,subtotal_toman,discount_percent,request_key,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?)""",(sid,day,warehouse,reference,notes,total,subtotal,str(discount),key,now()))
         purchase_id=int(cur.lastrowid)
-        for sku,qty,cost in selected:
+        for sku,qty,cost,effective in selected:
             mid=int(sku["id"])
             after=int(sku[column])+qty
             conn.execute("UPDATE master_products SET "+column+"=?,updated_at=? WHERE id=?",
                          (after,now(),mid))
             conn.execute("""INSERT INTO sister_purchase_lines
-                  (purchase_id,master_id,quantity,unit_cost_toman)
-                  VALUES (?,?,?,?)""",(purchase_id,mid,qty,cost))
+                  (purchase_id,master_id,quantity,unit_cost_toman,list_unit_cost_toman)
+                  VALUES (?,?,?,?,?)""",(purchase_id,mid,qty,effective,cost))
             conn.execute("""INSERT INTO master_stock_events
                   (occurred_at,master_id,source,delta,balance_after,reference)
                   VALUES (?,?,?,?,?,?)""",(now(),mid,warehouse,qty,after,
                                            "supplier-purchase:"+str(purchase_id)))
+        if conn.execute("SELECT name FROM sister_purchase_suppliers WHERE id=?",(sid,)).fetchone()[0]==MEHR:
+            from .sister_invoices import _ledger
+            _ledger(conn,day,total,0,"purchase_general","supplier-purchase:"+str(purchase_id),notes)
         conn.execute("COMMIT")
         return purchase_id
     except Exception:
@@ -163,6 +188,8 @@ def register_supplier_payment(conn,supplier_id,bank_id,amount,paid_on,request_ke
         bank=conn.execute("SELECT id FROM sister_finance_accounts WHERE id=? AND active=1",(bid,)).fetchone()
         if bank is None:raise ImportErrorDetail("حساب بانکی فعال انتخاب کن.")
         balance=supplier_totals(conn,sid)
+        if balance["name"]==MEHR:
+            raise ImportErrorDetail("پرداخت به مه هر را فقط از صفحه حساب مه هر ثبت کن.")
         if val>balance["due"]:raise ImportErrorDetail("مبلغ پرداخت از بدهی ثبت‌شده بیشتر است.")
         row=conn.execute("""INSERT INTO sister_purchase_payments
           (supplier_id,bank_id,paid_on,amount_toman,notes,request_key,created_at)
