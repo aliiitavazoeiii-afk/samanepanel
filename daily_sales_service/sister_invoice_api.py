@@ -140,7 +140,7 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     total=sum(r["qty"]*r["sale_unit"] for r in lines)
     cost=sum(r["qty"]*r["purchase_unit"] for r in lines)
     paid=sum(r["amount"] for r in receipts)
-    body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><button type="button" class="m2-btn" onclick="window.print()">چاپ فاکتور</button><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a></div>'
+    body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a></div>'
     body+='<section class="m2-card"><h3>'+e(inv["name"])+'</h3><p>'+e(inv["phone"])+' · '+jal_label(inv["invoice_date"])+' · '+("خانه" if inv["origin"]=="home" else "کارخانه")+' · '+("ارسال‌شده" if inv["status"]=="dispatched" else "پیش‌نویس")+'</p>'
     body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>تعداد</th><th>خرید هر عدد</th><th>فروش هر عدد</th><th>جمع فروش</th></tr></thead><tbody>'
     for r in lines:
