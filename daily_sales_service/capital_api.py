@@ -22,16 +22,27 @@ def financial_capital(conn,as_of=None):
     extras=components(conn)
     cash=int(finance["cash_balance"])
     claim=int(finance["total_receivable"])
+    customer_claim=int(finance["invoice_receivable"])
+    mehr_claim=int(finance["mehr_receivable"])
+    business_debt=int(finance["total_liabilities_recorded"])
     equipment=sum(int(extras.get(k) or 0) for k in ("raw_materials","equipment","other_assets"))
     liabilities=int(extras.get("other_liabilities") or 0)
     invoice_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0])
     purchases_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0])
     inventory=stock["total_value"]
-    known_total=int(stock["known_value"])+cash+claim+equipment-liabilities
+    known_total=(int(stock["known_value"])+cash+claim+customer_claim+mehr_claim
+                 +equipment-liabilities-business_debt)
     result={**stock,
             "cash_balance":cash,
             "platform_receivables":finance["platforms"],
             "total_receivable":claim,
+            "customer_receivable":customer_claim,
+            "mehr_receivable":mehr_claim,
+            "mehr_payable":int(finance["mehr_payable"]),
+            "supplier_payable":int(finance["supplier_payable"]),
+            "customer_advances":int(finance["customer_advances"]),
+            "business_liabilities":business_debt,
+            "all_recorded_receivables":claim+customer_claim+mehr_claim,
             "manual_balances":extras,
             "raw_materials":extras.get("raw_materials"),
             "equipment":extras.get("equipment"),
@@ -45,6 +56,8 @@ def financial_capital(conn,as_of=None):
             "sales_gross":finance["sales"]["gross"],
             "sales_fees":finance["sales"]["fees"],
             "sales_cogs_known":finance["sales"]["cogs_known"],
+            "mold_sales_profit":finance["sales"]["mold_profit"],
+            "mold_sales_gross":finance["sales"]["mold_gross"],
             "unknown_sold_cost_lines":finance["sales"]["unknown_cost_lines"],
             "historical_stock_reconstructed":False}
     return result
@@ -61,9 +74,9 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
     body='<h1>گزارش جامع سرمایه</h1>'
     body+='<p class="m2-hint">خلاصه دارایی‌های ثبت‌شده، طلب پلتفرم‌ها، مانده حساب‌ها و ارزش کالای آماده. هیچ بدهی تأمین‌کننده‌ای از پنل‌های دیگر وارد نمی‌شود.</p>'
     if stat["supplier_purchase_accounting_pending"]:
-        body+='<div class="m2-msg">خریدهای جدید دیا/دارما/بادیگارد به موجودی اضافه شده‌اند، اما بدهی تأمین‌کنندگان و اختلاف بهای خرید هنوز در گزارش جامع سرمایه یکپارچه نشده‌اند؛ رقم کل سرمایه تا تکمیل حسابداری قطعی نیست.</div>'
+        body+='<div class="m2-msg">بدهی خریدهای ثبت‌شده تأمین‌کنندگان در جمع اقلام شناخته‌شده لحاظ می‌شود، اما مانده افتتاحیه و اختلاف بهای ارزش‌گذاری موجودی هنوز تطبیق نشده است؛ سرمایه کل قطعی نیست.</div>'
     if stat["invoice_accounting_pending"]:
-        body+='<div class="m2-msg">فاکتورهای جدید و حساب مه هر هنوز به فرمول گزارش جامع سرمایه متصل نشده‌اند؛ بنابراین سرمایه کل قطعی نیست. مانده فاکتورها را در بخش فاکتورها و مه هر بررسی کن.</div>'
+        body+='<div class="m2-msg">سود فاکتورهای ارسال‌شده قالب، طلب مشتری و طلب/بدهی ثبت‌شده مه هر در گزارش لحاظ شده‌اند؛ مانده‌های افتتاحیه تاریخی هنوز تطبیق نشده و سرمایه کل قطعی نیست.</div>'
     if saved=="1":body+='<div class="m2-dk-success">مانده دارایی یا بدهی تکمیلی ذخیره شد.</div>'
     if stat["unknown_units"]:
         body+=f'<div class="m2-msg"><strong>ارزش کل موجودی هنوز کامل نیست.</strong> {fmt(stat["unknown_units"])} عدد کالا بهای تمام‌شده ندارد. رقم «جمع اقلام ارزش‌گذاری‌شده» فقط قسمت قابل محاسبه را نشان می‌دهد و سرمایه کل قطعی نیست. <a href="{ROOT}/pricing/cost">تکمیل بهای تمام‌شده</a></div>'
@@ -75,6 +88,11 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
        "تومان · "+fmt(stat["units"])+" عدد کالا"+(" · ارزش ناقص" if stat["unknown_units"] else "")),
       ("حساب‌ها و صندوق",stat["cash_balance"],"تومان · مانده واقعی حساب‌های ثبت‌شده"),
       ("طلب از پلتفرم‌ها",stat["total_receivable"],"تومان · پس از کارمزد و دریافتی‌ها"),
+      ("طلب از مشتریان فاکتورها",stat["customer_receivable"],"تومان · مانده فاکتورهای ارسال‌شده"),
+      ("طلب نزد مه هر",stat["mehr_receivable"],"تومان · مستقل از بانک"),
+      ("بدهی به مه هر",stat["mehr_payable"],"تومان · مانده ثبت‌شده"),
+      ("بدهی به سایر تأمین‌کنندگان",stat["supplier_payable"],"تومان · خریدهای این پنل"),
+      ("پیش‌دریافت مشتریان",stat["customer_advances"],"تومان · فاکتورهای هنوز ارسال‌نشده"),
       ("مواد اولیه",stat["raw_materials"],"تومان · مانده ثبت‌شده مستقل"),
       ("اموال و تجهیزات",stat["equipment"],"تومان · دارایی سرمایه‌ای"),
       ("سایر دارایی‌ها",stat["other_assets"],"تومان · مانده ثبت‌شده"),
@@ -91,7 +109,8 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
     body+='<div class="m2-finance-cards" style="margin-bottom:0">'
     for title,key in (("فروش کل ثبت‌شده","sales_gross"),
                       ("هزینه پلتفرم‌ها","sales_fees"),
-                      ("سود فروش تحقق‌یافته","sales_profit")):
+                      ("سود فروش تحقق‌یافته","sales_profit"),
+                      ("سود کل قالب‌ها","mold_sales_profit")):
         value=stat[key]
         body+='<div class="m2-card m2-finance-tile"><small>'+e(title)+'</small>'
         body+='<strong class="m2-finance-value">'+(fmt(value) if value is not None else "نامشخص")+'</strong></div>'
@@ -124,7 +143,7 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
         body+='<div><button class="m2-btn" type="submit">ثبت مبلغ</button></div></form>'
     body+='</details>'
     body+='<details class="m2-card m2-finance-section"><summary style="cursor:pointer">نحوه محاسبه و تاریخ ارزش‌گذاری</summary>'
-    body+='<p class="m2-hint">سرمایه = ارزش کالای آماده + مواد اولیه + تجهیزات + سایر دارایی‌ها + مانده حساب‌ها + طلب خالص پلتفرم‌ها − بدهی‌ها. فروش‌ها به میزان سود سرمایه را افزایش می‌دهند، اما سود جداگانه به دارایی اضافه نمی‌شود.</p>'
+    body+='<p class="m2-hint">سرمایه = موجودی کالا + حساب‌ها + طلب پلتفرم‌ها + طلب مشتریان + طلب از مه هر + سایر دارایی‌ها − بدهی مه هر − بدهی تأمین‌کنندگان − پیش‌دریافت مشتریان − سایر بدهی‌ها. فروش‌ها به میزان سود سرمایه را افزایش می‌دهند، اما سود جداگانه به دارایی اضافه نمی‌شود.</p>'
     body+=f'<form action="{ROOT}/capital-report" method="get" class="m2-fields"><div><label>تاریخ نرخ بهای تمام‌شده</label><input type="date" name="as_of" value="{e(stat["as_of"])}"></div><div><button class="m2-btn">محاسبه</button></div></form>'
     if stat["as_of"]!=today():
         body+='<p class="m2-msg">تاریخ گذشته فقط نرخ بهای تمام‌شده موجودی فعلی را تغییر می‌دهد؛ گردش موجودی و حساب در آن تاریخ بازسازی نشده است.</p>'
