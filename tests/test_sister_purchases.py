@@ -81,6 +81,19 @@ class SupplierPurchasesTest(unittest.TestCase):
                 register_purchase(self.conn,"دیا",self.day,"home",rows,"bad-"+str(len(rows))+str(rows[0][1]))
         self.assertEqual(self.count_stock("DIA-P"),0)
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0],0)
+    def test_excel_style_grid_supports_mold_and_apparel_sizes(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_purchase_grid import purchase_grid
+        page=purchase_grid(self.conn)
+        self.assertIn('id="purchase-category"',page)
+        self.assertIn('id="purchase-grid-body"',page)
+        self.assertIn('purchase-discount-percent',page)
+        for label in ("قالب","شورت زنانه دیا","شورت زنانه دارما","بادیگارد"):
+            self.assertIn(label,page)
+        self.assertIn("MOLD-P",page)
+        self.assertIn("DIA-P",page)
+        self.assertIn("BG-P",page)
+
     def test_mold_purchase_routes_to_existing_mehr_debt_without_double_posting(self):
         from daily_sales_service.sister_invoices import mehr_balance
         pid=register_purchase(self.conn,"مه هر",self.day,"home",[
