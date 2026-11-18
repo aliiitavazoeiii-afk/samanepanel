@@ -119,7 +119,7 @@ def purchases(conn=Depends(conn_dep)):
         body+='<optgroup label="'+size+'">'+''.join('<option value="'+str(r["id"])+'">'+e(r["title"])+' / '+e(r["color"])+' / '+size+'</option>' for r in conn.execute("SELECT id,title,color FROM master_products WHERE category='قالب' AND size=? AND active=1",(size,)))+'</optgroup>'
     body+='</select></div>'
     body+='<div><label>تعداد تحویل خانه</label><input name="qty" type="number" min="1" required></div>'
-    body+='<div><label>قیمت خرید هر عدد از مه هر</label><input name="cost" type="number" min="0" required></div>'
+    body+='<div><label>قیمت خرید هر عدد از مه هر</label><input name="cost" type="number" min="1" required></div>'
     body+='<div><label>تاریخ خرید</label><input name="day" type="date" value="'+today()+'" required></div>'
     body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div></div>'
     body+='<button class="m2-btn">ثبت خرید و افزایش موجودی خانه</button></section></form>'
