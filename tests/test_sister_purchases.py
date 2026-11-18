@@ -138,6 +138,22 @@ class SupplierPurchasesTest(unittest.TestCase):
         self.assertIn("ثبت تسویه یا تهاتر",page)
         self.assertIn("دریافت از مه هر",page)
 
+    def test_supplier_purchase_liability_is_reflected_in_overall_capital(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_finance_logic import overview
+        from daily_sales_service.capital_api import financial_capital
+        before=financial_capital(self.conn)
+        self.assertEqual(before["known_components_total"],1000000)
+        register_purchase(self.conn,"دیا",self.day,"home",
+                          [(self.ids["DIA-P"],10,58000)],"cap-liability-1")
+        info=overview(self.conn)
+        self.assertEqual(info["supplier_payable"],580000)
+        self.assertEqual(info["mehr_payable"],0)
+        cap=financial_capital(self.conn)
+        self.assertEqual(cap["supplier_payable"],580000)
+        self.assertEqual(cap["known_components_total"],920000)
+        self.assertIsNone(cap["total_capital"])
+
     def test_does_not_auto_import_existing_stock_as_new_purchase(self):
         self.conn.execute("UPDATE master_products SET seller_stock=50 WHERE id=?",(self.ids["DIA-P"],))
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0],0)
