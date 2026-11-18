@@ -70,7 +70,7 @@ def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
 async def add_purchase(request:Request,conn=Depends(conn_dep)):
     form=await request.form()
     items=[]
-    for index in range(1,21):
+    for index in range(1,121):
         mid=form.get("master_"+str(index),"")
         if not mid:continue
         items.append((mid,form.get("qty_"+str(index),""),form.get("cost_"+str(index),"")))
