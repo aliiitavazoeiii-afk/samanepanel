@@ -136,7 +136,7 @@ class SupplierPurchasesTest(unittest.TestCase):
         page=supplier(conn=self.conn).body.decode("utf-8")
         self.assertIn("حساب مه هر",page)
         self.assertIn("ثبت تسویه یا تهاتر",page)
-        self.assertIn("دریافت از مه هر",page)
+        self.assertIn("واریز مه هر به من",page)
 
     def test_supplier_purchase_liability_is_reflected_in_overall_capital(self):
         from daily_sales_service.app import app
