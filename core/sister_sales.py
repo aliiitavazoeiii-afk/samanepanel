@@ -71,7 +71,7 @@ _CANONICAL_PAGES = {
     "master": "/settings/products/new/",
     "invoices": "/invoices/",
     "invoices/new": "/invoices/new/",
-    "invoices/mehr": "/invoices/mehr/",
+    "invoices/mehr": "/finance/mehr/",
     "invoices/purchases": "/invoices/purchases/",
     "purchases": "/purchases/",
     "master/stock": "/inventory/stock/",
