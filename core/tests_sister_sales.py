@@ -135,6 +135,13 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(resolve("/takvin/").url_name,"takvin")
         self.assertEqual(resolve("/purchases/").url_name,"sister_purchases")
 
+    def test_mehr_finance_detail_route_is_protected_and_has_legacy_bookmark(self):
+        self.assertEqual(reverse("sister_finance_mehr"),"/finance/mehr/")
+        self.assertEqual(resolve("/finance/mehr/").func,sister_sales.digikala_proxy)
+        self.assertEqual(resolve("/invoices/mehr/").func,sister_sales.digikala_proxy)
+        self.assertEqual(self.client.get("/finance/mehr/").status_code,302)
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/invoices/mehr"),"/finance/mehr/")
+
     def test_supplier_purchasing_routes_are_authenticated_and_csrf_protected(self):
         self.assertEqual(reverse("sister_purchases"),"/purchases/")
         self.assertEqual(resolve("/purchases/").func,sister_sales.digikala_proxy)
