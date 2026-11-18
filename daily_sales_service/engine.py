@@ -82,6 +82,8 @@ def init_db(db_path, catalog_path=None):
   ensure_capital_components(conn)
   from .sister_invoices import ensure_schema as ensure_sister_invoices
   ensure_sister_invoices(conn)
+  from .sister_purchases import ensure_schema as ensure_sister_purchases
+  ensure_sister_purchases(conn)
   with conn:
    for key,value in DEFAULT_SETTINGS.items():
     conn.execute('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)',(key,value))
