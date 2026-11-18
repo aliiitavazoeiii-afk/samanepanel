@@ -384,3 +384,6 @@ router.include_router(platform_router)
 router.include_router(capital_router)
 from .sister_finance_api import router as finance_router
 router.include_router(finance_router)
+
+from .sister_invoice_api import router as sister_invoice_router
+router.include_router(sister_invoice_router)
