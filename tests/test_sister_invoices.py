@@ -180,6 +180,21 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn("جزئیات فاکتورها",html)
         self.assertNotIn("فاکتور #"+str(iid)+" · مشتری تست</th>",html)
 
+    def test_finance_sales_shows_combined_profit_without_customer_invoice_details(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_finance_api import all_sales,finance_home
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        report=all_sales(channel="mold",conn=self.db).body.decode("utf-8")
+        self.assertIn("سود کل قالب‌ها",report)
+        self.assertIn("90,000",report)
+        self.assertNotIn("مشتری تست",report)
+        home=finance_home(conn=self.db).body.decode("utf-8")
+        self.assertIn("سود کل قالب‌ها",home)
+        self.assertIn("بدهی من به مه هر",home)
+        self.assertIn("طلب مشتریان فاکتورها",home)
+        self.assertNotIn("مشتری تست",home)
+
     def test_draft_advances_are_customer_liabilities_not_sale_profit(self):
         from daily_sales_service.app import app
         from daily_sales_service.sister_finance_logic import overview
