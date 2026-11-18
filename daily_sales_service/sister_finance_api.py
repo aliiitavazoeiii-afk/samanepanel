@@ -72,6 +72,7 @@ def finance_home(conn=Depends(conn_dep)):
     if sales["unknown_cost_lines"]:
         body+=f'<div class="m2-msg">{sales["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل قطعی نیست.</div>'
     body+='<p class="m2-hint">سود قالب‌ها شامل فاکتورهای ارسال‌شده و فروش‌های کانال قالب است؛ هر فروش باید فقط یک بار در سیستم ثبت شود. بدهی و طلب مه هر با تهاتر خودکار یکی نمی‌شوند.</p>'
+    body+='<p><a class="m2-btn" href="'+ROOT+'/invoices/mehr">جزئیات حساب مه هر و تهاتر</a></p>'
     body+='<h3 class="m2-bundle-label">طلب هر پلتفرم</h3>'+platform_tiles(conn)
     body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">حساب‌ها و طلب‌ها</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a>'
