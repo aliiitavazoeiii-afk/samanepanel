@@ -51,6 +51,8 @@ def platform_tiles(conn):
 def finance_home(conn=Depends(conn_dep)):
     info=overview(conn);sales=info["sales"]
     body='<h1>مالی و حسابداری</h1><p class="m2-hint">طلب پلتفرم‌ها از فروش‌های تأییدشده محاسبه می‌شود؛ دریافت‌های ثبت‌شده فقط طلب را تسویه می‌کنند.</p>'
+    if conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0]:
+        body+='<div class="m2-msg">بدهی خرید تأمین‌کنندگان دیا/دارما/بادیگارد در بخش «خرید کالا» ثبت می‌شود و هنوز در جمع‌های این صفحه یکپارچه نشده است.</div>'
     if conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0]:
         body+='<div class="m2-msg">تراکنش‌های فاکتور مشتری و بدهی/طلب مه هر در صفحات فاکتورها قابل مشاهده‌اند؛ آمار فروش این صفحه هنوز آن‌ها را یکپارچه نمی‌کند.</div>'
     body+=nav("finance")
