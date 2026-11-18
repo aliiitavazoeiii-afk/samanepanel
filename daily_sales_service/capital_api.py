@@ -25,6 +25,7 @@ def financial_capital(conn,as_of=None):
     equipment=sum(int(extras.get(k) or 0) for k in ("raw_materials","equipment","other_assets"))
     liabilities=int(extras.get("other_liabilities") or 0)
     invoice_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0])
+    purchases_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0])
     inventory=stock["total_value"]
     known_total=int(stock["known_value"])+cash+claim+equipment-liabilities
     result={**stock,
@@ -37,8 +38,9 @@ def financial_capital(conn,as_of=None):
             "other_assets":extras.get("other_assets"),
             "liabilities":extras.get("other_liabilities"),
             "known_components_total":known_total,
-            "total_capital":known_total if inventory is not None and not invoice_pending else None,
+            "total_capital":known_total if inventory is not None and not invoice_pending and not purchases_pending else None,
             "invoice_accounting_pending":invoice_pending,
+            "supplier_purchase_accounting_pending":purchases_pending,
             "sales_profit":finance["sales"]["profit"],
             "sales_gross":finance["sales"]["gross"],
             "sales_fees":finance["sales"]["fees"],
@@ -58,6 +60,8 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
         return page_with_style("تاریخ نامعتبر",f'<div class="m2-msg">{e(exc)}</div>')
     body='<h1>گزارش جامع سرمایه</h1>'
     body+='<p class="m2-hint">خلاصه دارایی‌های ثبت‌شده، طلب پلتفرم‌ها، مانده حساب‌ها و ارزش کالای آماده. هیچ بدهی تأمین‌کننده‌ای از پنل‌های دیگر وارد نمی‌شود.</p>'
+    if stat["supplier_purchase_accounting_pending"]:
+        body+='<div class="m2-msg">خریدهای جدید دیا/دارما/بادیگارد به موجودی اضافه شده‌اند، اما بدهی تأمین‌کنندگان و اختلاف بهای خرید هنوز در گزارش جامع سرمایه یکپارچه نشده‌اند؛ رقم کل سرمایه تا تکمیل حسابداری قطعی نیست.</div>'
     if stat["invoice_accounting_pending"]:
         body+='<div class="m2-msg">فاکتورهای جدید و حساب مه هر هنوز به فرمول گزارش جامع سرمایه متصل نشده‌اند؛ بنابراین سرمایه کل قطعی نیست. مانده فاکتورها را در بخش فاکتورها و مه هر بررسی کن.</div>'
     if saved=="1":body+='<div class="m2-dk-success">مانده دارایی یا بدهی تکمیلی ذخیره شد.</div>'
