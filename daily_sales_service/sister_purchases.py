@@ -80,6 +80,8 @@ def supplier_totals(conn,supplier_id):
     sid=int(supplier_id)
     row=conn.execute("SELECT id,name FROM sister_purchase_suppliers WHERE id=?",(sid,)).fetchone()
     if row is None:raise ImportErrorDetail("تأمین‌کننده پیدا نشد.")
+    if row["name"]==MEHR:
+        raise ImportErrorDetail("حساب مه هر از دفتر بدهی و طلب اختصاصی او نمایش داده می‌شود؛ این مانده خرید عمومی ناقص است.")
     purchased=int(conn.execute("""SELECT COALESCE(SUM(total_toman),0)
         FROM sister_purchase_orders WHERE supplier_id=?""",(sid,)).fetchone()[0])
     paid=int(conn.execute("""SELECT COALESCE(SUM(amount_toman),0)
