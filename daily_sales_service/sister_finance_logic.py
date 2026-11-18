@@ -81,14 +81,14 @@ def _day_bounds(from_date=None,to_date=None):
     if start and end and start>end:raise ImportErrorDetail("تاریخ شروع از پایان بزرگ‌تر است.")
     return start,end
 
-def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None):
+def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_invoices=True):
     """All three sale sources, COGS snapshots intact, no mutable postings."""
     start,end=_day_bounds(from_date,to_date)
     if channel and channel not in PLATFORM_KEYS:raise ImportErrorDetail("پلتفرم نامعتبر است.")
     lines=[]
     if channel in (None,"digikala"):
         sql="""SELECT s.sale_date,s.source,s.variant_id,s.qty,s.price_toman,
-                     s.fee_toman,s.cost_toman,p.title
+                     s.fee_toman,s.cost_toman,p.title,p.category
                FROM sales s JOIN products p ON p.variant_id=s.variant_id WHERE 1=1"""
         args=[]
         if start:sql+=" AND s.sale_date>=?";args.append(start)
@@ -106,13 +106,14 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None):
                  "units":packs*max(1,int(pack_parts)),
                  "gross":gross,"fees":fee,"cogs":cost,
                  "net":gross-fee,"profit":gross-fee-cost if cost is not None else None,
-                 "kind":"digikala"})
+                 "kind":"digikala","category":r["category"]})
     for source,table,query in (
        ("v3","platform_sales","""SELECT s.id,s.channel,s.sale_date,s.packs,s.units,
-                              s.gross_toman,s.cogs_toman,s.commission_toman,l.title
-                              FROM platform_sales s JOIN platform_listings l ON l.id=s.listing_id"""),
+                              s.gross_toman,s.cogs_toman,s.commission_toman,l.title,m.category
+                              FROM platform_sales s JOIN platform_listings l ON l.id=s.listing_id
+                              JOIN master_products m ON m.id=l.master_id"""),
        ("v4","platform_bundle_sales","""SELECT s.id,s.channel,s.sale_date,s.packs,s.units,
-                              s.gross_toman,s.cogs_toman,s.commission_toman,b.title || ' / ' || v.size AS title
+                              s.gross_toman,s.cogs_toman,s.commission_toman,b.title || ' / ' || v.size AS title,b.category
                               FROM platform_bundle_sales s
                               JOIN platform_bundle_variants v ON v.id=s.variant_id
                               JOIN platform_bundle_models b ON b.id=v.bundle_id""")):
@@ -130,12 +131,33 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None):
                  "sale_date":r["sale_date"],"title":r["title"],"packs":int(r["packs"]),
                  "units":int(r["units"]),"gross":gross,"fees":fees,"cogs":cost,
                  "net":gross-fees,"profit":gross-fees-cost if cost is not None else None,
-                 "kind":source})
+                 "kind":source,"category":r["category"]})
+    if include_invoices and channel in (None,"mold"):
+        # One recognized sale per dispatched invoice; drafts are not revenue.
+        sql="""SELECT i.id,i.invoice_date,c.name,
+           COALESCE(SUM(l.qty),0) AS units,
+           COALESCE(SUM(l.qty*l.sale_unit),0) AS gross,
+           COALESCE(SUM(l.qty*l.purchase_unit),0) AS cogs
+           FROM sister_invoices i
+           JOIN sister_invoice_customers c ON c.id=i.customer_id
+           JOIN sister_invoice_lines l ON l.invoice_id=i.id
+           WHERE i.status='dispatched'"""
+        args=[]
+        if start:sql+=" AND i.invoice_date>=?";args.append(start)
+        if end:sql+=" AND i.invoice_date<=?";args.append(end)
+        sql+=" GROUP BY i.id,i.invoice_date,c.name"
+        for r in conn.execute(sql,args):
+            gross,cost=int(r["gross"]),int(r["cogs"])
+            lines.append({"source":"mold","sale_id":"invoice:"+str(r["id"]),
+                 "sale_date":r["invoice_date"],"title":"فاکتور #"+str(r["id"])+" · "+r["name"],
+                 "packs":1,"units":int(r["units"]),"gross":gross,"fees":0,
+                 "cogs":cost,"net":gross,"profit":gross-cost,
+                 "kind":"invoice","category":"قالب"})
     lines.sort(key=lambda x:(x["sale_date"],x["sale_id"]),reverse=True)
     return lines[:int(limit)] if limit is not None else lines
 
-def sales_report(conn,channel=None,from_date=None,to_date=None,limit=100):
-    lines=sale_lines(conn,channel,from_date,to_date)
+def sales_report(conn,channel=None,from_date=None,to_date=None,limit=100,include_invoices=True):
+    lines=sale_lines(conn,channel,from_date,to_date,include_invoices=include_invoices)
     total={"orders":len(lines),"packs":sum(r["packs"] for r in lines),
            "units":sum(r["units"] for r in lines),
            "gross":sum(r["gross"] for r in lines),
@@ -145,6 +167,15 @@ def sales_report(conn,channel=None,from_date=None,to_date=None,limit=100):
            "unknown_cost_lines":sum(1 for r in lines if r["cogs"] is None),
            "profit":None,"lines":lines[:limit]}
     if total["unknown_cost_lines"]==0:total["profit"]=total["net"]-total["cogs_known"]
+    mold=[r for r in lines if r.get("category")=="قالب"]
+    total["mold_orders"]=len(mold)
+    total["mold_gross"]=sum(r["gross"] for r in mold)
+    total["mold_net"]=sum(r["net"] for r in mold)
+    total["mold_cogs_known"]=sum(r["cogs"] or 0 for r in mold)
+    total["mold_unknown_cost_lines"]=sum(r["cogs"] is None for r in mold)
+    total["mold_profit"]=(total["mold_net"]-total["mold_cogs_known"]
+                          if total["mold_unknown_cost_lines"]==0 else None)
+    total["mold_invoice_count"]=sum(r["kind"]=="invoice" for r in mold)
     return total
 
 def parties(conn):
@@ -254,7 +285,8 @@ def cancel_movement(conn,identifier):
         conn.execute("ROLLBACK");raise
 
 def platform_balances(conn):
-    due={key:sales_report(conn,key)["net"] for key in PLATFORM_KEYS}
+    # Platform payouts must never include direct customer invoices.
+    due={key:sales_report(conn,key,include_invoices=False)["net"] for key in PLATFORM_KEYS}
     receipts={r["code"]:int(r["amount"])
               for r in conn.execute("""SELECT p.code,SUM(m.amount_toman) amount
                FROM sister_finance_movements m
@@ -270,12 +302,41 @@ def platform_balances(conn):
                          "outstanding":earned-settled}
     return balances
 
+def invoice_claims(conn):
+    """Outstanding confirmed invoices and unearned advances on draft invoices."""
+    items=conn.execute("""SELECT i.status,
+      COALESCE((SELECT SUM(l.qty*l.sale_unit) FROM sister_invoice_lines l
+         WHERE l.invoice_id=i.id),0) AS gross,
+      COALESCE((SELECT SUM(p.amount) FROM sister_invoice_receipts p
+         WHERE p.invoice_id=i.id),0) AS paid
+      FROM sister_invoices i""")
+    owed=advances=0
+    for r in items:
+        if r["status"]=="dispatched":
+            owed+=int(r["gross"])-int(r["paid"])
+        else:
+            advances+=int(r["paid"])
+    return {"customer_receivable":owed,"customer_advances":advances}
+
+
 def overview(conn):
     by_platform=platform_balances(conn)
     cash=accounts(conn)
     total_due=sum(r["outstanding"] for r in by_platform.values())
     all_sales=sales_report(conn)
+    from .sister_invoices import mehr_balance
+    from .sister_purchases import suppliers
+    mehr=mehr_balance(conn)
+    claims=invoice_claims(conn)
+    other_suppliers=sum(x["due"] for x in suppliers(conn))
     return {"platforms":by_platform,"accounts":cash,
+            "invoice_receivable":claims["customer_receivable"],
+            "customer_advances":claims["customer_advances"],
+            "mehr_receivable":mehr["credit"],
+            "mehr_payable":mehr["debt"],
+            "supplier_payable":other_suppliers,
+            "total_receivables_including_mehr":total_due+claims["customer_receivable"]+mehr["credit"],
+            "total_liabilities_recorded":mehr["debt"]+other_suppliers+claims["customer_advances"],
             "total_receivable":total_due,
             "cash_balance":sum(x["balance"] for x in cash),
             "sales":{k:v for k,v in all_sales.items() if k!="lines"},
