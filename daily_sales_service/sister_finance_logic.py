@@ -239,7 +239,7 @@ def cancel_movement(conn,identifier):
     conn.execute("BEGIN IMMEDIATE")
     try:
         linked=conn.execute("SELECT reference FROM sister_finance_movements WHERE id=? AND cancelled_at IS NULL",(mid,)).fetchone()
-        if linked is not None and str(linked["reference"] or "").startswith(("invoice-receipt:","receive-mehr:", "mehr-settlement:")):
+        if linked is not None and str(linked["reference"] or "").startswith(("invoice-receipt:","receive-mehr:", "mehr-settlement:","supplier-purchase-payment:")):
             raise ImportErrorDetail("این گردش به فاکتور یا حساب مه هر متصل است؛ ابطال جداگانه باعث مغایرت می‌شود.")
         # Supplier settlement cash movements end with ':bank' and are paired with a Mehr ledger entry.
         if linked is not None and str(linked["reference"] or "").endswith(":bank"):
