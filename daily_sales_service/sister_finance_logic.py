@@ -167,7 +167,7 @@ def sales_report(conn,channel=None,from_date=None,to_date=None,limit=100,include
            "unknown_cost_lines":sum(1 for r in lines if r["cogs"] is None),
            "profit":None,"lines":lines[:limit]}
     if total["unknown_cost_lines"]==0:total["profit"]=total["net"]-total["cogs_known"]
-    mold=[r for r in lines if r.get("category")=="قالب"]
+    mold=[r for r in lines if "قالب" in str(r.get("category") or "")]
     total["mold_orders"]=len(mold)
     total["mold_gross"]=sum(r["gross"] for r in mold)
     total["mold_net"]=sum(r["net"] for r in mold)
