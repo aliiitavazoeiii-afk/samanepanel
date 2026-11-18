@@ -186,7 +186,10 @@ def daily_sales_page(conn,channel,day=""):
     rows=[x for x in list_bundle_variants(conn,channel) if x["bundle_active"] and x["variant_active"]]
     claim=platform_balances(conn)[channel]["outstanding"]
     body=f'<h1>فروش روزانه {e(PLATFORMS[channel])}</h1>'
-    body+='<p class="m2-hint">ثبت سفارش، کسر موجودی، محاسبه هزینه پلتفرم و بهای تمام‌شده و ایجاد طلب از همان پلتفرم، همگی به یک فروش متصل هستند.</p>'
+    if channel=="mold":
+        body+='<p class="m2-hint">سود کل قالب‌ها شامل فروش‌های کانال قالب و فاکتورهای ارسال‌شده قالب است. طلب پلتفرم جدا از طلب مشتری فاکتور نگهداری می‌شود؛ فاکتور یک بار بیشتر نباید ثبت شود.</p>'
+    else:
+        body+='<p class="m2-hint">ثبت سفارش، کسر موجودی، محاسبه هزینه پلتفرم و بهای تمام‌شده و ایجاد طلب از همان پلتفرم، همگی به یک فروش متصل هستند.</p>'
     body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">مانده طلب از {e(PLATFORMS[channel])}: {fmt(claim)} تومان</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/sales?channel={channel}">گزارش کامل این پلتفرم</a></div>'
     body+=f'<form class="m2-filters m2-day-filter" method="get" action="{ROOT}/platforms/{channel}/sales"><label>گزارش فروش کدام روز؟</label>'
@@ -195,7 +198,7 @@ def daily_sales_page(conn,channel,day=""):
     overview=[("سفارش",stats["orders"],"ردیف"),("تعداد کالای فیزیکی",stats["units"],"عدد"),
               ("فروش ناخالص",stats["gross"],"تومان"),
               ("کارمزد "+PLATFORMS[channel],stats["fees"],"تومان"),
-              ("طلب ایجادشده از فروش",stats["net"],"تومان"),
+              ("فروش خالص" if channel=="mold" else "طلب ایجادشده از فروش",stats["net"],"تومان"),
               ("بهای تمام‌شده",stats["cogs_known"],"تومان · موارد دارای بها"),
               ("سود فروش",stats["profit"],"تومان · پس از کارمزد و بهای کالا")]
     for title,value,foot in overview:
@@ -219,9 +222,12 @@ def daily_sales_page(conn,channel,day=""):
     if not rows:body+=f'<p class="m2-hint"><a href="{ROOT}/platforms/{channel}">اول کالا را در پلتفرم تعریف کن.</a></p>'
     body+='</div>'
     body+='<div class="m2-card m2-finance-section"><h3>ریز فروش‌های روز انتخابی</h3>'
+    if channel=="mold":
+        body+='<p class="m2-hint">جمع بالای صفحه فاکتورهای ارسال‌شده را هم دارد؛ جزئیات فاکتورها و حساب مشتری فقط در بخش فاکتورها قابل مشاهده است.</p>'
     if stats["lines"]:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>محصول</th><th>بسته</th><th>عدد کالا</th><th>فروش</th><th>هزینه پلتفرم</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
         for r in stats["lines"]:
+            if r["kind"]=="invoice":continue
             body+=f'<tr><th>{e(r["title"])}</th><td>{fmt(r["packs"])}</td><td>{fmt(r["units"])}</td><td>{fmt(r["gross"])}</td><td>{fmt(r["fees"])}</td><td>{fmt(r["cogs"])}</td><td>{fmt(r["net"])}</td><td>{fmt(r["profit"])}</td></tr>'
         body+='</tbody></table></div>'
     else:body+='<p class="m2-hint">برای این روز هنوز فروش ثبت نشده است.</p>'
