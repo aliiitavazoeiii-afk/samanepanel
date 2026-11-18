@@ -19,6 +19,7 @@ router=APIRouter()
 
 def nav(active=""):
     tabs=[("finance","مرکز مالی"),("finance/accounts","حساب‌ها"),
+          ("invoices/mehr","حساب مه هر"),
           ("finance/movements?section=receipt","دریافتی‌ها"),
           ("finance/movements?section=payment","پرداختی‌ها"),
           ("finance/sales","گزارش فروش")]
@@ -52,18 +53,25 @@ def finance_home(conn=Depends(conn_dep)):
     info=overview(conn);sales=info["sales"]
     body='<h1>مالی و حسابداری</h1><p class="m2-hint">طلب پلتفرم‌ها از فروش‌های تأییدشده محاسبه می‌شود؛ دریافت‌های ثبت‌شده فقط طلب را تسویه می‌کنند.</p>'
     if conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0]:
-        body+='<div class="m2-msg">بدهی خرید تأمین‌کنندگان دیا/دارما/بادیگارد در بخش «خرید کالا» ثبت می‌شود و هنوز در جمع‌های این صفحه یکپارچه نشده است.</div>'
+        body+='<div class="m2-msg">بدهی خرید تأمین‌کنندگان در جمع‌های مالی ثبت‌شده لحاظ می‌شود؛ مانده‌های قدیمی منتقل نشده‌اند و باید تطبیق داده شوند.</div>'
     if conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0]:
-        body+='<div class="m2-msg">تراکنش‌های فاکتور مشتری و بدهی/طلب مه هر در صفحات فاکتورها قابل مشاهده‌اند؛ آمار فروش این صفحه هنوز آن‌ها را یکپارچه نمی‌کند.</div>'
+        body+='<div class="m2-msg">سود فاکتورهای ارسال‌شده قالب در فروش کل لحاظ شده است. طلب مشتری و حساب مه هر هم در کارت‌های مالی هستند؛ برای جزئیات، صفحات مربوط را باز کن.</div>'
     body+=nav("finance")
     body+=tiles([("جمع طلب پلتفرم‌ها",info["total_receivable"],"تومان"),
+                 ("طلب مشتریان فاکتورها",info["invoice_receivable"],"تومان"),
+                 ("طلب من از مه هر",info["mehr_receivable"],"تومان"),
+                 ("بدهی من به مه هر",info["mehr_payable"],"تومان"),
+                 ("بدهی سایر تأمین‌کنندگان",info["supplier_payable"],"تومان"),
+                 ("پیش‌دریافت فاکتورهای ارسال‌نشده",info["customer_advances"],"تومان"),
                  ("جمع موجودی حساب‌های ثبت‌شده",info["cash_balance"],"تومان"),
                  ("فروش ثبت‌شده",sales["gross"],"تومان"),
                  ("کارمزدها",sales["fees"],"تومان"),
                  ("بهای تمام‌شده ثبت‌شده",sales["cogs_known"],"تومان · به‌جز موارد نامشخص"),
-                 ("سود پس از هزینه کالا",sales["profit"],"تومان · در صورت تکمیل بها")])
+                 ("سود پس از هزینه کالا",sales["profit"],"تومان · در صورت تکمیل بها"),
+                 ("سود کل قالب‌ها",sales["mold_profit"],"تومان · فروش قالب و فاکتورهای ارسال‌شده")])
     if sales["unknown_cost_lines"]:
         body+=f'<div class="m2-msg">{sales["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل قطعی نیست.</div>'
+    body+='<p class="m2-hint">سود قالب‌ها شامل فاکتورهای ارسال‌شده و فروش‌های کانال قالب است؛ هر فروش باید فقط یک بار در سیستم ثبت شود. بدهی و طلب مه هر با تهاتر خودکار یکی نمی‌شوند.</p>'
     body+='<h3 class="m2-bundle-label">طلب هر پلتفرم</h3>'+platform_tiles(conn)
     body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">حساب‌ها و طلب‌ها</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a>'
@@ -193,7 +201,8 @@ def all_sales(channel:str="",from_date:str="",to_date:str="",conn=Depends(conn_d
     body+=f'<div><label>از تاریخ</label><input type="date" name="from_date" value="{e(from_date)}"></div>'
     body+=f'<div><label>تا تاریخ</label><input type="date" name="to_date" value="{e(to_date)}"></div>'
     body+='<div><button class="m2-btn" type="submit">نمایش گزارش</button></div></form></section>'
-    body+=tiles([("سفارش ثبت‌شده",report["orders"],"ردیف"),
+    body+=tiles([("سود کل قالب‌ها",report["mold_profit"],"تومان · جمع فروش قالب و فاکتورها"),
+                 ("سفارش ثبت‌شده",report["orders"],"ردیف"),
                  ("تعداد بسته",report["packs"],"بسته"),
                  ("فروش ناخالص",report["gross"],"تومان"),
                  ("هزینه پلتفرم",report["fees"],"تومان"),
@@ -201,6 +210,7 @@ def all_sales(channel:str="",from_date:str="",to_date:str="",conn=Depends(conn_d
                  ("بهای تمام‌شده",report["cogs_known"],"تومان · ثبت‌شده"),
                  ("سود",report["profit"],"تومان · پس از کارمزد و بهای کالا")])
     if report["unknown_cost_lines"]:body+=f'<div class="m2-msg">{report["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل نامشخص است.</div>'
+    body+='<p class="m2-hint">فاکتورهای ارسال‌شده قالب در جمع فروش و سود لحاظ می‌شوند؛ دریافت مشتری از فاکتور فقط مانده طلب را کاهش می‌دهد و فروش تازه نیست.</p>'
     body+='<section class="m2-card m2-finance-section"><h3>ریز فروش‌ها</h3>'
     if report["lines"]:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>پلتفرم</th><th>محصول</th><th>بسته</th><th>عدد کالا</th><th>فروش</th><th>هزینه پلتفرم</th><th>بهای کالا</th><th>طلب ایجادشده</th><th>سود</th></tr></thead><tbody>'
