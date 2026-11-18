@@ -146,7 +146,7 @@ def dispatch_invoice(conn,invoice_id):
         else:
             # Direct factory delivery is a NEW purchase; never touches home stock.
             cost=sum(int(r["qty"])*int(r["purchase_unit"]) for r in lines)
-            _ledger(conn,inv["invoice_date"],cost,0,"factory_invoice","factory-invoice:"+str(invoice_id))
+            _ledger(conn,today(),cost,0,"factory_invoice","factory-invoice:"+str(invoice_id))
         conn.execute("UPDATE sister_invoices SET status='dispatched',posted_at=? WHERE id=?",(now(),invoice_id))
         conn.execute("COMMIT")
     except Exception:
