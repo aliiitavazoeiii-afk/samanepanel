@@ -9,6 +9,7 @@ from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .sister_finance_logic import accounts
 from .sister_purchase_grid import purchase_grid
+from .sister_invoices import mehr_balance
 from .sister_purchases import (CATEGORIES,register_purchase,register_supplier_payment,
     suppliers,supplier_totals,purchase_history,purchase_detail,supplier_history)
 
@@ -38,11 +39,39 @@ def _account_options(conn):
     return ''.join('<option value="'+str(r["id"])+'">'+e(r["title"])+'</option>'
                    for r in accounts(conn) if r["active"])
 
+def mehr_account_section(conn):
+    """Render Mehr debt, held customer proceeds, and deliberate settlement here.
+
+    Both purchase paths post debt to the same sister_mehr_ledger, and customer
+    receipts into Mehr's account still post credit there. Never auto-offset.
+    """
+    balance=mehr_balance(conn)
+    body='<section class="m2-card" id="mehr-account"><h3>حساب مه هر</h3>'
+    body+='<p class="m2-hint">خرید قالب و سایر کالاها از مه هر را از فرم «ثبت خرید جدید» همین صفحه وارد کن. واریز مشتری به مه هر طلب تو است، نه پرداخت خودت. بدهی و طلب فقط با ثبت تسویه یا تهاتر تغییر می‌کنند.</p>'
+    body+='<div class="m2-msg">مانده این دفتر شامل خریدها و پرداخت‌های قدیمیِ منتقل‌نشده نیست؛ قبل از اعتماد به مانده نهایی، حساب افتتاحیه را تطبیق بده.</div>'
+    body+='<div class="m2-finance-cards"><div class="m2-card"><small>بدهی من به مه هر</small><strong>'+fmt(balance["debt"])+'</strong></div>'
+    body+='<div class="m2-card"><small>طلب من از مه هر</small><strong>'+fmt(balance["credit"])+'</strong></div>'
+    body+='<div class="m2-card"><small>خالص (مثبت: طلبکار)</small><strong>'+fmt(balance["net"])+'</strong></div></div>'
+    body+='<h3>ثبت پرداخت، دریافت یا تهاتر با مه هر</h3>'
+    body+='<form method="post" action="'+ROOT+'/invoices/mehr/settle"><input type="hidden" name="request_key" value="'+_token()+'"><div class="m2-fields">'
+    body+='<div><label>نوع عملیات</label><select name="kind"><option value="offset">تهاتر بدهی و طلب</option><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
+    body+='<div><label>مبلغ (تومان)</label><input type="number" min="1" name="amount" required></div>'
+    body+='<div><label>تاریخ</label><input type="date" name="day" value="'+today()+'" required></div>'
+    body+='<div><label>حساب بانکی (فقط برای انتقال واقعی)</label><select name="account_id"><option value="">انتخاب حساب</option>'+_account_options(conn)+'</select></div>'
+    body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div></div>'
+    body+='<button class="m2-btn" type="submit">ثبت تسویه مه هر</button></form>'
+    body+='<h3>گردش‌های اخیر حساب مه هر</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>نوع</th><th>تغییر بدهی</th><th>تغییر طلب</th><th>توضیحات</th></tr></thead><tbody>'
+    names={"purchase":"خرید قدیمی قالب","purchase_general":"خرید کالا","factory_invoice":"خرید ارسال مستقیم","customer_to_mehr":"دریافتی مشتری نزد مه هر","offset":"تهاتر","paid_to_mehr":"پرداخت به مه هر","received_from_mehr":"دریافت از مه هر"}
+    for row in conn.execute("SELECT occurred_on,kind,debt_delta,credit_delta,notes FROM sister_mehr_ledger ORDER BY id DESC LIMIT 100"):
+        body+='<tr><td>'+jal_label(row["occurred_on"])+'</td><td>'+e(names.get(row["kind"],row["kind"]))+'</td><td>'+fmt(row["debt_delta"])+'</td><td>'+fmt(row["credit_delta"])+'</td><td>'+e(row["notes"])+'</td></tr>'
+    body+='</tbody></table></div></section>'
+    return body
+
 @router.get(ROOT+"/purchases")
 def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
     body='<h1>خرید کالا</h1><p class="m2-hint">ثبت خرید قالب، دیا، دارما، بادیگارد و زیرپوش؛ به سبک جدول خرید تکوین. خرید قطعی به موجودی فیزیکی اضافه می‌شود و بدهی تأمین‌کننده را ثبت می‌کند.</p>'
     body+='<p class="m2-msg">مانده این قسمت از خریدهای جدید محاسبه می‌شود؛ بدهی‌های قدیمی تأمین‌کنندگان هنوز وارد نشده‌اند. خرید یا افزایش موجودی قدیمی را دوباره ثبت نکن.</p>'
-    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/finance/accounts">حساب‌ها و صندوق</a></div>'
+    body+='<div class="m2-tabs"><a href="#mehr-account">حساب مه هر و تسویه</a><a href="'+ROOT+'/finance/accounts">حساب‌ها و صندوق</a></div>'
     body+='<section class="m2-card"><h3>ثبت خرید جدید</h3><form id="purchase-entry-form" method="post" action="'+ROOT+'/purchases/add"><input type="hidden" name="request_key" value="'+_token()+'">'
     body+='<div class="m2-fields"><div><label>تأمین‌کننده</label><input list="sister-suppliers" name="supplier" maxlength="120" required placeholder="مثلاً دیا یا دارما"></div>'
     body+='<datalist id="sister-suppliers"><option value="مه هر"></option>'+''.join('<option value="'+e(s["name"])+'"></option>' for s in suppliers(conn))+'</datalist>'
@@ -52,12 +81,13 @@ def purchase_home(supplier_id:str="",receipt_id:str="",conn=Depends(conn_dep)):
     body+='<div class="m2-fields"><div><label>تخفیف کل خرید (%)</label><input id="purchase-discount-percent" name="discount_percent" type="number" step="0.01" min="0" max="99.99" value="0" required></div><div><label>توضیحات خرید (اختیاری)</label><input name="notes" maxlength="500"></div></div>'
     body+=purchase_grid(conn)
     body+='<button type="submit" class="m2-btn">ثبت قطعی خرید و افزایش موجودی</button></form></section>'
-    body+='<section class="m2-card"><h3>حساب تأمین‌کنندگان (تومان)</h3><p class="m2-hint">حساب «مه هر» جداگانه ثبت می‌شود؛ مانده او را از صفحه مخصوص مه هر ببین.</p>'
+    body+='<section class="m2-card"><h3>حساب تأمین‌کنندگان (تومان)</h3><p class="m2-hint">حساب «مه هر» در همین صفحه و پایین جدول نمایش داده می‌شود؛ بدهی و طلب او جدا از سایر تأمین‌کنندگان هستند.</p>'
     body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تأمین‌کننده</th><th>جمع خرید</th><th>جمع پرداخت</th><th>مانده بدهی</th><th></th></tr></thead><tbody>'
     existing=suppliers(conn)
     for s in existing:
         body+='<tr><td>'+e(s["name"])+'</td><td>'+fmt(s["purchased"])+'</td><td>'+fmt(s["paid"])+'</td><td>'+fmt(s["due"])+'</td><td><a href="'+ROOT+'/purchases?supplier_id='+str(s["id"])+'">جزئیات و پرداخت</a></td></tr>'
     body+='</tbody></table></div></section>'
+    body+=mehr_account_section(conn)
     if supplier_id:
         try:s=supplier_totals(conn,int(supplier_id));ps,pm=supplier_history(conn,int(supplier_id))
         except (ValueError,TypeError,ImportErrorDetail) as exc:return _error(exc)
