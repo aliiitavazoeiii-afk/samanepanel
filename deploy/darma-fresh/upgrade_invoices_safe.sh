@@ -65,24 +65,28 @@ docker build --pull=false --network=none -f deploy/darma-fresh/Dockerfile.sister
 echo "Django checks and proxy tests, no production migration in this phase."
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py check
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python web manage.py test core.tests_sister_sales -v 2
-echo "Compile all sister modules and run invoice regression tests in a disposable container."
+echo "Compile all sister modules and run invoice and unified purchasing regressions in disposable containers."
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python sister-digikala \
   -m compileall -q daily_sales_service tests
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint env sister-digikala \
   -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -p 'test_sister_invoices.py' -v
+docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint env sister-digikala \
+  -u SALES_START_EMPTY_STOCK python -m unittest discover -s tests -p 'test_sister_purchases.py' -v
 
 echo "Verify expected invoice API routes before affecting running services."
 docker compose -f "$COMPOSE" run --rm --no-deps --entrypoint python sister-digikala - <<'PY'
 from daily_sales_service.app import app
 paths=app.openapi()["paths"]
 root="/daily-sales"
-for route in ("/invoices","/invoices/new","/invoices/create",
+for route in ("/purchases","/purchases/add","/purchases/payments/add",
+              "/invoices","/invoices/new","/invoices/create",
               "/invoices/mehr","/invoices/mehr/settle",
               "/invoices/purchases","/invoices/purchases/add",
               "/invoices/{invoice_id}","/invoices/{invoice_id}/dispatch",
               "/invoices/{invoice_id}/receipt"):
     assert root+route in paths, "Missing route: "+route
-for route in ("/invoices/create","/invoices/mehr/settle",
+for route in ("/purchases/add","/purchases/payments/add",
+              "/invoices/create","/invoices/mehr/settle",
               "/invoices/purchases/add","/invoices/{invoice_id}/dispatch",
               "/invoices/{invoice_id}/receipt"):
     assert "post" in paths[root+route], "Missing POST route: "+route
@@ -108,7 +112,7 @@ for attempt in range(25):
         time.sleep(2)
 else:
     raise RuntimeError("Sister service did not become healthy")
-for route in ("/invoices","/invoices/new","/invoices/mehr","/invoices/purchases"):
+for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoices/purchases"):
     req=urllib.request.Request(base+route,headers={"Authorization":auth})
     with urllib.request.urlopen(req,timeout=10) as res:
         assert res.status==200,route
@@ -116,7 +120,9 @@ for route in ("/invoices","/invoices/new","/invoices/mehr","/invoices/purchases"
     print("INVOICE_HTTP_OK",route)
 conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 required={"sister_invoice_customers","sister_invoices","sister_invoice_lines",
-          "sister_invoice_receipts","sister_mehr_ledger","sister_mehr_purchases"}
+          "sister_invoice_receipts","sister_mehr_ledger","sister_mehr_purchases",
+          "sister_purchase_suppliers","sister_purchase_orders","sister_purchase_lines",
+          "sister_purchase_payments"}
 tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 assert required.issubset(tables),required-tables
 print("INVOICE_SCHEMA_READY")
@@ -124,6 +130,9 @@ conn.close()
 PY
 code="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/invoices/)"
 test "$code" = "302" || { echo "ERROR: Django invoice route login redirect is HTTP $code" >&2; exit 1; }
+purchase_code="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/purchases/)"
+test "$purchase_code" = "302" || { echo "ERROR: Django purchase route login redirect is HTTP $purchase_code" >&2; exit 1; }
+echo "DJANGO_PURCHASING_ROUTE_OK"
 echo "DJANGO_INVOICE_ROUTE_OK"
 echo "INSTALL_DONE version=$(git rev-parse --short HEAD) backup=$STAMP"
 docker compose -f "$COMPOSE" ps
