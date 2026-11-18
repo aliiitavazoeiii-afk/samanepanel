@@ -5,6 +5,7 @@ on:
     paths:
       - 'daily_sales_service/**'
       - 'tests/test_sister_invoices.py'
+      - 'tests/test_sister_purchases.py'
       - '.github/workflows/sister-invoice-regression.yml'
   workflow_dispatch:
 jobs:
@@ -22,4 +23,6 @@ jobs:
       - name: Compile business modules
         run: python -m compileall -q daily_sales_service tests/test_sister_invoices.py
       - name: Run invoice ledger regression
-        run: python -m unittest discover -s tests -p 'test_sister_invoices.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_sister_invoices.py' -v
+          python -m unittest discover -s tests -p 'test_sister_purchases.py' -v
