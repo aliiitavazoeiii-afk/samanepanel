@@ -127,6 +127,17 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(sister_sales.public_redirect_location("/daily-sales/invoices/15"),
                          "/invoices/15/")
 
+    def test_supplier_purchasing_routes_are_authenticated_and_csrf_protected(self):
+        self.assertEqual(reverse("sister_purchases"),"/purchases/")
+        self.assertEqual(resolve("/purchases/").func,sister_sales.digikala_proxy)
+        self.assertEqual(self.client.get("/purchases/").status_code,302)
+        for route in ("purchases","purchases/add","purchases/payments/add"):
+            self.assertIn(route,sister_sales._ALLOWED)
+        for route in ("purchases/add","purchases/payments/add"):
+            self.assertIn(route,sister_sales._POST)
+            self.assertEqual(self.client.post("/sales/digikala/"+route).status_code,302)
+        self.assertEqual(sister_sales.public_redirect_location("/daily-sales/purchases"),"/purchases/")
+
     def test_master_proxy_requires_auth(self):
         for url in ("/settings/products/new/", "/settings/products/digikala/",
                     "/settings/products/platforms/", "/report/sister-capital/",
