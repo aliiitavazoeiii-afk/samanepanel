@@ -34,7 +34,7 @@ def sku_options(conn,size):
 def page_invoices(conn,query=""):
     rows=invoices(conn,query)
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
-    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/invoices/purchases">خرید از مه هر</a></div>'
+    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
     body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت</th><th>فروش</th><th>مانده مشتری</th></tr></thead><tbody>'
     for r in rows:
@@ -87,7 +87,7 @@ def supplier(conn=Depends(conn_dep)):
     body+='<div class="m2-finance-cards"><div class="m2-card"><small>بدهی من به مه هر</small><strong>'+fmt(b["debt"])+'</strong></div>'
     body+='<div class="m2-card"><small>طلب من از مه هر</small><strong>'+fmt(b["credit"])+'</strong></div>'
     body+='<div class="m2-card"><small>خالص (مثبت: طلبکار)</small><strong>'+fmt(b["net"])+'</strong></div></div>'
-    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/purchases">ثبت خرید از مه هر</a></div>'
+    body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/purchases">ثبت خرید کالا</a></div>'
     body+='<section class="m2-card"><h3>ثبت تسویه یا تهاتر</h3>'
     body+='<form method="post" action="'+ROOT+'/invoices/mehr/settle"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
     body+='<div><label>نوع عملیات</label><select name="kind"><option value="offset">تهاتر از طلب من</option><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
@@ -112,19 +112,9 @@ def settle(kind:str=Form(...),amount:str=Form(...),day:str=Form(...),request_key
 
 @router.get(ROOT+"/invoices/purchases")
 def purchases(conn=Depends(conn_dep)):
-    body='<h1>خرید قالب از مه هر</h1><p class="m2-hint">فقط خرید واقعی را اینجا ثبت کن؛ اصلاح شمارش موجودی، بدهی جدید نمی‌سازد.</p>'
-    body+='<form action="'+ROOT+'/invoices/purchases/add" method="post"><input type="hidden" name="request_key" value="'+token()+'"><section class="m2-card"><div class="m2-fields">'
-    body+='<div><label>قالب و سایز</label><select name="master_id" required><option value="">انتخاب</option>'
-    for size in SIZES:
-        body+='<optgroup label="'+size+'">'+''.join('<option value="'+str(r["id"])+'">'+e(r["title"])+' / '+e(r["color"])+' / '+size+'</option>' for r in conn.execute("SELECT id,title,color FROM master_products WHERE category='قالب' AND size=? AND active=1",(size,)))+'</optgroup>'
-    body+='</select></div>'
-    body+='<div><label>تعداد تحویل خانه</label><input name="qty" type="number" min="1" required></div>'
-    body+='<div><label>قیمت خرید هر عدد از مه هر</label><input name="cost" type="number" min="1" required></div>'
-    body+='<div><label>تاریخ خرید</label><input name="day" type="date" value="'+today()+'" required></div>'
-    body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div></div>'
-    body+='<button class="m2-btn">ثبت خرید و افزایش موجودی خانه</button></section></form>'
-    body+='<p><a href="'+ROOT+'/invoices/mehr">مشاهده مانده مه هر</a></p>'
-    return page_with_style("خرید از مه هر",body)
+    # One source of truth for NEW purchases. Old purchasing database rows and
+    # legacy POST endpoint remain intact for audit/compatibility.
+    return RedirectResponse(ROOT+"/purchases",status_code=303)
 
 @router.post(ROOT+"/invoices/purchases/add")
 def purchase_add(master_id:int=Form(...),qty:str=Form(...),cost:str=Form(...),day:str=Form(...),
