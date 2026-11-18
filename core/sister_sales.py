@@ -53,13 +53,13 @@ _ALLOWED = {"", "import", "preview", "commit", "inventory", "cost", "costs/uploa
             "master/stock/undo", "master/stock/transfer/revise",
             "pricing", "pricing/cost", "pricing/sales", "pricing/digikala", "pricing/digikala/save", "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save",
             "catalog", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance", "finance/accounts", "finance/movements", "finance/sales", "api/sister-finance.json", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel", "platforms", "capital-report", "capital-report/component/save", "api/sister-capital.json",
-            "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add"}
+            "platforms/digikala", "platforms/basalam", "platforms/basalam/add", "platforms/basalam/sales", "platforms/basalam/sales/add", "platforms/site", "platforms/site/add", "platforms/site/sales", "platforms/site/sales/add", "platforms/mold", "platforms/mold/add", "platforms/mold/sales", "platforms/mold/sales/add", "invoices", "invoices/new", "invoices/create", "invoices/mehr", "invoices/mehr/settle", "invoices/purchases", "invoices/purchases/add"}
 _POST = {"preview", "commit", "day/delete", "cost", "costs/upload", "stock/adjust", "setting",
          "master/add", "master/rename", "master/edit", "master/stock/adjust",
          "master/stock/bulk-adjust", "master/stock/transfer",
          "master/stock/undo", "master/stock/transfer/revise",
          "pricing/cost/save", "pricing/sales/save", "pricing/sales/variants/save", "pricing/digikala/save", "capital-report/component/save", "catalog/map", "catalog/parts/save", "catalog/edit", "catalog/archive", "catalog/archive-bulk", "catalog/restore", "finance/accounts/add", "finance/parties/add", "finance/movements/add", "finance/movements/cancel",
-         "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add"}
+         "platforms/basalam/add", "platforms/basalam/sales/add", "platforms/site/add", "platforms/site/sales/add", "platforms/mold/add", "platforms/mold/sales/add", "invoices/create", "invoices/mehr/settle", "invoices/purchases/add"}
 _LIMIT = 64 * 1024 * 1024
 _ROOT = "/sales/digikala"
 _API = "/daily-sales"
@@ -69,6 +69,10 @@ _API = "/daily-sales"
 # authenticated /sales/digikala/* proxy endpoints.
 _CANONICAL_PAGES = {
     "master": "/settings/products/new/",
+    "invoices": "/invoices/",
+    "invoices/new": "/invoices/new/",
+    "invoices/mehr": "/invoices/mehr/",
+    "invoices/purchases": "/invoices/purchases/",
     "master/stock": "/inventory/stock/",
     "pricing/digikala": "/settings/products/platforms/digikala/pricing/",
     "catalog": "/settings/products/platforms/digikala/",
@@ -211,11 +215,11 @@ def add_csrf(request, html):
 
 @login_required
 def digikala_proxy(request, tail=""):
-    if tail not in _ALLOWED:
+    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt))?",tail):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     if request.method not in ("GET", "POST"):
         return HttpResponse("متد غیرمجاز است.", status=405)
-    if request.method == "POST" and tail not in _POST:
+    if request.method == "POST" and tail not in _POST and not re.fullmatch(r"invoices/\d+/(?:dispatch|receipt)",tail):
         return HttpResponse("متد غیرمجاز است.", status=405)
     password = os.getenv("SALES_ADMIN_PASSWORD", "")
     if len(password) < 16:
