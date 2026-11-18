@@ -120,6 +120,24 @@ class SupplierPurchasesTest(unittest.TestCase):
         self.assertEqual(self.count_stock("BG-P"),1)
         self.assertEqual(suppliers(self.conn)[0]["purchased"],366625)
 
+    def test_purchases_page_has_only_purchase_and_stock_entry_not_financial_forms(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_purchase_api import purchase_home
+        page=purchase_home(conn=self.conn).body.decode("utf-8")
+        self.assertIn("ثبت قطعی خرید و افزایش موجودی",page)
+        self.assertIn("خریدهای اخیر",page)
+        self.assertNotIn("ثبت تسویه مه هر",page)
+        self.assertNotIn("ثبت پرداخت</button>",page)
+        self.assertNotIn("حساب تأمین‌کنندگان (تومان)",page)
+
+    def test_mehr_ledger_kept_on_invoices_page(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_invoice_api import supplier
+        page=supplier(conn=self.conn).body.decode("utf-8")
+        self.assertIn("حساب مه هر",page)
+        self.assertIn("ثبت تسویه یا تهاتر",page)
+        self.assertIn("دریافت از مه هر",page)
+
     def test_does_not_auto_import_existing_stock_as_new_purchase(self):
         self.conn.execute("UPDATE master_products SET seller_stock=50 WHERE id=?",(self.ids["DIA-P"],))
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0],0)
