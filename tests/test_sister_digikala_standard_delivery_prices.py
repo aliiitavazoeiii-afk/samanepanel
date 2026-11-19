@@ -103,6 +103,36 @@ class StandardDigiKalaDailyImport(unittest.TestCase):
         self.assertEqual(p["rows"][0]["price"],370000)
         self.assertEqual(p["rows"][0]["price_source"],"قیمت تخفیفی فهرست دیجی‌کالا")
 
+    def test_inactive_catalog_listing_can_post_historical_sale_without_activation(self):
+        self.conn.execute("UPDATE products SET active=0 WHERE variant_id=?",(self.vid,))
+        before=self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                                 (self.master_id,)).fetchone()[0]
+        preview=create_preview(self.conn,today(),"seller",self.report(1))
+        self.assertFalse(preview["errors"],preview["errors"])
+        self.assertEqual(preview["inactive_codes"],[self.vid])
+        html=preview_page(preview).body.decode("utf-8")
+        self.assertIn("کاتالوگ فعلی غیرفعال‌اند",html)
+        self.assertIn(str(self.vid),html)
+        self.assertEqual(self.conn.execute("SELECT active FROM products WHERE variant_id=?",
+                         (self.vid,)).fetchone()[0],0)
+        commit_preview(self.conn,preview["token"])
+        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                         (self.master_id,)).fetchone()[0],before-2)
+        self.assertEqual(self.conn.execute("SELECT active FROM products WHERE variant_id=?",
+                         (self.vid,)).fetchone()[0],0)
+
+    def test_inactive_and_unmapped_listing_still_blocks_sale_without_stock_change(self):
+        self.conn.execute("UPDATE products SET active=0,master_id=NULL WHERE variant_id=?",
+                          (self.vid,))
+        self.conn.execute("DELETE FROM dk_variant_parts WHERE variant_id=?",(self.vid,))
+        before=self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                                 (self.master_id,)).fetchone()[0]
+        preview=create_preview(self.conn,today(),"seller",self.report(1))
+        self.assertTrue(preview["errors"])
+        self.assertIn("متصل نیست",preview["errors"][0])
+        self.assertEqual(self.conn.execute("SELECT seller_stock FROM master_products WHERE id=?",
+                         (self.master_id,)).fetchone()[0],before)
+
     def test_no_real_price_still_blocks_atomic_sale(self):
         self.conn.execute("UPDATE products SET list_price_rial=0,promotion_price_rial=0,"
                           "sale_price_toman=0 WHERE variant_id=?",(self.vid,))
