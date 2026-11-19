@@ -196,6 +196,7 @@ def strict_preview(conn,sale_date,source,files):
     by_title=defaultdict(list)
     for v in variants.values(): by_title[v["title_key"]].append(v)
     entries={}; price_sources={}; errors=[]; ignored=0; fallback=0
+    inactive_codes=set()
     sha=hashlib.sha256()
     for filename,data in files:
         sha.update(filename.encode()); sha.update(data)
@@ -213,9 +214,13 @@ def strict_preview(conn,sale_date,source,files):
                 continue
             mid=var["master_id"]
             master=masters.get(int(mid)) if mid is not None else None
-            if not var["active"] or master is None or not master["active"]:
+            if master is None or not master["active"]:
                 errors.append(f"کد تنوع {var['variant_id']} هنوز به یک محصول فعال در «تعریف محصولات» متصل نیست.")
                 continue
+            # A DigiKala delivery report can contain a genuine historical sale
+            # of a listing which is now inactive in the copied catalog.
+            # Keep its catalog status unchanged, but make it visible in preview.
+            if not var["active"]:inactive_codes.add(int(var["variant_id"]))
             price=row["price"]
             price_source="قیمت داخل فایل اکسل"
             if price is None:
@@ -282,7 +287,8 @@ def strict_preview(conn,sale_date,source,files):
                         "shortage":max(0,-remaining),"code":master["code"],
                         "color":master["color"],"size":master["size"]})
     return {"errors":errors,"rows":prepared,"sale_date":sale_date,"source":source,
-            "ignored":ignored,"fallback_prices":fallback,"files_count":len(files),
+            "ignored":ignored,"fallback_prices":fallback,
+            "inactive_codes":sorted(inactive_codes),"files_count":len(files),
             "files_sha256":sha.hexdigest(),
             "known_cost_count":sum(1 for r in prepared if r["cost"] is not None),
             "stock_changes":changes}
