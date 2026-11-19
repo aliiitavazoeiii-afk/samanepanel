@@ -209,6 +209,9 @@ def preview_page(data):
         for item in sorted(shortages,key=lambda x:(x.get("code",""),x.get("size",""))):
             body+=f'<li>{e(item.get("code",""))} / {e(item.get("color",""))} / {e(item.get("size",""))}: {fmt(item["stock_after"])} عدد</li>'
         body+='</ul></div>'
+    if data.get("inactive_codes"):
+        code_list="، ".join(str(code) for code in data["inactive_codes"])
+        body+=f'<div class="m2-msg">هشدار: کد(های) {e(code_list)} در کاتالوگ فعلی غیرفعال‌اند، اما به کالای فعال متصل هستند و در فایل فروش قطعی آمده‌اند. وضعیت کاتالوگ تغییر نمی‌کند؛ قبل از تأیید، ترکیب بسته و قیمت را کنترل کن.</div>'
     if data["fallback_prices"]:
         body+=f'<div class="m2-msg">قیمت {data["fallback_prices"]} ردیف به‌صورت خودکار از قیمت‌های تعریف‌شده پنل یا کاتالوگ دیجی‌کالا خوانده شده است. مبلغ قیمت فروش را پیش از تأیید کنترل کن؛ قیمت اولیه فهرست ممکن است قدیمی باشد.</div>'
     if unknown:
