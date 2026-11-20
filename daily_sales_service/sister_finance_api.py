@@ -60,11 +60,8 @@ def finance_home(conn=Depends(conn_dep)):
     body+='<p><a class="m2-btn" href="'+ROOT+'/finance/open-invoices">فاکتورهای باز و مانده‌های پرداخت‌نشده</a></p>'
     body+=tiles([("جمع طلب پلتفرم‌ها",info["total_receivable"],"تومان"),
                  ("طلب مشتریان فاکتورها",info["invoice_receivable"],"تومان"),
-                 ("وجوه مشتری نزد مه هر",info["mehr_receivable"],"تومان · برای تسویه بدهی خرید"),
-                 ("کل بدهی خرید من به مه هر",info["mehr_payable"],"تومان · پیش از کسر وجوه مشتری"),
-                 ("مانده خالص حساب مه هر",abs(info["mehr_receivable"]-info["mehr_payable"]),
-                  "تومان · "+("بدهکار به مه هر" if info["mehr_receivable"]<info["mehr_payable"] else
-                              ("طلبکار از مه هر" if info["mehr_receivable"]>info["mehr_payable"] else "تسویه‌شده"))),
+                 ("بدهی خالص من به مه هر",max(0,info["mehr_payable"]-info["mehr_receivable"]),"تومان · پس از کسر وجوه مشتری"),
+                 ("طلب خالص من از مه هر",max(0,info["mehr_receivable"]-info["mehr_payable"]),"تومان · اگر وجوه نزد مهر بیشتر از بدهی باشد"),
                  ("بدهی سایر تأمین‌کنندگان",info["supplier_payable"],"تومان"),
                  ("پیش‌دریافت فاکتورهای ارسال‌نشده",info["customer_advances"],"تومان"),
                  ("جمع موجودی حساب‌های ثبت‌شده",info["cash_balance"],"تومان"),
@@ -73,6 +70,7 @@ def finance_home(conn=Depends(conn_dep)):
                  ("بهای تمام‌شده ثبت‌شده",sales["cogs_known"],"تومان · به‌جز موارد نامشخص"),
                  ("سود پس از هزینه کالا",sales["profit"],"تومان · در صورت تکمیل بها"),
                  ("سود کل قالب‌ها",sales["mold_profit"],"تومان · فروش قالب و فاکتورهای ارسال‌شده")])
+    body+='<p class="m2-hint">ریز حساب مهر: بدهی خرید '+fmt(info["mehr_payable"])+' تومان، وجوه مشتری نزد مهر '+fmt(info["mehr_receivable"])+' تومان؛ کارت طلب فقط مازاد خالص را نشان می‌دهد.</p>'
     if sales["unknown_cost_lines"]:
         body+=f'<div class="m2-msg">{sales["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل قطعی نیست.</div>'
     body+='<p class="m2-hint">سود قالب‌ها شامل فاکتورهای ارسال‌شده و فروش‌های کانال قالب است؛ هر فروش باید فقط یک بار در سیستم ثبت شود. بدهی و طلب مه هر با تهاتر خودکار یکی نمی‌شوند.</p>'
@@ -102,10 +100,10 @@ def open_invoice_balances(conn=Depends(conn_dep)):
     body+=nav("finance")
     body+=tiles([("مانده مشتریان",sum(int(x["gross"])-int(x["paid"]) for x in rows),"تومان · فاکتورهای ارسال‌شده"),
                  ("دریافت ثبت‌شده با بانک نامشخص",int(unallocated[0]),"تومان · "+str(int(unallocated[1]))+" دریافت؛ خارج از مانده بانک"),
-                 ("کل بدهی خرید من به مه هر",mehr["debt"],"تومان · پیش از کسر وجوه مشتری"),
-                 ("وجوه مشتری نزد مه هر",mehr["credit"],"تومان · برای تسویه بدهی خرید"),
-                 ("مانده خالص حساب مه هر",abs(mehr["net"]),("تومان · "+("بدهکار به مه هر" if mehr["net"]<0 else ("طلبکار از مه هر" if mehr["net"]>0 else "تسویه‌شده")))),
+                 ("بدهی خالص من به مه هر",max(0,-mehr["net"]),"تومان · پس از کسر وجوه مشتری"),
+                 ("طلب خالص من از مه هر",max(0,mehr["net"]),"تومان · در صورت مازاد نزد مهر"),
                  ("بدهی سایر تأمین‌کنندگان",sum(int(x["due"]) for x in supplier_rows),"تومان")])
+    body+='<p class="m2-hint">ریز حساب مهر: کل بدهی خرید '+fmt(mehr["debt"])+' تومان؛ وجوه مشتری نزد مهر '+fmt(mehr["credit"])+' تومان. این دو مبلغ برای محاسبه مانده خالص فقط یک‌بار در مقابل هم قرار می‌گیرند.</p>'
     body+='<section class="m2-card"><h3>فاکتورهای باز مشتریان</h3>'
     if rows:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>جمع</th><th>دریافتی</th><th>مانده</th></tr></thead><tbody>'
