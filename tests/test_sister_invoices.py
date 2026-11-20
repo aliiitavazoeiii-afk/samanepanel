@@ -503,5 +503,110 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertEqual(sum(x["amount"] for x in receipts),108000000)
         self.assertEqual(len(receipts),2)
 
+
+    def test_edit_invoice_corrects_1m_to_10m_with_audit_without_reselling(self):
+        from daily_sales_service.sister_invoices import edit_invoice,invoice_detail,invoice_audit
+        from daily_sales_service.sister_finance_logic import sales_report
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        inv,lines,receipts=invoice_detail(self.db,iid)
+        initial=sales_report(self.db,"mold")["gross"]
+        self.assertEqual(initial,220000)
+        corrected={
+          "کوچک":{"qty":2,"purchase":40000,"sale":10000000},
+          "متوسط":{"qty":1,"purchase":50000,"sale":80000}
+        }
+        edit_invoice(self.db,iid,inv["name"],inv["phone"],inv["invoice_date"],corrected,
+                     "ویرایش اشتباه",inv["version"],"fix-1m-to-10m")
+        revised,ls,_=invoice_detail(self.db,iid)
+        self.assertEqual(revised["version"],1)
+        self.assertEqual(sum(x["qty"]*x["sale_unit"] for x in ls),20080000)
+        self.assertEqual(sales_report(self.db,"mold")["gross"],20080000)
+        self.assertEqual(mehr_balance(self.db)["debt"],130000)
+        self.assertEqual(len(invoice_audit(self.db,iid)),1)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoices WHERE id=?",(iid,)).fetchone()[0],1)
+        with self.assertRaisesRegex(ImportErrorDetail,"تغییر کرده"):
+            edit_invoice(self.db,iid,inv["name"],inv["phone"],inv["invoice_date"],
+                         corrected,"",inv["version"],"edit-again")
+
+    def test_edit_receipt_corrects_amount_and_factory_mehr_in_one_transaction(self):
+        from daily_sales_service.sister_invoices import edit_invoice_receipt,invoice_detail
+        iid=self._invoice("factory");dispatch_invoice(self.db,iid)
+        rid=record_receipt(self.db,iid,10000,"mehr",self.day,"received-wrong")
+        self.assertEqual(mehr_balance(self.db)["credit"],10000)
+        edit_invoice_receipt(self.db,iid,rid,100000,self.day,
+                             "اصلاح دریافت",None,"receipt-correction")
+        inv,ls,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(receipts[0]["amount"],100000)
+        self.assertEqual(mehr_balance(self.db)["credit"],100000)
+        self.assertEqual(mehr_balance(self.db)["net"],-30000)
+        linked=self.db.execute("""SELECT credit_delta FROM sister_mehr_ledger
+            WHERE reference=?""",("invoice-receipt:"+str(rid),)).fetchone()
+        self.assertEqual(linked[0],100000)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoice_receipts WHERE invoice_id=?",(iid,)).fetchone()[0],1)
+        with self.assertRaisesRegex(ImportErrorDetail,"مانده فاکتور"):
+            edit_invoice_receipt(self.db,iid,rid,300000,self.day,"",None,"over-receipt")
+        self.assertEqual(mehr_balance(self.db)["credit"],100000)
+
+    def test_edit_home_invoice_reconciles_stock_once(self):
+        from daily_sales_service.sister_invoices import edit_invoice,invoice_detail
+        iid=self._invoice("home")
+        self.db.execute("UPDATE master_products SET seller_stock=25 WHERE id=?",(self.skus["کوچک"],))
+        self.db.execute("UPDATE master_products SET seller_stock=25 WHERE id=?",(self.skus["متوسط"],))
+        dispatch_invoice(self.db,iid)
+        first=self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0]
+        inv,ls,_=invoice_detail(self.db,iid)
+        new={"کوچک":{"master_id":self.skus["کوچک"],"qty":3,"purchase":40000,"sale":70000},
+             "متوسط":{"master_id":self.skus["متوسط"],"qty":1,"purchase":50000,"sale":80000}}
+        edit_invoice(self.db,iid,inv["name"],inv["phone"],self.day,new,"",0,"increase-one")
+        self.assertEqual(self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0],first-1)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM master_stock_events WHERE reference LIKE ?",("sister-invoice-correction:"+str(iid)+":%",)).fetchone()[0],1)
+        self.assertEqual(mehr_balance(self.db)["debt"],0)
+
+    def test_cancel_draft_or_dispatched_without_receipts_reverses_once_and_hides_sales(self):
+        from daily_sales_service.sister_invoices import cancel_invoice,invoice_detail,invoice_audit
+        from daily_sales_service.sister_finance_logic import sales_report
+        iid=self._invoice("factory");dispatch_invoice(self.db,iid)
+        before=mehr_balance(self.db)["debt"]
+        self.assertEqual(before,130000)
+        cancel_invoice(self.db,iid,"void-no-payment",0)
+        self.assertEqual(mehr_balance(self.db)["debt"],0)
+        self.assertEqual(sales_report(self.db,"mold")["gross"],0)
+        inv,ls,rec=invoice_detail(self.db,iid)
+        self.assertEqual(inv["is_void"],1)
+        self.assertEqual(len(invoice_audit(self.db,iid)),1)
+        with self.assertRaisesRegex(ImportErrorDetail,"قبلاً ابطال"):
+            cancel_invoice(self.db,iid,"void-again",1)
+        with self.assertRaisesRegex(ImportErrorDetail,"ابطال"):
+            record_receipt(self.db,iid,1000,"mine",self.day,"cannot-receive")
+
+    def test_cancel_home_invoice_returns_stock_and_blocks_paid_invoice(self):
+        from daily_sales_service.sister_invoices import cancel_invoice,invoice_detail
+        iid=self._invoice("home")
+        dispatch_invoice(self.db,iid)
+        before=self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0]
+        cancel_invoice(self.db,iid,"void-home",0)
+        self.assertEqual(self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0],before+2)
+        other=self._invoice("factory");dispatch_invoice(self.db,other)
+        record_receipt(self.db,other,10000,"mehr",self.day,"paid-before-delete")
+        with self.assertRaisesRegex(ImportErrorDetail,"دریافت ثبت"):
+            cancel_invoice(self.db,other,"void-paid",0)
+        self.assertEqual(self.db.execute("SELECT is_void FROM sister_invoices WHERE id=?",(other,)).fetchone()[0],0)
+
+    def test_invoice_edit_routes_and_visible_actions(self):
+        from daily_sales_service.sister_invoice_api import edit_form,detail,page_invoices
+        iid=self._invoice("factory")
+        html=edit_form(invoice_id=iid,conn=self.db).body.decode("utf-8")
+        self.assertIn("ذخیره اصلاح فاکتور",html)
+        self.assertIn("invoice-edit-form",html)
+        item=detail(invoice_id=iid,conn=self.db).body.decode("utf-8")
+        self.assertIn("حذف / ابطال فاکتور",item)
+        self.assertIn("/edit",item)
+        record_receipt(self.db,iid,10000,"mine",self.day,"wrong-receipt")
+        updated=detail(invoice_id=iid,conn=self.db).body.decode("utf-8")
+        self.assertIn("ویرایش این دریافتی",updated)
+        listing=page_invoices(self.db)
+        self.assertIn("ویرایش",listing.body.decode("utf-8"))
+
 if __name__=="__main__":
     unittest.main()
