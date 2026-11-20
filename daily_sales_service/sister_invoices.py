@@ -56,6 +56,13 @@ CREATE TABLE IF NOT EXISTS sister_invoice_submission_keys (
  request_key TEXT PRIMARY KEY, invoice_id INTEGER NOT NULL UNIQUE REFERENCES sister_invoices(id),
  created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sister_mehr_settlement_links (
+ reference TEXT PRIMARY KEY REFERENCES sister_mehr_ledger(reference),
+ target_type TEXT NOT NULL CHECK(target_type IN ('invoice','purchase')),
+ target_id INTEGER NOT NULL CHECK(target_id>0)
+);
+CREATE INDEX IF NOT EXISTS idx_sister_mehr_settlement_target
+ ON sister_mehr_settlement_links(target_type,target_id);
 """
 def ensure_schema(conn):
     conn.executescript(SCHEMA)
@@ -222,11 +229,57 @@ def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,accoun
         if manage_tx:conn.execute("ROLLBACK")
         raise
 
-def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
-    """Post an auditable Mehr settlement, even without a bank account selection.
+def mehr_open_items(conn):
+    """Read-only invoice and supplier-purchase liabilities, no duplicate postings.
 
-    If no account is supplied, no bank/cash movement is invented. A reconciliation
-    marker is retained in the Mehr ledger notes. Old bank-linked calls still work.
+    Per-item outstanding is net of customer payments to Mehr and explicitly
+    assigned Mehr cash settlements. Legacy unassigned settlements stay in the
+    overall net balance only, so users cannot mistake them for a specific item.
+    """
+    items=[]
+    for r in conn.execute("""SELECT i.id,i.invoice_date,c.name,
+      COALESCE(SUM(l.qty*l.purchase_unit),0) cost
+      FROM sister_invoices i JOIN sister_invoice_customers c ON c.id=i.customer_id
+      JOIN sister_invoice_lines l ON l.invoice_id=i.id
+      WHERE i.origin='factory' AND i.status='dispatched'
+      GROUP BY i.id ORDER BY i.id DESC"""):
+        gross=int(r["cost"])
+        customer=int(conn.execute("""SELECT COALESCE(SUM(amount),0)
+            FROM sister_invoice_receipts WHERE invoice_id=?
+              AND destination IN ('mehr','check_mehr')""",(r["id"],)).fetchone()[0])
+        linked=int(conn.execute("""SELECT COALESCE(SUM(-l.debt_delta),0)
+            FROM sister_mehr_settlement_links a JOIN sister_mehr_ledger l ON l.reference=a.reference
+            WHERE a.target_type='invoice' AND a.target_id=? AND l.kind='paid_to_mehr'""",(r["id"],)).fetchone()[0])
+        remaining=max(0,gross-customer-linked)
+        items.append({"target":"invoice:"+str(r["id"]),"kind":"invoice","id":int(r["id"]),
+                      "date":r["invoice_date"],"label":"فاکتور #"+str(r["id"])+" / "+r["name"],
+                      "gross":gross,"credit":customer,"paid":linked,"remaining":remaining})
+    for r in conn.execute("""SELECT p.id,p.purchase_date,p.supplier_invoice,p.total_toman
+        FROM sister_purchase_orders p
+        JOIN sister_purchase_suppliers s ON s.id=p.supplier_id
+        WHERE s.name='مه هر' ORDER BY p.id DESC"""):
+        # A purchase is eligible only if the Mehr ledger actually has its posting.
+        has_ledger=conn.execute("""SELECT 1 FROM sister_mehr_ledger
+           WHERE kind='purchase_general' AND reference=?""",
+           ("supplier-purchase:"+str(r["id"]),)).fetchone()
+        if not has_ledger:continue
+        paid=int(conn.execute("""SELECT COALESCE(SUM(-l.debt_delta),0)
+            FROM sister_mehr_settlement_links a JOIN sister_mehr_ledger l ON l.reference=a.reference
+            WHERE a.target_type='purchase' AND a.target_id=? AND l.kind='paid_to_mehr'""",(r["id"],)).fetchone()[0])
+        gross=int(r["total_toman"])
+        items.append({"target":"purchase:"+str(r["id"]),"kind":"purchase","id":int(r["id"]),
+                      "date":r["purchase_date"],"label":"خرید قالب #"+str(r["id"])+
+                      (" / "+r["supplier_invoice"] if r["supplier_invoice"] else ""),
+                      "gross":gross,"credit":0,"paid":paid,"remaining":max(0,gross-paid)})
+    return items
+
+
+def settlement(conn,kind,amount,day,request_key,account_id=None,notes="",target=""):
+    """One atomic, idempotent Mehr posting. Optional link reconciles a document.
+
+    Never posts an invoice customer receipt a second time. Offset changes both
+    ledger sides equally (net stays unchanged). Bank is optional and never
+    invented; unallocated legacy postings are still supported.
     """
     if kind not in ("offset","paid_to_mehr","received_from_mehr"):
         raise ImportErrorDetail("نوع تسویه نامعتبر است.")
@@ -234,12 +287,15 @@ def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
     if val<=0:raise ImportErrorDetail("مبلغ تسویه باید مثبت باشد.")
     key=_text(request_key,100)
     if not key:raise ImportErrorDetail("شناسه تسویه لازم است.")
+    target=_text(target,100)
+    if target and kind!="paid_to_mehr":
+        raise ImportErrorDetail("انتخاب فاکتور فقط برای پرداخت به مهر مجاز است.")
     conn.execute("BEGIN IMMEDIATE")
     try:
         if conn.execute("SELECT 1 FROM sister_mehr_ledger WHERE reference=?",(key,)).fetchone():
             raise ImportErrorDetail("این تسویه قبلاً ثبت شده است.")
         balance=mehr_balance(conn)
-        net=int(balance["net"])  # positive = net due from Mehr, negative = debt to Mehr
+        net=int(balance["net"])
         if kind=="offset":
             if val>min(balance["debt"],balance["credit"]):
                 raise ImportErrorDetail("مبلغ تهاتر از وجوه مشتری نزد مهر یا بدهی خرید بیشتر است.")
@@ -247,6 +303,12 @@ def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
         elif kind=="paid_to_mehr":
             if val>max(0,-net):
                 raise ImportErrorDetail("مبلغ پرداخت از بدهی خالص ثبت‌شده به مهر بیشتر است.")
+            if target:
+                item=next((r for r in mehr_open_items(conn) if r["target"]==target),None)
+                if item is None or item["remaining"]<=0:
+                    raise ImportErrorDetail("فاکتور یا خرید انتخابی بدهی باز ندارد.")
+                if val>item["remaining"]:
+                    raise ImportErrorDetail("مبلغ پرداخت از مانده فاکتور یا خرید انتخابی بیشتر است.")
             debt,credit=-val,0
             if account_id not in (None,""):
                 _bank(conn,account_id,"payment",val,day,key+":bank","mehr-supplier",SUPPLIER)
@@ -261,9 +323,14 @@ def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
             marker="حساب بانکی نامشخص؛ اثر بانکی ثبت نشد"
             note=(note+"؛ " if note else "")+marker
         _ledger(conn,day,debt,credit,kind,key,note)
+        if target:
+            target_kind,target_id=target.split(":")
+            conn.execute("""INSERT INTO sister_mehr_settlement_links
+                (reference,target_type,target_id) VALUES (?,?,?)""",
+                (key,target_kind,int(target_id)))
         conn.execute("COMMIT")
     except Exception:
-        conn.execute("ROLLBACK")
+        if conn.in_transaction:conn.execute("ROLLBACK")
         raise
 
 def mehr_balance(conn):
