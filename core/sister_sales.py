@@ -219,18 +219,18 @@ def add_csrf(request, html):
 
 @login_required
 def invoice_proxy(request, invoice_id, action=""):
-    if action and action not in ("dispatch", "receipt"):
+    if action and action not in ("dispatch", "receipt", "edit", "cancel"):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     return digikala_proxy(request, "invoices/" + str(invoice_id) + ("/" + action if action else ""))
 
 
 @login_required
 def digikala_proxy(request, tail=""):
-    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt))?",tail):
+    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|cancel|receipts/\d+/edit))?",tail):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     if request.method not in ("GET", "POST"):
         return HttpResponse("متد غیرمجاز است.", status=405)
-    if request.method == "POST" and tail not in _POST and not re.fullmatch(r"invoices/\d+/(?:dispatch|receipt)",tail):
+    if request.method == "POST" and tail not in _POST and not re.fullmatch(r"invoices/\d+/(?:dispatch|receipt|edit|cancel|receipts/\d+/edit)",tail):
         return HttpResponse("متد غیرمجاز است.", status=405)
     password = os.getenv("SALES_ADMIN_PASSWORD", "")
     if len(password) < 16:
