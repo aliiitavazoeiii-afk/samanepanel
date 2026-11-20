@@ -23,7 +23,7 @@ def financial_capital(conn,as_of=None):
     cash=int(finance["cash_balance"])
     claim=int(finance["total_receivable"])
     customer_claim=int(finance["invoice_receivable"])
-    mehr_claim=int(finance["mehr_receivable"])
+    mehr_claim=int(finance["mehr_net_receivable"])
     business_debt=int(finance["total_liabilities_recorded"])
     equipment=sum(int(extras.get(k) or 0) for k in ("raw_materials","equipment","other_assets"))
     liabilities=int(extras.get("other_liabilities") or 0)
@@ -38,7 +38,9 @@ def financial_capital(conn,as_of=None):
             "total_receivable":claim,
             "customer_receivable":customer_claim,
             "mehr_receivable":mehr_claim,
-            "mehr_payable":int(finance["mehr_payable"]),
+            "mehr_payable":int(finance["mehr_net_payable"]),
+            "mehr_gross_purchase_debt":int(finance["mehr_payable"]),
+            "mehr_customer_funds_held":int(finance["mehr_receivable"]),
             "supplier_payable":int(finance["supplier_payable"]),
             "customer_advances":int(finance["customer_advances"]),
             "business_liabilities":business_debt,
@@ -89,8 +91,8 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
       ("حساب‌ها و صندوق",stat["cash_balance"],"تومان · مانده واقعی حساب‌های ثبت‌شده"),
       ("طلب از پلتفرم‌ها",stat["total_receivable"],"تومان · پس از کارمزد و دریافتی‌ها"),
       ("طلب از مشتریان فاکتورها",stat["customer_receivable"],"تومان · مانده فاکتورهای ارسال‌شده"),
-      ("وجوه مشتری نزد مه هر",stat["mehr_receivable"],"تومان · قابل تهاتر با بدهی خرید"),
-      ("کل بدهی خرید به مه هر",stat["mehr_payable"],"تومان · پیش از کسر وجوه مشتری"),
+      ("طلب خالص از مه هر",stat["mehr_receivable"],"تومان · فقط مازاد وجوه نزد مهر نسبت به بدهی"),
+      ("بدهی خالص به مه هر",stat["mehr_payable"],"تومان · پس از کسر وجوه مشتری"),
       ("بدهی به سایر تأمین‌کنندگان",stat["supplier_payable"],"تومان · خریدهای این پنل"),
       ("پیش‌دریافت مشتریان",stat["customer_advances"],"تومان · فاکتورهای هنوز ارسال‌نشده"),
       ("مواد اولیه",stat["raw_materials"],"تومان · مانده ثبت‌شده مستقل"),
@@ -98,6 +100,7 @@ def capital_report(as_of:str="",saved:str="",conn=Depends(conn_dep)):
       ("سایر دارایی‌ها",stat["other_assets"],"تومان · مانده ثبت‌شده"),
       ("بدهی‌ها",stat["liabilities"],"تومان · صرفاً بدهی‌های همین پنل"),
     ]
+    body+='<p class="m2-hint">ریز حساب مهر (فقط جهت اطلاع): بدهی خرید ثبت‌شده '+fmt(stat["mehr_gross_purchase_debt"])+' تومان، وجوه مشتری نزد مهر '+fmt(stat["mehr_customer_funds_held"])+' تومان. در جمع سرمایه فقط مانده خالص مهر یک بار حساب می‌شود.</p>'
     body+='<div class="m2-finance-cards">'
     for title,value,subtitle in cards:
         display=fmt(value) if value is not None else "ثبت نشده"
