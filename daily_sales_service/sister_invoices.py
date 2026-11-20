@@ -4,6 +4,7 @@ Amounts are integer toman. An invoice is not a second marketplace sale.
 Drafts have no stock or supplier impact; dispatch posts exactly once.
 """
 import uuid
+import json
 from .engine import ImportErrorDetail, money
 from .effective_costs import today, valid_date
 from .master_engine import now
@@ -51,6 +52,16 @@ CREATE TABLE IF NOT EXISTS sister_mehr_purchases (
  request_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sister_invoice_customer ON sister_invoices(customer_id,invoice_date);
+CREATE TABLE IF NOT EXISTS sister_invoice_audit (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ invoice_id INTEGER NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('edit','cancel','receipt_edit')),
+ old_json TEXT NOT NULL,
+ new_json TEXT NOT NULL,
+ request_key TEXT NOT NULL UNIQUE,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sister_invoice_audit_invoice ON sister_invoice_audit(invoice_id,id);
 CREATE INDEX IF NOT EXISTS idx_sister_receipt_invoice ON sister_invoice_receipts(invoice_id);
 CREATE TABLE IF NOT EXISTS sister_invoice_submission_keys (
  request_key TEXT PRIMARY KEY, invoice_id INTEGER NOT NULL UNIQUE REFERENCES sister_invoices(id),
@@ -66,6 +77,14 @@ CREATE INDEX IF NOT EXISTS idx_sister_mehr_settlement_target
 """
 def ensure_schema(conn):
     conn.executescript(SCHEMA)
+    fields={r["name"] for r in conn.execute("PRAGMA table_info(sister_invoices)")}
+    if "is_void" not in fields:
+        conn.execute("ALTER TABLE sister_invoices ADD COLUMN is_void INTEGER NOT NULL DEFAULT 0")
+    if "version" not in fields:
+        conn.execute("ALTER TABLE sister_invoices ADD COLUMN version INTEGER NOT NULL DEFAULT 0")
+    if "voided_at" not in fields:
+        conn.execute("ALTER TABLE sister_invoices ADD COLUMN voided_at TEXT")
+
 
 def _date(value, allow_future=False):
     value=valid_date(value)
@@ -142,6 +161,7 @@ def dispatch_invoice(conn,invoice_id,manage_tx=True):
     try:
         inv=conn.execute("SELECT * FROM sister_invoices WHERE id=?",(int(invoice_id),)).fetchone()
         if inv is None:raise ImportErrorDetail("فاکتور پیدا نشد.")
+        if inv["is_void"]:raise ImportErrorDetail("این فاکتور ابطال شده است.")
         if inv["status"]!="draft":raise ImportErrorDetail("این فاکتور قبلاً ارسال شده؛ موجودی و بدهی دوباره تغییر نمی‌کند.")
         lines=list(conn.execute("SELECT * FROM sister_invoice_lines WHERE invoice_id=?",(invoice_id,)))
         if not lines:raise ImportErrorDetail("فاکتور بدون کالا قابل ارسال نیست.")
@@ -204,6 +224,7 @@ def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,accoun
         invoice=conn.execute("""SELECT i.*,c.name FROM sister_invoices i JOIN sister_invoice_customers c
             ON c.id=i.customer_id WHERE i.id=?""",(int(invoice_id),)).fetchone()
         if not invoice:raise ImportErrorDetail("فاکتور پیدا نشد.")
+        if invoice["is_void"]:raise ImportErrorDetail("فاکتور ابطال‌شده دریافت جدید نمی‌پذیرد.")
         total=conn.execute("""SELECT SUM(qty*sale_unit) FROM sister_invoice_lines WHERE invoice_id=?""",(invoice_id,)).fetchone()[0] or 0
         paid=conn.execute("SELECT COALESCE(SUM(amount),0) FROM sister_invoice_receipts WHERE invoice_id=?",(invoice_id,)).fetchone()[0]
         if val+paid>total:raise ImportErrorDetail("پرداخت از مانده فاکتور بیشتر است.")
@@ -241,7 +262,7 @@ def mehr_open_items(conn):
       COALESCE(SUM(l.qty*l.purchase_unit),0) cost
       FROM sister_invoices i JOIN sister_invoice_customers c ON c.id=i.customer_id
       JOIN sister_invoice_lines l ON l.invoice_id=i.id
-      WHERE i.origin='factory' AND i.status='dispatched'
+      WHERE i.origin='factory' AND i.status='dispatched' AND i.is_void=0
       GROUP BY i.id ORDER BY i.id DESC"""):
         gross=int(r["cost"])
         customer=int(conn.execute("""SELECT COALESCE(SUM(amount),0)
@@ -417,7 +438,7 @@ def open_customer_invoices(conn,limit=None):
                     FROM sister_invoice_receipts r WHERE r.invoice_id=i.id),0) AS paid
         FROM sister_invoices i
         JOIN sister_invoice_customers c ON c.id=i.customer_id
-        WHERE i.status='dispatched'
+        WHERE i.status='dispatched' AND i.is_void=0
           AND COALESCE((SELECT SUM(l.qty*l.sale_unit)
                          FROM sister_invoice_lines l WHERE l.invoice_id=i.id),0)
               > COALESCE((SELECT SUM(r.amount)
@@ -427,6 +448,234 @@ def open_customer_invoices(conn,limit=None):
     if limit is not None:
         return [dict(r) for r in conn.execute(sql+" LIMIT ?",(int(limit),))]
     return [dict(r) for r in conn.execute(sql)]
+
+
+
+def _invoice_snapshot(conn,invoice_id):
+    invoice=conn.execute("""SELECT i.*,c.name,c.phone FROM sister_invoices i
+        JOIN sister_invoice_customers c ON c.id=i.customer_id WHERE i.id=?""",(invoice_id,)).fetchone()
+    if not invoice:raise ImportErrorDetail("فاکتور پیدا نشد.")
+    lines=[dict(r) for r in conn.execute("SELECT * FROM sister_invoice_lines WHERE invoice_id=? ORDER BY size",(invoice_id,))]
+    receipts=[dict(r) for r in conn.execute("SELECT * FROM sister_invoice_receipts WHERE invoice_id=? ORDER BY id",(invoice_id,))]
+    return {"invoice":dict(invoice),"lines":lines,"receipts":receipts}
+
+
+def _audit_invoice(conn,invoice_id,action,before,after,key):
+    conn.execute("""INSERT INTO sister_invoice_audit
+        (invoice_id,action,old_json,new_json,request_key,created_at)
+        VALUES (?,?,?,?,?,?)""",
+        (invoice_id,action,json.dumps(before,ensure_ascii=False,sort_keys=True),
+         json.dumps(after,ensure_ascii=False,sort_keys=True),key,now()))
+
+
+def _adjust_invoice_stock(conn,invoice_id,previous,revised,request_key):
+    """Apply signed differences; leave all prior stock events intact."""
+    prev={}
+    curr={}
+    for line in previous:
+        mid=int(line["master_id"])
+        prev[mid]=prev.get(mid,0)+int(line["qty"])
+    for line in revised:
+        mid=int(line["master_id"])
+        curr[mid]=curr.get(mid,0)+int(line["qty"])
+    for mid in sorted(set(prev)|set(curr)):
+        correction=prev.get(mid,0)-curr.get(mid,0)
+        if correction==0:continue
+        sku=conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()
+        if sku is None:raise ImportErrorDetail("کالای قبلی دیگر در انبار پیدا نمی‌شود.")
+        new_stock=int(sku["seller_stock"])+correction
+        conn.execute("UPDATE master_products SET seller_stock=?,updated_at=? WHERE id=?",
+                     (new_stock,now(),mid))
+        conn.execute("""INSERT INTO master_stock_events
+            (occurred_at,master_id,source,delta,balance_after,reference)
+            VALUES (?,?,?,?,?,?)""",
+            (now(),mid,"home",correction,new_stock,
+             "sister-invoice-correction:"+str(invoice_id)+":"+request_key))
+
+
+def edit_invoice(conn,invoice_id,customer_name,phone,invoice_date,lines,notes,
+                 expected_version,request_key):
+    """Correct an existing invoice atomically; never create a second sale."""
+    try:iid=int(invoice_id);version=int(expected_version)
+    except (TypeError,ValueError):raise ImportErrorDetail("شماره یا نسخه فاکتور نامعتبر است.")
+    key=_text(request_key,100)
+    if not key:raise ImportErrorDetail("شناسه ویرایش لازم است.")
+    name=_text(customer_name,120)
+    if len(name)<2:raise ImportErrorDetail("نام مشتری را کامل وارد کن.")
+    day=_date(invoice_date);phone=_text(phone,40);memo=_text(notes)
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        before=_invoice_snapshot(conn,iid)
+        inv=before["invoice"]
+        if inv["is_void"]:raise ImportErrorDetail("فاکتور ابطال‌شده قابل ویرایش نیست.")
+        if inv["version"]!=version:raise ImportErrorDetail("فاکتور بعد از باز شدن فرم تغییر کرده؛ صفحه را تازه‌سازی کن.")
+        if conn.execute("SELECT 1 FROM sister_invoice_audit WHERE request_key=?",(key,)).fetchone():
+            raise ImportErrorDetail("این ویرایش قبلاً ثبت شده است.")
+        next_lines=[]
+        for size in SIZES:
+            row=lines.get(size,{}) or {}
+            qty=money(row.get("qty") or 0)
+            purchase=money(row.get("purchase") or 0)
+            sale=money(row.get("sale") or 0)
+            if qty>100000:raise ImportErrorDetail("تعداد سایز "+size+" بیش از حد مجاز است.")
+            if not qty:continue
+            if not sale or not purchase:raise ImportErrorDetail("قیمت خرید و فروش سایز "+size+" را وارد کن.")
+            mid=None
+            if inv["origin"]=="home":
+                mid_raw=row.get("master_id")
+                if mid_raw in (None,""):raise ImportErrorDetail("کالای واقعی سایز "+size+" را انتخاب کن.")
+                try:mid=int(mid_raw)
+                except (TypeError,ValueError):raise ImportErrorDetail("کالای انتخابی نامعتبر است.")
+                sku=conn.execute("SELECT category,size,active FROM master_products WHERE id=?",(mid,)).fetchone()
+                if sku is None or sku["category"]!="قالب" or sku["size"]!=size or not sku["active"]:
+                    raise ImportErrorDetail("قالب انتخابی با سایز "+size+" سازگار نیست.")
+            next_lines.append({"invoice_id":iid,"size":size,"master_id":mid,
+                               "qty":qty,"purchase_unit":purchase,"sale_unit":sale})
+        if not next_lines:raise ImportErrorDetail("حداقل یک ردیف دارای تعداد مثبت لازم است.")
+        old_sales=sum(int(x["qty"])*int(x["sale_unit"]) for x in before["lines"])
+        new_sales=sum(x["qty"]*x["sale_unit"] for x in next_lines)
+        paid=sum(int(x["amount"]) for x in before["receipts"])
+        if new_sales<paid:
+            raise ImportErrorDetail("مبلغ جدید فاکتور از دریافتی ثبت‌شده کمتر است؛ اول دریافتی را اصلاح کن.")
+        if inv["origin"]=="factory" and inv["status"]=="dispatched":
+            old_cost=sum(int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"])
+            new_cost=sum(x["qty"]*x["purchase_unit"] for x in next_lines)
+            customer_to_mehr=sum(int(r["amount"]) for r in before["receipts"]
+                                 if r["destination"] in ("mehr","check_mehr"))
+            linked=int(conn.execute("""SELECT COALESCE(SUM(-l.debt_delta),0)
+                FROM sister_mehr_settlement_links a
+                JOIN sister_mehr_ledger l ON l.reference=a.reference
+                WHERE a.target_type='invoice' AND a.target_id=? AND l.kind='paid_to_mehr'""",
+                (iid,)).fetchone()[0])
+            if new_cost<customer_to_mehr+linked:
+                raise ImportErrorDetail("بهای خرید جدید از مجموع واریزی مشتری نزد مهر و تسویه‌های این فاکتور کمتر می‌شود.")
+            if mehr_balance(conn)["debt"]+new_cost-old_cost<0:
+                raise ImportErrorDetail("به‌خاطر تهاترهای قبلی، بدهی مهر برای این اصلاح کافی نیست.")
+        conn.execute("""INSERT INTO sister_invoice_customers(name,phone,created_at)
+            VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET
+            phone=CASE WHEN excluded.phone!='' THEN excluded.phone ELSE sister_invoice_customers.phone END""",
+            (name,phone,now()))
+        customer_id=conn.execute("SELECT id FROM sister_invoice_customers WHERE name=?",(name,)).fetchone()[0]
+        if inv["status"]=="dispatched":
+            if inv["origin"]=="home":
+                _adjust_invoice_stock(conn,iid,before["lines"],next_lines,key)
+            else:
+                delta=sum(x["qty"]*x["purchase_unit"] for x in next_lines)-sum(
+                    int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"])
+                if delta:
+                    _ledger(conn,today(),delta,0,"factory_invoice_adjustment",
+                            "invoice-edit:"+str(iid)+":"+key,
+                            "اصلاح بهای خرید فاکتور #"+str(iid))
+        conn.execute("DELETE FROM sister_invoice_lines WHERE invoice_id=?",(iid,))
+        for line in next_lines:
+            conn.execute("""INSERT INTO sister_invoice_lines
+              (invoice_id,size,master_id,qty,purchase_unit,sale_unit)
+              VALUES (?,?,?,?,?,?)""",
+              (iid,line["size"],line["master_id"],line["qty"],line["purchase_unit"],line["sale_unit"]))
+        conn.execute("""UPDATE sister_invoices SET customer_id=?,invoice_date=?,notes=?,version=version+1
+            WHERE id=?""",(customer_id,day,memo,iid))
+        after=_invoice_snapshot(conn,iid)
+        _audit_invoice(conn,iid,"edit",before,after,key)
+        conn.execute("COMMIT")
+        return iid
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
+def edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,request_key):
+    """Only correct amount/date/note; destination and bank stay unchanged."""
+    key=_text(request_key,100)
+    if not key:raise ImportErrorDetail("شناسه اصلاح دریافت لازم است.")
+    val=money(amount)
+    if val<=0:raise ImportErrorDetail("مبلغ دریافتی باید مثبت باشد.")
+    day=_date(paid_on);memo=_text(notes)
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        iid=int(invoice_id);rid=int(receipt_id)
+        before=_invoice_snapshot(conn,iid)
+        if before["invoice"]["is_void"]:raise ImportErrorDetail("فاکتور ابطال‌شده قابل اصلاح نیست.")
+        receipt=next((x for x in before["receipts"] if x["id"]==rid),None)
+        if receipt is None:raise ImportErrorDetail("این دریافت متعلق به فاکتور نیست.")
+        if conn.execute("SELECT 1 FROM sister_invoice_audit WHERE request_key=?",(key,)).fetchone():
+            raise ImportErrorDetail("این ویرایش قبلاً انجام شده است.")
+        total=sum(int(x["qty"])*int(x["sale_unit"]) for x in before["lines"])
+        others=sum(int(x["amount"]) for x in before["receipts"] if x["id"]!=rid)
+        if others+val>total:raise ImportErrorDetail("جمع دریافتی‌ها نمی‌تواند از مبلغ فاکتور بیشتر شود.")
+        cheque=_date(check_date,allow_future=True) if receipt["destination"]=="check_mehr" else None
+        if receipt["destination"]=="check_mehr" and not cheque:
+            raise ImportErrorDetail("تاریخ چک لازم است.")
+        ref="invoice-receipt:"+str(rid)
+        if receipt["destination"]=="mine" and receipt["account_id"] is not None:
+            bank=conn.execute("""UPDATE sister_finance_movements
+                SET amount_toman=?,movement_date=?
+                WHERE reference=? AND kind='receipt' AND cancelled_at IS NULL""",(val,day,ref))
+            if bank.rowcount!=1:raise ImportErrorDetail("گردش بانکی مرتبط با دریافت پیدا نشد.")
+        elif receipt["destination"] in ("mehr","check_mehr"):
+            old_credit=int(receipt["amount"])
+            if mehr_balance(conn)["credit"]+val-old_credit<0:
+                raise ImportErrorDetail("مبلغ جدید با تهاتر قبلی مهر سازگار نیست؛ ابتدا تهاتر را بررسی کن.")
+            entry=conn.execute("""UPDATE sister_mehr_ledger SET credit_delta=?,occurred_on=?
+                WHERE reference=? AND kind='customer_to_mehr'""",(val,day,ref))
+            if entry.rowcount!=1:raise ImportErrorDetail("ثبت واریز مشتری نزد مهر پیدا نشد.")
+        conn.execute("""UPDATE sister_invoice_receipts
+            SET amount=?,paid_on=?,notes=?,check_date=? WHERE id=? AND invoice_id=?""",
+            (val,day,memo,cheque,rid,iid))
+        conn.execute("UPDATE sister_invoices SET version=version+1 WHERE id=?",(iid,))
+        after=_invoice_snapshot(conn,iid)
+        _audit_invoice(conn,iid,"receipt_edit",before,after,key)
+        conn.execute("COMMIT")
+        return rid
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
+def cancel_invoice(conn,invoice_id,request_key,expected_version):
+    """Reverses one invoice exactly once; preserves lines and audit trail.
+
+    Any recorded customer receipt or Mehr settlement must first be reconciled:
+    automatically refunding real cash would be incorrect.
+    """
+    key=_text(request_key,100)
+    if not key:raise ImportErrorDetail("شناسه ابطال لازم است.")
+    try:iid=int(invoice_id);version=int(expected_version)
+    except (TypeError,ValueError):raise ImportErrorDetail("شماره یا نسخه فاکتور نامعتبر است.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        before=_invoice_snapshot(conn,iid)
+        inv=before["invoice"]
+        if inv["is_void"]:raise ImportErrorDetail("این فاکتور قبلاً ابطال شده است.")
+        if inv["version"]!=version:raise ImportErrorDetail("فاکتور تغییر کرده؛ صفحه را تازه‌سازی کن.")
+        if before["receipts"]:
+            raise ImportErrorDetail("این فاکتور دریافت ثبت‌شده دارد؛ برای جلوگیری از حذف واریز واقعی، فعلاً فقط ویرایش فاکتور و دریافتی مجاز است.")
+        linked=conn.execute("""SELECT 1 FROM sister_mehr_settlement_links
+            WHERE target_type='invoice' AND target_id=?""",(iid,)).fetchone()
+        if linked:raise ImportErrorDetail("فاکتور تسویه مهر دارد؛ پیش از ابطال باید تسویه آن بررسی شود.")
+        if inv["status"]=="dispatched":
+            if inv["origin"]=="home":
+                _adjust_invoice_stock(conn,iid,before["lines"],[],key)
+            else:
+                old_cost=sum(int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"])
+                if mehr_balance(conn)["debt"]<old_cost:
+                    raise ImportErrorDetail("با توجه به تهاترهای قبلی مهر، ابطال خودکار این فاکتور مجاز نیست.")
+                _ledger(conn,today(),-old_cost,0,"factory_invoice_cancel",
+                        "invoice-cancel:"+str(iid)+":"+key,
+                        "ابطال فاکتور بدون دریافت مشتری #"+str(iid))
+        conn.execute("""UPDATE sister_invoices SET is_void=1,voided_at=?,version=version+1 WHERE id=?""",
+                     (now(),iid))
+        after=_invoice_snapshot(conn,iid)
+        _audit_invoice(conn,iid,"cancel",before,after,key)
+        conn.execute("COMMIT")
+        return iid
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
+def invoice_audit(conn,invoice_id):
+    return [dict(r) for r in conn.execute("""SELECT id,action,created_at
+         FROM sister_invoice_audit WHERE invoice_id=? ORDER BY id DESC""",(int(invoice_id),))]
 
 
 def invoices(conn,query=""):
