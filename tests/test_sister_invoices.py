@@ -469,5 +469,39 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn('id="mehr-target"',supplier_html)
         self.assertIn('type="text" inputmode="numeric"',supplier_html)
 
+
+    def test_verified_76m_factory_invoice_58m_mehr_and_separate_41496000_purchase(self):
+        from daily_sales_service.sister_invoices import mehr_open_items,invoice_detail
+        from daily_sales_service.sister_purchases import register_purchase
+        from daily_sales_service.sister_finance_api import add_outgoing
+        lines={
+          "بزرگ":{"qty":500,"purchase":80000,"sale":112000},
+          "متوسط":{"qty":500,"purchase":72000,"sale":104000},
+          "کوچک":{"qty":0}
+        }
+        iid=create_invoice(self.db,"مشتری واقعی آزمایشی","",self.day,"factory",lines)
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,58000000,"mehr",self.day,"customer-58m")
+        record_receipt(self.db,iid,50000000,"mine",self.day,"customer-50m")
+        pid=register_purchase(self.db,"مه هر",self.day,"home",
+                              [(self.skus["بزرگ"],494,84000)],"separate-purchase-41m")
+        self.assertEqual(mehr_balance(self.db),{"debt":117496000,"credit":58000000,"net":-59496000})
+        items={x["target"]:x for x in mehr_open_items(self.db)}
+        self.assertEqual(items["invoice:"+str(iid)]["remaining"],18000000)
+        self.assertEqual(items["purchase:"+str(pid)]["remaining"],41496000)
+        result=add_outgoing(purpose="supplier:holder",amount="۱۸٬۰۰۰٬۰۰۰",paid_on=self.day,
+                            request_key="realistic-holder-payment",mehr_target="invoice:"+str(iid),
+                            conn=self.db)
+        self.assertEqual(result.status_code,303)
+        self.assertEqual(mehr_balance(self.db)["net"],-41496000)
+        items={x["target"]:x for x in mehr_open_items(self.db)}
+        self.assertEqual(items["invoice:"+str(iid)]["remaining"],0)
+        self.assertEqual(items["purchase:"+str(pid)]["remaining"],41496000)
+        invoice,items_,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(sum(l["qty"]*l["sale_unit"] for l in items_),108000000)
+        self.assertEqual(sum(l["qty"]*l["purchase_unit"] for l in items_),76000000)
+        self.assertEqual(sum(x["amount"] for x in receipts),108000000)
+        self.assertEqual(len(receipts),2)
+
 if __name__=="__main__":
     unittest.main()
