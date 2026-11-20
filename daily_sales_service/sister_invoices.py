@@ -223,7 +223,13 @@ def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,accoun
         raise
 
 def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
-    if kind not in ("offset","paid_to_mehr","received_from_mehr"):raise ImportErrorDetail("نوع تسویه نامعتبر است.")
+    """Post an auditable Mehr settlement, even without a bank account selection.
+
+    If no account is supplied, no bank/cash movement is invented. A reconciliation
+    marker is retained in the Mehr ledger notes. Old bank-linked calls still work.
+    """
+    if kind not in ("offset","paid_to_mehr","received_from_mehr"):
+        raise ImportErrorDetail("نوع تسویه نامعتبر است.")
     day=_date(day);val=money(amount)
     if val<=0:raise ImportErrorDetail("مبلغ تسویه باید مثبت باشد.")
     key=_text(request_key,100)
@@ -233,21 +239,32 @@ def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
         if conn.execute("SELECT 1 FROM sister_mehr_ledger WHERE reference=?",(key,)).fetchone():
             raise ImportErrorDetail("این تسویه قبلاً ثبت شده است.")
         balance=mehr_balance(conn)
+        net=int(balance["net"])  # positive = net due from Mehr, negative = debt to Mehr
         if kind=="offset":
-            if val>min(balance["debt"],balance["credit"]):raise ImportErrorDetail("مبلغ تهاتر از طلب یا بدهی بیشتر است.")
+            if val>min(balance["debt"],balance["credit"]):
+                raise ImportErrorDetail("مبلغ تهاتر از وجوه مشتری نزد مهر یا بدهی خرید بیشتر است.")
             debt,credit=-val,-val
         elif kind=="paid_to_mehr":
-            if val>balance["debt"]:raise ImportErrorDetail("پرداخت از بدهی ثبت‌شده بیشتر است.")
+            if val>max(0,-net):
+                raise ImportErrorDetail("مبلغ پرداخت از بدهی خالص ثبت‌شده به مهر بیشتر است.")
             debt,credit=-val,0
-            _bank(conn,account_id,"payment",val,day,key+":bank","mehr-supplier",SUPPLIER)
+            if account_id not in (None,""):
+                _bank(conn,account_id,"payment",val,day,key+":bank","mehr-supplier",SUPPLIER)
         else:
-            if val>balance["credit"]:raise ImportErrorDetail("دریافت از طلب ثبت‌شده بیشتر است.")
+            if val>max(0,net):
+                raise ImportErrorDetail("مبلغ دریافتی از طلب خالص ثبت‌شده نزد مهر بیشتر است.")
             debt,credit=0,-val
-            _bank(conn,account_id,"receipt",val,day,key+":bank","mehr-supplier",SUPPLIER)
-        _ledger(conn,day,debt,credit,kind,key,notes)
+            if account_id not in (None,""):
+                _bank(conn,account_id,"receipt",val,day,key+":bank","mehr-supplier",SUPPLIER)
+        note=_text(notes)
+        if kind!="offset" and account_id in (None,""):
+            marker="حساب بانکی نامشخص؛ اثر بانکی ثبت نشد"
+            note=(note+"؛ " if note else "")+marker
+        _ledger(conn,day,debt,credit,kind,key,note)
         conn.execute("COMMIT")
     except Exception:
-        conn.execute("ROLLBACK");raise
+        conn.execute("ROLLBACK")
+        raise
 
 def mehr_balance(conn):
     row=conn.execute("SELECT COALESCE(SUM(debt_delta),0),COALESCE(SUM(credit_delta),0) FROM sister_mehr_ledger").fetchone()
