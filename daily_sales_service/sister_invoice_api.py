@@ -36,9 +36,9 @@ def page_invoices(conn,query=""):
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
-    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت</th><th>فروش</th><th>مانده مشتری</th></tr></thead><tbody>'
+    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
     for r in rows:
-        body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس")+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td></tr>'
+        body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس")+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده")+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
 
@@ -199,6 +199,7 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     body+='</tbody></table></div><div class="m2-finance-cards"><div class="m2-card"><small>کل فاکتور</small><strong>'+fmt(total)+'</strong></div>'
     body+='<div class="m2-card"><small>بهای کالا</small><strong>'+fmt(cost)+'</strong></div>'
     body+='<div class="m2-card"><small>سود ناخالص</small><strong>'+fmt(total-cost)+'</strong></div>'
+    body+='<div class="m2-card"><small>دریافتی مشتری</small><strong>'+fmt(paid)+'</strong></div>'
     body+='<div class="m2-card"><small>مانده مشتری</small><strong>'+fmt(total-paid)+'</strong></div></div><p>'+e(inv["notes"])+'</p>'
     if inv["status"]=="draft":
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/dispatch"><button class="m2-btn" onclick="return confirm(\'ارسال قطعی شود؟ این عملیات بر موجودی یا بدهی مه هر اثر می‌گذارد.\')">تأیید ارسال قطعی</button></form>'
@@ -206,12 +207,12 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     body+='<section class="m2-card"><h3>پرداخت‌های مشتری</h3>'
     for r in receipts:
         label={"mine":"به حساب من","mehr":"به حساب مه هر","check_mehr":"چک تحویل مه هر"}[r["destination"]]
-        body+='<p>'+jal_label(r["paid_on"])+' — '+e(label)+' — '+fmt(r["amount"])+' تومان'+(' — تاریخ چک '+jal_label(r["check_date"]) if r["check_date"] else '')+' — '+e(r["notes"])+'</p>'
+        body+='<p>'+jal_label(r["paid_on"])+' — '+e(label)+(' (بانک نامشخص)' if r["destination"]=="mine" and r["account_id"] is None else '')+' — '+fmt(r["amount"])+' تومان'+(' — تاریخ چک '+jal_label(r["check_date"]) if r["check_date"] else '')+' — '+e(r["notes"])+'</p>'
     if total>paid:
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipt"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
         body+='<div><label>مبلغ (تومان)</label><input type="number" min="1" max="'+str(total-paid)+'" name="amount" required></div>'
         body+='<div><label>دریافت‌کننده</label><select name="destination"><option value="mine">حساب من</option><option value="mehr">حساب مه هر</option><option value="check_mehr">چک تحویل مه هر</option></select></div>'
-        body+='<div><label>حساب من (در صورت واریز به من)</label><select name="account_id"><option value="">انتخاب حساب</option>'+receipt_bank_options(conn)+'</select></div>'
+        body+='<input type="hidden" name="account_id" value=""><p class="m2-hint">دریافت به من بدون انتخاب بانک ثبت می‌شود؛ تا زمان تعیین حساب واقعی به موجودی بانک اضافه نمی‌شود.</p>'
         body+='<div><label>تاریخ پرداخت</label><input type="date" name="paid_on" value="'+today()+'" required></div>'
         body+='<div><label>تاریخ چک (در صورت چک)</label><input type="date" name="check_date"></div>'
         body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
