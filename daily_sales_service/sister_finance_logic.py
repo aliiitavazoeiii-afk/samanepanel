@@ -143,7 +143,7 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_
            FROM sister_invoices i
            JOIN sister_invoice_customers c ON c.id=i.customer_id
            JOIN sister_invoice_lines l ON l.invoice_id=i.id
-           WHERE i.status='dispatched'"""
+           WHERE i.status='dispatched' AND i.is_void=0"""
         args=[]
         if start:sql+=" AND i.invoice_date>=?";args.append(start)
         if end:sql+=" AND i.invoice_date<=?";args.append(end)
@@ -311,7 +311,7 @@ def invoice_claims(conn):
          WHERE l.invoice_id=i.id),0) AS gross,
       COALESCE((SELECT SUM(p.amount) FROM sister_invoice_receipts p
          WHERE p.invoice_id=i.id),0) AS paid
-      FROM sister_invoices i""")
+      FROM sister_invoices i WHERE i.is_void=0""")
     owed=advances=0
     for r in items:
         if r["status"]=="dispatched":
