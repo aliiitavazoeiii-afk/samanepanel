@@ -81,6 +81,7 @@ def new_invoice(conn=Depends(conn_dep)):
     body+='<section class="m2-card"><h3>جمع فاکتور و دریافتی</h3>'
     body+='<div class="m2-finance-cards">'
     body+='<div class="m2-card"><small>جمع کل فاکتور</small><strong id="invoice-grand-total">۰</strong><span class="m2-unit">تومان</span></div>'
+    body+='<div class="m2-card"><small>سود ناخالص فاکتور</small><strong id="invoice-gross-profit">۰</strong><span class="m2-unit">تومان · فروش منهای بهای خرید</span></div>'
     body+='<div class="m2-card"><small>دریافت اولیه</small><strong id="invoice-paid-total">۰</strong><span class="m2-unit">تومان</span></div>'
     body+='<div class="m2-card"><small>مانده مشتری</small><strong id="invoice-remaining">۰</strong><span class="m2-unit">تومان</span></div></div>'
     body+='<div class="m2-fields"><div><label>مبلغ دریافتی هنگام ثبت (تومان؛ اختیاری)</label><input type="number" min="0" value="0" name="initial_amount" id="invoice-initial-amount"></div>'
@@ -98,16 +99,18 @@ def new_invoice(conn=Depends(conn_dep)):
   var fmt=function(n){return new Intl.NumberFormat("fa-IR").format(n);};
   var number=function(name){var x=form.elements[name];return x?Math.max(0,Number(x.value)||0):0;};
   var qty=form.querySelectorAll("[data-invoice-qty]"),sales=form.querySelectorAll("[data-invoice-sale]");
-  var total=document.getElementById("invoice-grand-total"),paid=document.getElementById("invoice-paid-total"),balance=document.getElementById("invoice-remaining");
+  var total=document.getElementById("invoice-grand-total"),profit=document.getElementById("invoice-gross-profit"),paid=document.getElementById("invoice-paid-total"),balance=document.getElementById("invoice-remaining");
   function refresh(){
-    var sum=0;
+    var sum=0,cost=0;
     for(var i=0;i<qty.length;i++){
       var line=(Number(qty[i].value)||0)*(Number(sales[i].value)||0);
+      var purchase=qty[i].closest("tr").querySelector('input[name^="purchase_"]');
+      cost+=(Number(qty[i].value)||0)*(Number(purchase.value)||0);
       qty[i].closest("tr").querySelector("[data-invoice-row]").textContent=fmt(line);
       sum+=line;
     }
     var amount=number("initial_amount");
-    total.textContent=fmt(sum);paid.textContent=fmt(amount);balance.textContent=fmt(sum-amount);
+    total.textContent=fmt(sum);profit.textContent=fmt(sum-cost);paid.textContent=fmt(amount);balance.textContent=fmt(sum-amount);
     form.elements["initial_amount"].max=String(sum);
     var home=form.elements["origin"].value==="home";
     form.querySelectorAll(".invoice-sku-ambiguous").forEach(function(x){x.style.display=home?"":"none";});
@@ -147,8 +150,8 @@ def supplier(conn=Depends(conn_dep)):
     body+='<div class="m2-msg">مانده قدیمی مه هر هنوز با دفتر جدید تطبیق داده نشده است؛ عدد فعلی، مانده قطعی همه سال‌ها نیست.</div>'
     body+='<div class="m2-finance-cards"><div class="m2-card"><small>بدهی خالص من به مه هر</small><strong>'+fmt(max(0,-b["net"]))+'</strong><span class="m2-unit">تومان</span></div>'
     body+='<div class="m2-card"><small>طلب خالص من از مه هر</small><strong>'+fmt(max(0,b["net"]))+'</strong><span class="m2-unit">تومان</span></div>'
-    body+='<div class="m2-card"><small>کل بدهی خرید ثبت‌شده</small><strong>'+fmt(b["debt"])+'</strong></div>'
-    body+='<div class="m2-card"><small>وجوه مشتری نزد مه هر</small><strong>'+fmt(b["credit"])+'</strong></div></div>'
+    body+='</div>'
+    body+='<p class="m2-hint">ریز محاسبه: بدهی خرید '+fmt(b["debt"])+' تومان، وجوه مشتری نزد مهر '+fmt(b["credit"])+' تومان. مانده‌های بالا خالص این دو مبلغ‌اند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/purchases">ثبت خرید کالا</a></div>'
     body+='<section class="m2-card"><h3>ثبت تسویه یا تهاتر</h3>'
     body+='<form method="post" action="'+ROOT+'/invoices/mehr/settle"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
