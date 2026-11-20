@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS sister_invoice_submission_keys (
 );
 CREATE TABLE IF NOT EXISTS sister_mehr_settlement_links (
  reference TEXT PRIMARY KEY REFERENCES sister_mehr_ledger(reference),
- target_type TEXT NOT NULL CHECK(target_type IN ('invoice','purchase')),
+ target_type TEXT NOT NULL CHECK(target_type IN ('invoice','purchase','legacy_purchase')),
  target_id INTEGER NOT NULL CHECK(target_id>0)
 );
 CREATE INDEX IF NOT EXISTS idx_sister_mehr_settlement_target
@@ -270,6 +270,22 @@ def mehr_open_items(conn):
         items.append({"target":"purchase:"+str(r["id"]),"kind":"purchase","id":int(r["id"]),
                       "date":r["purchase_date"],"label":"خرید قالب #"+str(r["id"])+
                       (" / "+r["supplier_invoice"] if r["supplier_invoice"] else ""),
+                      "gross":gross,"credit":0,"paid":paid,"remaining":max(0,gross-paid)})
+    for r in conn.execute("""SELECT p.id,p.purchase_date,p.qty,p.unit_cost,m.size
+        FROM sister_mehr_purchases p
+        JOIN master_products m ON m.id=p.master_id
+        ORDER BY p.id DESC"""):
+        if not conn.execute("""SELECT 1 FROM sister_mehr_ledger
+           WHERE kind='purchase' AND reference=?""",("mehr-purchase:"+str(r["id"]),)).fetchone():
+            continue
+        gross=int(r["qty"])*int(r["unit_cost"])
+        paid=int(conn.execute("""SELECT COALESCE(SUM(-l.debt_delta),0)
+            FROM sister_mehr_settlement_links a JOIN sister_mehr_ledger l ON l.reference=a.reference
+            WHERE a.target_type='legacy_purchase' AND a.target_id=?
+              AND l.kind='paid_to_mehr'""",(r["id"],)).fetchone()[0])
+        items.append({"target":"legacy_purchase:"+str(r["id"]),"kind":"legacy_purchase",
+                      "id":int(r["id"]),"date":r["purchase_date"],
+                      "label":"خرید قدیمی قالب #"+str(r["id"])+" / "+r["size"],
                       "gross":gross,"credit":0,"paid":paid,"remaining":max(0,gross-paid)})
     return items
 
