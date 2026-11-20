@@ -54,6 +54,8 @@ CREATE INDEX IF NOT EXISTS idx_sister_finance_movement_date
 
 def ensure_finance_schema(conn):
     conn.executescript(SCHEMA)
+    from .sister_outgoings import ensure_schema as ensure_outgoing_schema
+    ensure_outgoing_schema(conn)
     for code,title in PARTIES:
         conn.execute("""INSERT OR IGNORE INTO sister_finance_parties
            (code,title,is_platform,created_at) VALUES(?,?,?,?)""",
