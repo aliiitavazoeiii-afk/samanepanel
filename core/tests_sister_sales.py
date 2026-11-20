@@ -127,6 +127,16 @@ class SalesChannelRoutesTest(SimpleTestCase):
         self.assertEqual(sister_sales.public_redirect_location("/daily-sales/invoices/15"),
                          "/invoices/15/")
 
+    def test_invoice_edit_void_and_receipt_correction_routes_are_authenticated(self):
+        self.assertEqual(reverse("sister_invoice_action",kwargs={"invoice_id":15,"action":"edit"}),"/invoices/15/edit/")
+        self.assertEqual(resolve("/invoices/15/edit/").func,sister_sales.invoice_proxy)
+        self.assertEqual(resolve("/invoices/15/cancel/").func,sister_sales.invoice_proxy)
+        self.assertEqual(resolve("/invoices/15/receipts/3/edit/").func,sister_sales.invoice_receipt_edit_proxy)
+        for url in ("/invoices/15/edit/","/invoices/15/cancel/","/invoices/15/receipts/3/edit/"):
+            self.assertEqual(self.client.get(url).status_code,302)
+            self.assertEqual(self.client.post(url).status_code,302)
+        self.assertEqual(sister_sales.invoice_proxy.__name__,"invoice_proxy")
+
     def test_new_purchasing_replaces_old_takvin_menu_but_preserves_old_route(self):
         from django.template.loader import get_template
         raw=get_template("base.html").template.source
