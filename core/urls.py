@@ -69,6 +69,7 @@ urlpatterns = [
     path("invoices/purchases/", sister_sales.digikala_proxy, {"tail": "invoices/purchases"}, name="sister_invoice_purchases"),
     path("invoices/<int:invoice_id>/", sister_sales.invoice_proxy, name="sister_invoice_detail"),
     path("invoices/<int:invoice_id>/<str:action>/", sister_sales.invoice_proxy, name="sister_invoice_action"),
+    path("invoices/<int:invoice_id>/receipts/<int:receipt_id>/edit/", sister_sales.invoice_receipt_edit_proxy, name="sister_invoice_receipt_edit"),
     path("sales/calendar/", daily_views.sale_calendar, name="legacy_sale_calendar"),
     path("sales/digikala/", sister_sales.digikala_proxy, name="sister_sales_digikala"),
     path("sales/digikala/<path:tail>", sister_sales.digikala_proxy, name="sister_sales_digikala_child"),
