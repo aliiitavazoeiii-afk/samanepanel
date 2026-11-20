@@ -9,7 +9,7 @@ from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
 from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
-    receive_purchase,settlement,mehr_balance,invoices,invoice_detail)
+    receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail)
 from .sister_finance_logic import accounts
 
 router=APIRouter()
@@ -152,15 +152,32 @@ def supplier(conn=Depends(conn_dep)):
     body+='<div class="m2-card"><small>طلب خالص من از مه هر</small><strong>'+fmt(max(0,b["net"]))+'</strong><span class="m2-unit">تومان</span></div>'
     body+='</div>'
     body+='<p class="m2-hint">ریز محاسبه: بدهی خرید '+fmt(b["debt"])+' تومان، وجوه مشتری نزد مهر '+fmt(b["credit"])+' تومان. مانده‌های بالا خالص این دو مبلغ‌اند.</p>'
+    open_items=mehr_open_items(conn)
+    body+='<section class="m2-card"><h3>بدهی‌های باز مهر به تفکیک فاکتور و خرید</h3>'
+    if open_items:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سند</th><th>تاریخ</th><th>بهای خرید</th><th>واریزی مشتری نزد مهر</th><th>پرداخت اختصاص‌یافته</th><th>مانده سند</th></tr></thead><tbody>'
+        for item in open_items:
+            title='<a href="'+ROOT+'/invoices/'+str(item["id"])+'">'+e(item["label"])+'</a>' if item["kind"]=="invoice" else e(item["label"])
+            body+='<tr><td>'+title+'</td><td>'+jal_label(item["date"])+'</td><td>'+fmt(item["gross"])+'</td><td>'+fmt(item["credit"])+'</td><td>'+fmt(item["paid"])+'</td><td>'+fmt(item["remaining"])+'</td></tr>'
+        body+='</tbody></table></div>'
+    else:body+='<p class="m2-hint">فعلاً فاکتور یا خرید باز ثبت نشده است.</p>'
+    body+='</section>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/purchases">ثبت خرید کالا</a></div>'
     body+='<section class="m2-card"><h3>ثبت تسویه یا تهاتر</h3>'
     body+='<form method="post" action="'+ROOT+'/invoices/mehr/settle"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
-    body+='<div><label>نوع عملیات</label><select name="kind"><option value="offset">تهاتر وجوه مشتری با بدهی خرید من</option><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
-    body+='<div><label>مبلغ (تومان)</label><input type="number" name="amount" min="1" required></div>'
+    body+='<div><label>نوع عملیات</label><select name="kind" id="mehr-action"><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="offset">تهاتر وجوه مشتری با بدهی خرید</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
+    body+='<div id="mehr-target-wrap"><label>انتخاب فاکتور یا خرید بابت پرداخت</label><select name="target" id="mehr-target"><option value="">انتخاب سند</option>'
+    for item in open_items:
+        if item["remaining"]>0:
+            body+='<option value="'+e(item["target"])+'">'+e(item["label"])+' · مانده '+fmt(item["remaining"])+' تومان</option>'
+    body+='</select></div>'
+    body+='<div><label>مبلغ (تومان)</label><input type="text" inputmode="numeric" dir="ltr" name="amount" placeholder="مثلاً 18000000" required></div>'
     body+='<div><label>تاریخ ثبت</label><input type="date" name="day" value="'+today()+'" required></div>'
-    body+='<p class="m2-hint">برای ثبت پرداخت یا دریافت به مهر، انتخاب بانک لازم نیست؛ مبلغ و تاریخ در دفتر مهر ثبت می‌شود. تا وقتی حساب واقعی مشخص نشده، مانده بانک در پنل تغییر نمی‌کند.</p>'
+    body+='<p class="m2-hint">پرداخت واقعی بدهی خالص را کم می‌کند و به فاکتور انتخاب‌شده وصل می‌شود. تهاترِ ۵۸ میلیون واریزی مشتری از قبل در مانده خالص حساب شده؛ تهاترِ جداگانه مانده خالص را دوباره کم نمی‌کند و برای تطبیق دوطرفه دفتر است. هیچ بانکی انتخاب نمی‌شود.</p>'
     body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
-    body+='</div><button class="m2-btn">ثبت تسویه</button></form></section>'
+    body+='</div><button class="m2-btn">ثبت تسویه</button></form>'
+    body+='<script>(function(){var a=document.getElementById("mehr-action"),w=document.getElementById("mehr-target-wrap"),t=document.getElementById("mehr-target");if(!a)return;function update(){var pay=a.value==="paid_to_mehr";w.style.display=pay?"":"none";t.required=pay;}a.addEventListener("change",update);update();})();</script>'
+    body+='</section>'
     body+='<section class="m2-card"><h3>گردش حساب مه هر</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>نوع</th><th>تغییر بدهی خرید</th><th>تغییر وجه مشتری نزد مهر</th><th>توضیحات</th></tr></thead><tbody>'
     labels={"purchase_general":"خرید کالا","purchase":"خرید خانه","factory_invoice":"ارسال کارخانه","customer_to_mehr":"واریز/چک مشتری","offset":"تهاتر","paid_to_mehr":"پرداخت به مه هر","received_from_mehr":"دریافت از مه هر"}
     for r in conn.execute("SELECT * FROM sister_mehr_ledger ORDER BY id DESC LIMIT 200"):
@@ -170,8 +187,11 @@ def supplier(conn=Depends(conn_dep)):
 
 @router.post(ROOT+"/invoices/mehr/settle")
 def settle(kind:str=Form(...),amount:str=Form(...),day:str=Form(...),request_key:str=Form(...),
-           account_id:str=Form(""),notes:str=Form(""),conn=Depends(conn_dep)):
-    try:settlement(conn,kind,amount,day,request_key,account_id,notes)
+           account_id:str=Form(""),notes:str=Form(""),target:str=Form(""),conn=Depends(conn_dep)):
+    try:
+        if kind=="paid_to_mehr" and not target:
+            raise ImportErrorDetail("فاکتور یا خرید مورد تسویه را انتخاب کن.")
+        settlement(conn,kind,amount,day,request_key,account_id,notes,target=target)
     except (ImportErrorDetail,ValueError) as ex:return form_error(ex,"invoices/mehr")
     return RedirectResponse(ROOT+"/invoices/mehr",status_code=303)
 
@@ -205,6 +225,10 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     body+='<div class="m2-card"><small>سود ناخالص</small><strong>'+fmt(total-cost)+'</strong></div>'
     body+='<div class="m2-card"><small>دریافتی مشتری</small><strong>'+fmt(paid)+'</strong></div>'
     body+='<div class="m2-card"><small>مانده مشتری</small><strong>'+fmt(total-paid)+'</strong></div></div><p>'+e(inv["notes"])+'</p>'
+    if inv["origin"]=="factory" and inv["status"]=="dispatched":
+        item=next((r for r in mehr_open_items(conn) if r["kind"]=="invoice" and r["id"]==invoice_id),None)
+        if item:
+            body+='<p class="m2-hint">حساب تأمین‌کننده این فاکتور: بهای خرید '+fmt(item["gross"])+' تومان، وجوه مشتری نزد مهر '+fmt(item["credit"])+' تومان، پرداخت من به مهر '+fmt(item["paid"])+' تومان، <strong>مانده پرداخت این فاکتور به مهر: '+fmt(item["remaining"])+' تومان</strong>. این مبلغ با مانده مشتری فرق دارد.</p>'
     if inv["status"]=="draft":
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/dispatch"><button class="m2-btn" onclick="return confirm(\'ارسال قطعی شود؟ این عملیات بر موجودی یا بدهی مه هر اثر می‌گذارد.\')">تأیید ارسال قطعی</button></form>'
     body+='</section>'
