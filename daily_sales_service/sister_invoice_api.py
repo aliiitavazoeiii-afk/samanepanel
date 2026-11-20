@@ -8,7 +8,7 @@ from .effective_costs import today
 from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
-from .sister_invoices import (SIZES,create_invoice,dispatch_invoice,record_receipt,
+from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
     receive_purchase,settlement,mehr_balance,invoices,invoice_detail)
 from .sister_finance_logic import accounts
 
@@ -48,23 +48,81 @@ def index(q:str="",conn=Depends(conn_dep)):
 
 @router.get(ROOT+"/invoices/new")
 def new_invoice(conn=Depends(conn_dep)):
-    body='<h1>فاکتور جدید</h1><p class="m2-hint">مبالغ به تومان هستند؛ مبلغ خرید از مه هر و قیمت فروش به مشتری را جدا ثبت کن.</p>'
-    body+='<form action="'+ROOT+'/invoices/create" method="post"><section class="m2-card"><div class="m2-fields">'
+    body='<h1>فاکتور جدید</h1><p class="m2-hint">همه اطلاعات، جمع فاکتور و دریافت اولیه را همین‌جا ثبت کن. با ثبت نهایی، فاکتور قطعی و موجودی دقیقاً یک بار اصلاح می‌شود.</p>'
+    body+='<form id="sister-one-invoice" action="'+ROOT+'/invoices/create" method="post">'
+    body+='<input type="hidden" name="request_key" value="'+token()+'">'
+    body+='<section class="m2-card"><h3>مشخصات و محل ارسال</h3><div class="m2-fields">'
     body+='<div><label>نام مشتری</label><input name="customer_name" list="sister-customer-list" required maxlength="120"></div>'
     body+='<datalist id="sister-customer-list">'+''.join('<option value="'+e(x[0])+'"></option>' for x in conn.execute("SELECT name FROM sister_invoice_customers ORDER BY name"))+'</datalist>'
     body+='<div><label>شماره تماس</label><input name="phone" maxlength="40"></div>'
     body+='<div><label>تاریخ فاکتور</label><input type="date" name="invoice_date" value="'+today()+'" required></div>'
-    body+='<div><label>محل ارسال</label><select name="origin" id="invoice-origin"><option value="home">خانه (کسر از موجودی)</option><option value="factory">کارخانه (بدون کسر از خانه)</option></select></div></div></section>'
-    body+='<section class="m2-card"><h3>سه سایز قالب</h3><p class="m2-hint">در ارسال از خانه، برای هر سایز کالای واقعی موجودی را انتخاب کن. برای کارخانه انتخاب کالا لازم نیست.</p>'
-    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>قالب موجودی خانه</th><th>تعداد</th><th>قیمت خرید هر عدد از مه هر</th><th>قیمت فروش هر عدد</th></tr></thead><tbody>'
-    for size in SIZES:
-        key={"کوچک":"small","متوسط":"medium","بزرگ":"large"}[size]
-        body+='<tr><th>'+size+'</th><td><select name="master_'+key+'">'+sku_options(conn,size)+'</select></td>'
-        body+='<td><input type="number" min="0" max="100000" name="qty_'+key+'" value="0" required></td>'
+    body+='<div><label>محل کسر کالا / ارسال (فقط یک‌بار)</label><select name="origin" id="invoice-origin"><option value="home">خانه (کسر از موجودی خانه)</option><option value="factory">کارخانه (خرید مستقیم از مه هر، بدون کسر از خانه)</option></select></div>'
+    body+='</div></section>'
+    body+='<section class="m2-card"><h3>اقلام فاکتور</h3>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>تعداد</th><th>قیمت خرید هر عدد از مه هر</th><th>قیمت فروش هر عدد</th><th>جمع ردیف</th></tr></thead><tbody>'
+    for size,key in (("کوچک","small"),("متوسط","medium"),("بزرگ","large")):
+        body+='<tr><th>'+size+'</th><td><input type="number" min="0" max="100000" name="qty_'+key+'" value="0" required data-invoice-qty></td>'
         body+='<td><input type="number" min="0" name="purchase_'+key+'" placeholder="تومان"></td>'
-        body+='<td><input type="number" min="0" name="sale_'+key+'" placeholder="تومان"></td></tr>'
-    body+='</tbody></table></div><div class="m2-fields"><div><label>توضیحات فاکتور</label><textarea name="notes" maxlength="350"></textarea></div></div>'
-    body+='<button class="m2-btn" type="submit">ذخیره پیش‌نویس فاکتور</button></section></form>'
+        body+='<td><input type="number" min="0" name="sale_'+key+'" placeholder="تومان" data-invoice-sale></td>'
+        body+='<td><strong data-invoice-row>۰</strong> تومان</td></tr>'
+    body+='</tbody></table></div>'
+    # A physical SKU must be unambiguous; show a selector only for sizes with multiple active SKUs.
+    for size,key in (("کوچک","small"),("متوسط","medium"),("بزرگ","large")):
+        choices=list(conn.execute("""SELECT id,title,color,seller_stock FROM master_products
+            WHERE category='قالب' AND size=? AND active=1 ORDER BY title,color,id""",(size,)))
+        if len(choices)>1:
+            body+='<div class="m2-fields invoice-sku-ambiguous"><div><label>مدل / رنگ قالب '+size+' (فقط در صورت ارسال از خانه و ثبت تعداد)</label>'
+            body+='<select name="master_'+key+'"><option value="">انتخاب مدل دقیق</option>'
+            body+=''.join('<option value="'+str(r["id"])+'">'+e(r["title"])+' / '+e(r["color"])+' · موجودی '+fmt(r["seller_stock"])+'</option>' for r in choices)
+            body+='</select></div></div>'
+        elif len(choices)==1:
+            body+='<input type="hidden" name="master_'+key+'" value="'+str(choices[0]["id"])+'">'
+    body+='<div class="m2-fields"><div><label>توضیحات فاکتور</label><textarea name="notes" maxlength="350"></textarea></div></div></section>'
+    body+='<section class="m2-card"><h3>جمع فاکتور و دریافتی</h3>'
+    body+='<div class="m2-finance-cards">'
+    body+='<div class="m2-card"><small>جمع کل فاکتور</small><strong id="invoice-grand-total">۰</strong><span class="m2-unit">تومان</span></div>'
+    body+='<div class="m2-card"><small>دریافت اولیه</small><strong id="invoice-paid-total">۰</strong><span class="m2-unit">تومان</span></div>'
+    body+='<div class="m2-card"><small>مانده مشتری</small><strong id="invoice-remaining">۰</strong><span class="m2-unit">تومان</span></div></div>'
+    body+='<div class="m2-fields"><div><label>مبلغ دریافتی هنگام ثبت (تومان؛ اختیاری)</label><input type="number" min="0" value="0" name="initial_amount" id="invoice-initial-amount"></div>'
+    body+='<div><label>دریافت‌شده توسط</label><select name="destination" id="invoice-destination"><option value="mine">من (بدون انتخاب بانک)</option><option value="mehr">مه هر</option><option value="check_mehr">چک تحویل مه هر</option></select></div>'
+    body+='<div><label>تاریخ پرداخت</label><input type="date" name="paid_on" value="'+today()+'"></div>'
+    body+='<div id="invoice-check-date-wrap" style="display:none"><label>تاریخ چک</label><input type="date" name="check_date"></div>'
+    body+='<div><label>شرح دریافت / شماره پیگیری (اختیاری)</label><input name="receipt_notes" maxlength="350"></div></div>'
+    body+='<p class="m2-hint">اگر دریافت به من ثبت شود، ولی بانک مشخص نباشد، دریافت در تاریخچه فاکتور ثبت می‌شود؛ به مانده هیچ حساب بانکی اضافه نمی‌شود تا حساب واقعی تعیین شود.</p>'
+    body+='<button class="m2-btn" type="submit" id="invoice-save-button">ثبت نهایی فاکتور و دریافتی</button>'
+    body+='</section></form>'
+    body+=r'''<script>
+(function(){
+  var form=document.getElementById("sister-one-invoice");
+  if(!form)return;
+  var fmt=function(n){return new Intl.NumberFormat("fa-IR").format(n);};
+  var number=function(name){var x=form.elements[name];return x?Math.max(0,Number(x.value)||0):0;};
+  var qty=form.querySelectorAll("[data-invoice-qty]"),sales=form.querySelectorAll("[data-invoice-sale]");
+  var total=document.getElementById("invoice-grand-total"),paid=document.getElementById("invoice-paid-total"),balance=document.getElementById("invoice-remaining");
+  function refresh(){
+    var sum=0;
+    for(var i=0;i<qty.length;i++){
+      var line=(Number(qty[i].value)||0)*(Number(sales[i].value)||0);
+      qty[i].closest("tr").querySelector("[data-invoice-row]").textContent=fmt(line);
+      sum+=line;
+    }
+    var amount=number("initial_amount");
+    total.textContent=fmt(sum);paid.textContent=fmt(amount);balance.textContent=fmt(sum-amount);
+    form.elements["initial_amount"].max=String(sum);
+    var home=form.elements["origin"].value==="home";
+    form.querySelectorAll(".invoice-sku-ambiguous").forEach(function(x){x.style.display=home?"":"none";});
+    document.getElementById("invoice-check-date-wrap").style.display=form.elements["destination"].value==="check_mehr"?"":"none";
+  }
+  form.addEventListener("input",refresh);form.addEventListener("change",refresh);
+  form.addEventListener("submit",function(ev){
+    var grand=0;
+    for(var i=0;i<qty.length;i++)grand+=(Number(qty[i].value)||0)*(Number(sales[i].value)||0);
+    if(grand<=0||number("initial_amount")>grand){ev.preventDefault();alert("جمع فاکتور و مبلغ دریافتی را بررسی کن.");return;}
+    document.getElementById("invoice-save-button").disabled=true;
+  });
+  refresh();
+})();
+</script>'''
     return page_with_style("فاکتور جدید",body)
 
 @router.post(ROOT+"/invoices/create")
@@ -75,8 +133,10 @@ async def create(request:Request,conn=Depends(conn_dep)):
         lines[size]={"qty":f.get("qty_"+key),"purchase":f.get("purchase_"+key),
                      "sale":f.get("sale_"+key),"master_id":f.get("master_"+key)}
     try:
-        iid=create_invoice(conn,f.get("customer_name"),f.get("phone"),f.get("invoice_date"),
-                           f.get("origin"),lines,f.get("notes"))
+        iid=submit_invoice(conn,f.get("customer_name"),f.get("phone"),f.get("invoice_date"),
+                           f.get("origin"),lines,f.get("notes"),f.get("request_key"),
+                           f.get("initial_amount","0"),f.get("destination","mine"),
+                           f.get("paid_on",""),f.get("check_date",""),f.get("receipt_notes",""))
     except (ImportErrorDetail,ValueError,TypeError) as ex:return form_error(ex,"invoices/new")
     return RedirectResponse(ROOT+"/invoices/"+str(iid),status_code=303)
 
