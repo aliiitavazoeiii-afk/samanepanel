@@ -57,6 +57,7 @@ def finance_home(conn=Depends(conn_dep)):
     if conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0]:
         body+='<div class="m2-msg">سود فاکتورهای ارسال‌شده قالب در فروش کل لحاظ شده است. طلب مشتری و حساب مه هر هم در کارت‌های مالی هستند؛ برای جزئیات، صفحات مربوط را باز کن.</div>'
     body+=nav("finance")
+    body+='<p><a class="m2-btn" href="'+ROOT+'/finance/open-invoices">فاکتورهای باز و مانده‌های پرداخت‌نشده</a></p>'
     body+=tiles([("جمع طلب پلتفرم‌ها",info["total_receivable"],"تومان"),
                  ("طلب مشتریان فاکتورها",info["invoice_receivable"],"تومان"),
                  ("طلب من از مه هر",info["mehr_receivable"],"تومان"),
@@ -81,6 +82,44 @@ def finance_home(conn=Depends(conn_dep)):
     body+='<a class="m2-btn" href="/calculator/">محاسبه‌گر</a></div>'
     body+='<p class="m2-hint">موجودی حساب بانکی بر اساس مانده اولیه و گردش‌های این دفتر محاسبه می‌شود. موجودی یا مطالبات دفتر قدیمی با این مبالغ جمع نشده‌اند.</p>'
     return page_with_style("مرکز مالی",body)
+
+
+@router.get(ROOT+"/finance/open-invoices")
+def open_invoice_balances(conn=Depends(conn_dep)):
+    from .sister_invoices import open_customer_invoices,mehr_balance
+    from .sister_purchases import suppliers
+    from .calendar_jalali import label as jal_label
+    rows=open_customer_invoices(conn,200)
+    supplier_rows=[x for x in suppliers(conn) if int(x["due"])>0]
+    mehr=mehr_balance(conn)
+    unallocated=conn.execute("""SELECT COALESCE(SUM(amount),0),COUNT(*)
+        FROM sister_invoice_receipts WHERE destination='mine' AND account_id IS NULL""").fetchone()
+    body='<h1>فاکتورهای باز و مانده حساب‌ها</h1>'
+    body+='<p class="m2-hint">مانده مشتریان، بدهی تأمین‌کنندگان و دریافت‌های بانک‌نامشخص از یکدیگر جدا هستند. پرداخت‌های فاکتور را دوباره در مالی ثبت نکن.</p>'
+    body+=nav("finance")
+    body+=tiles([("مانده مشتریان",sum(int(x["gross"])-int(x["paid"]) for x in rows),"تومان · فاکتورهای ارسال‌شده"),
+                 ("دریافت ثبت‌شده با بانک نامشخص",int(unallocated[0]),"تومان · "+str(int(unallocated[1]))+" دریافت؛ خارج از مانده بانک"),
+                 ("بدهی من به مه هر",mehr["debt"],"تومان · قابل تهاتر با طلب جداگانه"),
+                 ("طلب من از مه هر",mehr["credit"],"تومان · مستقل از بانک"),
+                 ("بدهی سایر تأمین‌کنندگان",sum(int(x["due"]) for x in supplier_rows),"تومان")])
+    body+='<section class="m2-card"><h3>فاکتورهای باز مشتریان</h3>'
+    if rows:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>جمع</th><th>دریافتی</th><th>مانده</th></tr></thead><tbody>'
+        for r in rows:
+            body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td></tr>'
+        body+='</tbody></table></div>'
+    else:body+='<p class="m2-hint">فاکتور ارسال‌شدهٔ تسویه‌نشده‌ای ثبت نشده است.</p>'
+    body+='</section>'
+    body+='<section class="m2-card"><h3>بدهی باز تأمین‌کنندگان</h3>'
+    if supplier_rows:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تأمین‌کننده</th><th>خرید</th><th>پرداخت</th><th>مانده بدهی</th></tr></thead><tbody>'
+        for r in supplier_rows:
+            body+='<tr><td>'+e(r["name"])+'</td><td>'+fmt(r["purchased"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["due"])+'</td></tr>'
+        body+='</tbody></table></div>'
+    else:body+='<p class="m2-hint">بدهی ثبت‌شدهٔ بازی برای تأمین‌کنندگان دیگر وجود ندارد.</p>'
+    body+='</section>'
+    body+='<p class="m2-hint">بدهی مه هر در دفتر جداگانه اوست و جزئیات پرداخت و تهاتر را از <a href="'+ROOT+'/invoices/mehr">حساب مه هر</a> ثبت کن. مانده‌های افتتاحیه قدیمی هنوز تطبیق نهایی نشده‌اند.</p>'
+    return page_with_style("فاکتورهای باز",body)
 
 @router.get(ROOT+"/finance/accounts")
 def finance_accounts(conn=Depends(conn_dep)):
