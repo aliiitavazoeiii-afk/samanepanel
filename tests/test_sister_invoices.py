@@ -340,5 +340,63 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertEqual(mehr_balance(self.db)["net"],0)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_finance_movements").fetchone()[0],0)
 
+
+    def test_outgoing_supplier_and_current_expenses_do_not_mix_with_marketplace(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_outgoings import (record_outgoing,cancel_outgoing,
+            outgoing_history,expense_total,unmatched_supplier_total)
+        from daily_sales_service.sister_finance_api import finance_movements,finance_home
+        from daily_sales_service.sister_finance_logic import accounts
+        from daily_sales_service.sister_purchases import register_purchase,supplier_totals
+        from daily_sales_service.sister_invoices import mehr_balance
+        register_purchase(self.db,"دارما",self.day,"home",[(self.skus["کوچک"],2,40000)],"outgoing-purchase")
+        sid=self.db.execute("SELECT id FROM sister_purchase_suppliers WHERE name='دارما'").fetchone()[0]
+        self.assertEqual(supplier_totals(self.db,sid)["due"],80000)
+        pay_id=record_outgoing(self.db,"supplier:darma",30000,self.day,"out-supplier-1",notes="تسویه خرید")
+        self.assertEqual(supplier_totals(self.db,sid)["due"],50000)
+        exp_id=record_outgoing(self.db,"expense:post",12000,self.day,"out-post-1")
+        record_outgoing(self.db,"expense:snap",5000,self.day,"out-snap-1")
+        self.assertEqual(expense_total(self.db),17000)
+        self.assertEqual(unmatched_supplier_total(self.db),0)
+        self.assertEqual(sum(a["movement_toman"] for a in accounts(self.db)),0)
+        with self.assertRaises(ImportErrorDetail):
+            record_outgoing(self.db,"supplier:darma",30000,self.day,"out-supplier-1")
+        with self.assertRaises(ImportErrorDetail):
+            record_outgoing(self.db,"expense:site",1000,self.day,"invalid-platform")
+        h=finance_movements(section="payment",conn=self.db).body.decode("utf-8")
+        self.assertIn("هزینه پست",h)
+        self.assertIn("دریافت",h)
+        self.assertIn('value="supplier:mehr"',h)
+        self.assertIn('value="expense:carton"',h)
+        self.assertNotIn('name="account_id"',h)
+        self.assertNotIn('value="expense:digikala"',h)
+        fin=finance_home(conn=self.db).body.decode("utf-8")
+        self.assertIn("هزینه‌های جاری ثبت‌شده",fin)
+        self.assertIn("17,000",fin)
+        cancel_outgoing(self.db,pay_id)
+        self.assertEqual(supplier_totals(self.db,sid)["due"],80000)
+        cancel_outgoing(self.db,exp_id)
+        self.assertEqual(expense_total(self.db),5000)
+        self.assertEqual(mehr_balance(self.db)["net"],0)
+
+    def test_unmatched_supplier_payment_remains_unallocated(self):
+        from daily_sales_service.sister_outgoings import record_outgoing,unmatched_supplier_total
+        from daily_sales_service.sister_purchases import supplier_totals
+        key=record_outgoing(self.db,"supplier:bodyguard",70000,self.day,"unmatched-supplier")
+        self.assertEqual(unmatched_supplier_total(self.db),70000)
+        self.assertIsNone(self.db.execute("SELECT linked_supplier_id FROM sister_manual_outgoings WHERE id=?",(key,)).fetchone()[0])
+
+    def test_one_page_invoice_live_profit_field_is_present(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_invoice_api import new_invoice,supplier
+        html=new_invoice(conn=self.db).body.decode("utf-8")
+        self.assertIn('id="invoice-gross-profit"',html)
+        self.assertIn('profit.textContent=fmt(sum-cost)',html)
+        mehr=supplier(conn=self.db).body.decode("utf-8")
+        self.assertIn("طلب خالص من از مه هر",mehr)
+        self.assertIn("بدهی خالص من به مه هر",mehr)
+        self.assertNotIn("<small>کل بدهی خرید ثبت‌شده</small>",mehr)
+        self.assertNotIn("<small>وجوه مشتری نزد مه هر</small>",mehr)
+
 if __name__=="__main__":
     unittest.main()
