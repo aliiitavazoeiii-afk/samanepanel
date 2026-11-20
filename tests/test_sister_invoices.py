@@ -198,7 +198,7 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn("سود کل قالب‌ها",home)
         self.assertIn("بدهی خالص من به مه هر",home)
         self.assertIn("طلب خالص من از مه هر",home)
-        self.assertIn("وجوه مشتری نزد مه هر",home)
+        self.assertIn("وجوه مشتری نزد مهر",home)
         self.assertIn("طلب مشتریان فاکتورها",home)
         self.assertNotIn("مشتری تست",home)
 
