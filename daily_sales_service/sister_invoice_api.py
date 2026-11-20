@@ -9,7 +9,8 @@ from .engine import ImportErrorDetail
 from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
 from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
-    receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail)
+    receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail,
+    edit_invoice,edit_invoice_receipt,cancel_invoice,invoice_audit)
 from .sister_finance_logic import accounts
 
 router=APIRouter()
@@ -36,9 +37,9 @@ def page_invoices(conn,query=""):
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
-    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
+    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th><th>عملیات</th></tr></thead><tbody>'
     for r in rows:
-        body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس")+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده")+'</td></tr>'
+        body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td><td>'+("ابطال‌شده" if r["is_void"] else '<a href="'+ROOT+'/invoices/'+str(r["id"])+'/edit">ویرایش</a> · <a href="'+ROOT+'/invoices/'+str(r["id"])+'">حذف / ابطال</a>')+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
 
@@ -142,6 +143,90 @@ async def create(request:Request,conn=Depends(conn_dep)):
                            f.get("paid_on",""),f.get("check_date",""),f.get("receipt_notes",""))
     except (ImportErrorDetail,ValueError,TypeError) as ex:return form_error(ex,"invoices/new")
     return RedirectResponse(ROOT+"/invoices/"+str(iid),status_code=303)
+
+
+@router.get(ROOT+"/invoices/{invoice_id}/edit")
+def edit_form(invoice_id:int,conn=Depends(conn_dep)):
+    try:inv,lines,receipts=invoice_detail(conn,invoice_id)
+    except ImportErrorDetail as exc:return form_error(exc)
+    if inv["is_void"]:return form_error(ImportErrorDetail("فاکتور ابطال‌شده قابل ویرایش نیست."))
+    by_size={r["size"]:r for r in lines}
+    body='<h1>ویرایش فاکتور #'+str(invoice_id)+'</h1>'
+    body+='<p class="m2-hint">قیمت، تعداد، جمع و سود را اصلاح کن. اگر مبلغ دریافتی اشتباه است، آن را جدا در جزئیات فاکتور ویرایش کن.</p>'
+    body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/edit" id="invoice-edit-form">'
+    body+='<input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
+    body+='<section class="m2-card"><div class="m2-fields">'
+    body+='<div><label>نام مشتری</label><input name="customer_name" value="'+e(inv["name"])+'" required maxlength="120"></div>'
+    body+='<div><label>شماره تماس</label><input name="phone" value="'+e(inv["phone"])+'" maxlength="40"></div>'
+    body+='<div><label>تاریخ</label><input name="invoice_date" type="date" value="'+e(inv["invoice_date"])+'" required></div>'
+    body+='<div><label>محل ارسال (غیرقابل تغییر)</label><input readonly value="'+("خانه" if inv["origin"]=="home" else "کارخانه")+'"></div></div>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>تعداد</th><th>خرید هر عدد</th><th>فروش هر عدد</th><th>جمع ردیف</th></tr></thead><tbody>'
+    for size,key in (("کوچک","small"),("متوسط","medium"),("بزرگ","large")):
+        line=by_size.get(size,{})
+        body+='<tr><th>'+size+'</th><td><input name="qty_'+key+'" type="number" min="0" max="100000" value="'+str(line.get("qty",0))+'" data-edit-qty></td>'
+        body+='<td><input name="purchase_'+key+'" type="number" min="0" value="'+str(line.get("purchase_unit",0))+'" data-edit-cost></td>'
+        body+='<td><input name="sale_'+key+'" type="number" min="0" value="'+str(line.get("sale_unit",0))+'" data-edit-sale></td>'
+        body+='<td><strong data-edit-row>۰</strong> تومان</td></tr>'
+        if inv["origin"]=="home":
+            choices=list(conn.execute("""SELECT id,title,color FROM master_products
+               WHERE category='قالب' AND size=? AND (active=1 OR id=?) ORDER BY title,id""",
+               (size,line.get("master_id"))))
+            body+='<tr><td colspan="5"><label>کالای انبار سایز '+size+'</label><select name="master_'+key+'"><option value="">انتخاب کالای فیزیکی</option>'
+            for sku in choices:
+                chosen=' selected' if sku["id"]==line.get("master_id") else ''
+                body+='<option value="'+str(sku["id"])+'"'+chosen+'>'+e(sku["title"])+' / '+e(sku["color"])+'</option>'
+            body+='</select></td></tr>'
+    body+='</tbody></table></div>'
+    body+='<div class="m2-fields"><div><label>توضیحات</label><textarea name="notes" maxlength="350">'+e(inv["notes"])+'</textarea></div></div>'
+    body+='<div class="m2-finance-cards"><div class="m2-card"><small>جمع فروش جدید</small><strong id="edit-total">۰</strong></div>'
+    body+='<div class="m2-card"><small>سود ناخالص جدید</small><strong id="edit-profit">۰</strong></div></div>'
+    body+='<p class="m2-hint">جمع دریافتی ثبت‌شده: '+fmt(sum(x["amount"] for x in receipts))+' تومان. جمع فروش اصلاح‌شده نباید کمتر از این عدد باشد.</p>'
+    body+='<button class="m2-btn" type="submit" onclick="return confirm(\'تغییرات فاکتور و اثر آن بر حساب و انبار ثبت شود؟\')">ذخیره اصلاح فاکتور</button> '
+    body+='<a class="m2-btn" href="'+ROOT+'/invoices/'+str(invoice_id)+'">انصراف</a></section></form>'
+    body+=r'''<script>(function(){var f=document.getElementById("invoice-edit-form");if(!f)return;
+    var q=f.querySelectorAll("[data-edit-qty]"),c=f.querySelectorAll("[data-edit-cost]"),s=f.querySelectorAll("[data-edit-sale]");
+    function refresh(){var total=0,cost=0;for(var i=0;i<q.length;i++){
+    var qty=Number(q[i].value)||0,amount=qty*(Number(s[i].value)||0);
+    cost+=qty*(Number(c[i].value)||0);total+=amount;
+    q[i].closest("tr").querySelector("[data-edit-row]").textContent=new Intl.NumberFormat("fa-IR").format(amount);}
+    document.getElementById("edit-total").textContent=new Intl.NumberFormat("fa-IR").format(total);
+    document.getElementById("edit-profit").textContent=new Intl.NumberFormat("fa-IR").format(total-cost);}
+    f.addEventListener("input",refresh);refresh();})();</script>'''
+    return page_with_style("ویرایش فاکتور",body)
+
+
+@router.post(ROOT+"/invoices/{invoice_id}/edit")
+async def edit_post(invoice_id:int,request:Request,conn=Depends(conn_dep)):
+    f=await request.form()
+    lines={}
+    for size,key in (("کوچک","small"),("متوسط","medium"),("بزرگ","large")):
+        lines[size]={"qty":f.get("qty_"+key),"purchase":f.get("purchase_"+key),
+                     "sale":f.get("sale_"+key),"master_id":f.get("master_"+key)}
+    try:edit_invoice(conn,invoice_id,f.get("customer_name"),f.get("phone"),
+                     f.get("invoice_date"),lines,f.get("notes"),
+                     f.get("version"),f.get("request_key"))
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/"+str(invoice_id)+"/edit")
+    return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
+
+
+@router.post(ROOT+"/invoices/{invoice_id}/cancel")
+def cancel_post(invoice_id:int,request_key:str=Form(...),version:int=Form(...),conn=Depends(conn_dep)):
+    try:cancel_invoice(conn,invoice_id,request_key,version)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/"+str(invoice_id))
+    return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
+
+
+@router.post(ROOT+"/invoices/{invoice_id}/receipts/{receipt_id}/edit")
+def receipt_edit_post(invoice_id:int,receipt_id:int,amount:str=Form(...),paid_on:str=Form(...),
+                      notes:str=Form(""),check_date:str=Form(""),request_key:str=Form(...),
+                      conn=Depends(conn_dep)):
+    try:edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,request_key)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/"+str(invoice_id))
+    return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
+
 
 @router.get(ROOT+"/invoices/mehr")
 def supplier(conn=Depends(conn_dep)):
