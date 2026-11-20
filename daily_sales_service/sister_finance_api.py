@@ -1,6 +1,7 @@
 """Django-embedded sister finance views: platform claims, receipts, payments,
 bank accounts and unified sale/cost/commission/profit reporting.
 """
+import uuid
 from urllib.parse import quote
 from fastapi import APIRouter,Depends,Form
 from fastapi.responses import RedirectResponse,JSONResponse
@@ -14,6 +15,10 @@ from .sister_finance_logic import (
     overview,platform_balances,sales_report,accounts,parties,movements,
     add_party,add_account,register_movement,cancel_movement
 )
+
+from .sister_outgoings import (EXPENSES,SUPPLIER_SHORTCUTS,record_outgoing,
+    cancel_outgoing,outgoing_history,expense_total,unmatched_supplier_total)
+from .sister_invoices import settlement as settle_mehr
 
 router=APIRouter()
 
@@ -156,9 +161,76 @@ def post_account(title:str=Form(...),opening:str=Form("0"),conn=Depends(conn_dep
     except (ImportErrorDetail,ValueError) as exc:return error_page(exc,"finance/accounts")
     return RedirectResponse(ROOT+"/finance/accounts",status_code=303)
 
+def outgoing_payment_page(conn):
+    from .calendar_jalali import label as jal_label
+    rows=outgoing_history(conn)
+    body='<h1>پرداختی‌ها و هزینه‌ها</h1>'
+    body+='<p class="m2-hint">این صفحه برای پرداخت به تأمین‌کننده و هزینه‌های جاری مثل پست، اسنپ، کارتن و بسته‌بندی است؛ نه پلتفرم‌های فروش. انتخاب حساب بانکی لازم نیست.</p>'
+    body+=nav("finance/movements?section=payment")
+    body+='<section class="m2-card m2-finance-section"><h3>ثبت پرداخت جدید</h3>'
+    body+='<form method="post" action="'+ROOT+'/finance/outgoings/add" class="m2-fields m2-finance-form">'
+    body+='<input type="hidden" name="request_key" value="'+uuid.uuid4().hex+'">'
+    body+='<div><label>بابت چه چیزی پرداخت شده؟</label><select name="purpose" id="outgoing-purpose" required>'
+    body+='<optgroup label="تأمین‌کننده / خرید"><option value="supplier:mehr">مهر (تسویه بدهی قالب)</option>'
+    for code,label in SUPPLIER_SHORTCUTS:
+        body+='<option value="supplier:'+e(code)+'">'+e(label)+'</option>'
+    body+='<option value="supplier:other">تأمین‌کننده دیگر</option></optgroup><optgroup label="هزینه‌های جاری">'
+    for code,label in EXPENSES:
+        body+='<option value="expense:'+e(code)+'">'+e(label)+'</option>'
+    body+='</optgroup></select></div>'
+    body+='<div id="outgoing-other-supplier" style="display:none"><label>نام تأمین‌کننده دیگر</label><input name="other_supplier" maxlength="120"></div>'
+    body+='<div><label>مبلغ پرداختی (تومان)</label><input name="amount" type="number" min="1" required></div>'
+    body+='<div><label>تاریخ پرداخت</label><input name="paid_on" type="date" value="'+today()+'" required></div>'
+    body+='<div><label>توضیحات (اختیاری)</label><input name="notes" maxlength="350"></div>'
+    body+='<div><button class="m2-btn" type="submit">ثبت پرداخت</button></div></form>'
+    body+='<p class="m2-hint">پرداخت مهر در دفتر اختصاصی خودش ثبت می‌شود. پرداخت به سایر تأمین‌کنندگان فقط وقتی خودکار از بدهی کم می‌شود که نام دقیقاً با یک تأمین‌کننده خرید مطابقت داشته باشد و مانده کافی باشد؛ در غیر این صورت به‌عنوان پرداختِ نیازمند تطبیق می‌ماند. از موجودی بانک مبلغی کم نمی‌شود تا حساب واقعی مشخص شود.</p>'
+    body+='</section>'
+    body+='<section class="m2-card m2-finance-section"><h3>سوابق پرداخت‌های بدون تعیین بانک</h3>'
+    if rows:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>بابت</th><th>مبلغ</th><th>وضعیت</th><th>شرح</th><th>عملیات</th></tr></thead><tbody>'
+        for r in rows:
+            purpose=(dict(EXPENSES).get(r["category"],"هزینه") if r["kind"]=="expense" else "پرداخت به "+r["party_title"])
+            status=("ابطال‌شده" if r["cancelled_at"] else
+                    ("هزینه ثبت‌شده" if r["kind"]=="expense" else
+                     ("کسر از بدهی خرید" if r["linked_supplier_id"] else "پرداخت نیازمند تطبیق خرید")))
+            body+='<tr><td>'+jal_label(r["paid_on"])+'</td><td>'+e(purpose)+'</td><td>'+fmt(r["amount_toman"])+'</td><td>'+e(status)+'</td><td>'+e(r["notes"])+'</td><td>'
+            if not r["cancelled_at"]:
+                body+='<form method="post" action="'+ROOT+'/finance/outgoings/cancel"><input type="hidden" name="outgoing_id" value="'+str(r["id"])+'"><button class="m2-finance-cancel" onclick="return confirm(\'این پرداخت ابطال شود؟\')">ابطال</button></form>'
+            else:body+='—'
+            body+='</td></tr>'
+        body+='</tbody></table></div>'
+    else:
+        body+='<p class="m2-hint">پرداخت جدیدی در دفتر بدون بانک ثبت نشده است.</p>'
+    body+='</section>'
+    body+='<p class="m2-hint">سوابق قدیمی پرداخت‌های بانکی حذف نشده‌اند. برای دیدن پرداخت‌های قبل از این تغییر، به <a href="'+ROOT+'/finance/accounts">حساب‌ها</a> مراجعه کن.</p>'
+    body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier");if(!f||!a)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";}f.addEventListener("change",show);show();})();</script>'
+    return page_with_style("پرداختی‌ها",body)
+
+@router.post(ROOT+"/finance/outgoings/add")
+def add_outgoing(purpose:str=Form(...),amount:str=Form(...),paid_on:str=Form(...),
+                 request_key:str=Form(...),notes:str=Form(""),other_supplier:str=Form(""),
+                 conn=Depends(conn_dep)):
+    try:
+        if purpose=="supplier:mehr":
+            settle_mehr(conn,"paid_to_mehr",amount,paid_on,request_key,notes=notes)
+        else:
+            record_outgoing(conn,purpose,amount,paid_on,request_key,notes,other_supplier)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return error_page(exc,"finance/movements?section=payment")
+    return RedirectResponse(ROOT+"/finance/movements?section=payment",status_code=303)
+
+@router.post(ROOT+"/finance/outgoings/cancel")
+def void_outgoing(outgoing_id:str=Form(...),conn=Depends(conn_dep)):
+    try:cancel_outgoing(conn,outgoing_id)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return error_page(exc,"finance/movements?section=payment")
+    return RedirectResponse(ROOT+"/finance/movements?section=payment",status_code=303)
+
 @router.get(ROOT+"/finance/movements")
 def finance_movements(section:str="receipt",conn=Depends(conn_dep)):
     kind=section if section in ("receipt","payment") else "receipt"
+    if kind=="payment":
+        return outgoing_payment_page(conn)
     banks=[a for a in accounts(conn) if a["active"]]
     people=parties(conn)
     heading="دریافتی‌ها" if kind=="receipt" else "پرداختی‌ها"
