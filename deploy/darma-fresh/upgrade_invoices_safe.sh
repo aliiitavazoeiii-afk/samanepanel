@@ -112,17 +112,25 @@ for attempt in range(25):
         time.sleep(2)
 else:
     raise RuntimeError("Sister service did not become healthy")
-for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoices/purchases"):
+for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoices/purchases",
+              "/finance/movements?section=payment","/finance/open-invoices"):
     req=urllib.request.Request(base+route,headers={"Authorization":auth})
     with urllib.request.urlopen(req,timeout=10) as res:
         assert res.status==200,route
-        assert b"<main" in res.read(500000),route
+        html=res.read(500000)
+        assert b"<main" in html,route
+        if route=="/finance/movements?section=payment":
+            assert b'outgoing-mehr-target-select' in html, "Holder invoice selector missing"
+            assert b'id="outgoing-amount" type="text"' in html, "Readable payment amount missing"
+        if route=="/invoices/new":
+            assert b'id="invoice-gross-profit"' in html, "Invoice profit missing"
     print("INVOICE_HTTP_OK",route)
 conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 required={"sister_invoice_customers","sister_invoices","sister_invoice_lines",
           "sister_invoice_receipts","sister_mehr_ledger","sister_mehr_purchases",
           "sister_purchase_suppliers","sister_purchase_orders","sister_purchase_lines",
-          "sister_purchase_payments"}
+          "sister_purchase_payments","sister_manual_outgoings",
+          "sister_mehr_settlement_links"}
 tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 assert required.issubset(tables),required-tables
 print("INVOICE_SCHEMA_READY")
