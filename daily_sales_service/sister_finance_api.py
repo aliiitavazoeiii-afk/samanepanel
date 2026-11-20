@@ -60,9 +60,9 @@ def finance_home(conn=Depends(conn_dep)):
     body+='<p><a class="m2-btn" href="'+ROOT+'/finance/open-invoices">فاکتورهای باز و مانده‌های پرداخت‌نشده</a></p>'
     body+=tiles([("جمع طلب پلتفرم‌ها",info["total_receivable"],"تومان"),
                  ("طلب مشتریان فاکتورها",info["invoice_receivable"],"تومان"),
-                 ("طلب من از مه هر",info["mehr_receivable"],"تومان · طلب ناخالص ثبت‌شده"),
-                 ("بدهی من به مه هر",info["mehr_payable"],"تومان · بدهی ناخالص ثبت‌شده"),
-                 ("مانده خالص حساب مه هر",info["mehr_receivable"]-info["mehr_payable"],
+                 ("وجوه مشتری نزد مه هر",info["mehr_receivable"],"تومان · برای تسویه بدهی خرید"),
+                 ("کل بدهی خرید من به مه هر",info["mehr_payable"],"تومان · پیش از کسر وجوه مشتری"),
+                 ("مانده خالص حساب مه هر",abs(info["mehr_receivable"]-info["mehr_payable"]),
                   "تومان · "+("بدهکار به مه هر" if info["mehr_receivable"]<info["mehr_payable"] else
                               ("طلبکار از مه هر" if info["mehr_receivable"]>info["mehr_payable"] else "تسویه‌شده"))),
                  ("بدهی سایر تأمین‌کنندگان",info["supplier_payable"],"تومان"),
@@ -102,9 +102,9 @@ def open_invoice_balances(conn=Depends(conn_dep)):
     body+=nav("finance")
     body+=tiles([("مانده مشتریان",sum(int(x["gross"])-int(x["paid"]) for x in rows),"تومان · فاکتورهای ارسال‌شده"),
                  ("دریافت ثبت‌شده با بانک نامشخص",int(unallocated[0]),"تومان · "+str(int(unallocated[1]))+" دریافت؛ خارج از مانده بانک"),
-                 ("بدهی من به مه هر",mehr["debt"],"تومان · قابل تهاتر با طلب جداگانه"),
-                 ("طلب من از مه هر",mehr["credit"],"تومان · پول مشتری نزد مهر"),
-                 ("خالص حساب مه هر",mehr["net"],("تومان · "+("بدهکار به مه هر" if mehr["net"]<0 else ("طلبکار از مه هر" if mehr["net"]>0 else "تسویه‌شده")))),
+                 ("کل بدهی خرید من به مه هر",mehr["debt"],"تومان · پیش از کسر وجوه مشتری"),
+                 ("وجوه مشتری نزد مه هر",mehr["credit"],"تومان · برای تسویه بدهی خرید"),
+                 ("مانده خالص حساب مه هر",abs(mehr["net"]),("تومان · "+("بدهکار به مه هر" if mehr["net"]<0 else ("طلبکار از مه هر" if mehr["net"]>0 else "تسویه‌شده")))),
                  ("بدهی سایر تأمین‌کنندگان",sum(int(x["due"]) for x in supplier_rows),"تومان")])
     body+='<section class="m2-card"><h3>فاکتورهای باز مشتریان</h3>'
     if rows:
