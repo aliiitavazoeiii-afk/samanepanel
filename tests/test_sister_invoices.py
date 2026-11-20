@@ -211,5 +211,80 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertEqual(report["mehr_receivable"],40000)
         self.assertEqual(financial_capital(self.db)["known_components_total"],0)
 
+
+    def test_one_page_invoice_single_submit_is_atomic_and_idempotent(self):
+        from daily_sales_service.sister_invoices import submit_invoice,invoice_detail
+        from daily_sales_service.sister_finance_logic import overview
+        from daily_sales_service.app import app
+        start_stock=self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0]
+        items={"کوچک":{"qty":2,"purchase":40000,"sale":70000}}
+        iid=submit_invoice(self.db,"تست یک مرحله‌ای","0912",self.day,"home",items,"یادداشت",
+                           "one-submit-1",initial_amount="50000",destination="mine",paid_on=self.day,
+                           receipt_notes="واریز به من، بانک مشخص نیست")
+        inv,lines,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(inv["status"],"dispatched")
+        self.assertEqual((len(lines),len(receipts),receipts[0]["amount"]), (1,1,50000))
+        self.assertIsNone(receipts[0]["account_id"])
+        self.assertEqual(self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0],start_stock-2)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM master_stock_events WHERE reference=?",
+                           ("sister-invoice:"+str(iid),)).fetchone()[0],1)
+        same=submit_invoice(self.db,"تست یک مرحله‌ای","0912",self.day,"home",items,"یادداشت",
+                            "one-submit-1",initial_amount="50000")
+        self.assertEqual(iid,same)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoice_receipts WHERE invoice_id=?",(iid,)).fetchone()[0],1)
+        self.assertEqual(overview(self.db)["invoice_receivable"],90000)
+        self.assertEqual(overview(self.db)["cash_balance"],0)
+
+    def test_one_page_invoice_invalid_initial_payment_rolls_back_stock_and_invoice(self):
+        from daily_sales_service.sister_invoices import submit_invoice
+        items={"کوچک":{"qty":2,"purchase":40000,"sale":70000}}
+        before=self.db.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0]
+        with self.assertRaises(ImportErrorDetail):
+            submit_invoice(self.db,"مشتری برگشت","0912",self.day,"home",items,"",
+                           "invalid-payment",initial_amount="200000")
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0],before)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM master_stock_events").fetchone()[0],0)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoice_submission_keys").fetchone()[0],0)
+
+    def test_factory_one_step_posts_mehr_debt_without_home_stock(self):
+        from daily_sales_service.sister_invoices import submit_invoice
+        items={"بزرگ":{"qty":3,"purchase":80000,"sale":120000}}
+        iid=submit_invoice(self.db,"مشتری کارخانه","",self.day,"factory",items,"",
+                           "factory-once",initial_amount="100000",destination="mehr",paid_on=self.day)
+        self.assertEqual(mehr_balance(self.db)["debt"],240000)
+        self.assertEqual(mehr_balance(self.db)["credit"],100000)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM master_stock_events").fetchone()[0],0)
+        self.assertEqual(self.db.execute("SELECT status FROM sister_invoices WHERE id=?",(iid,)).fetchone()[0],"dispatched")
+
+    def test_one_step_ambiguous_home_sku_must_be_selected(self):
+        from daily_sales_service.sister_invoices import submit_invoice
+        self.db.execute("""INSERT INTO master_products
+            (category,code,title,size,color,sale_price_toman,cost_toman,
+             seller_stock,digikala_stock,khorshid_stock,active,created_at,updated_at)
+            VALUES ('قالب','alt-small','تست دوم','کوچک','سفید',0,40000,0,0,0,1,?,?)""",
+            (self.day,self.day))
+        items={"کوچک":{"qty":1,"purchase":40000,"sale":70000}}
+        with self.assertRaisesRegex(ImportErrorDetail,"چند کالای واقعی"):
+            submit_invoice(self.db,"مشتری مبهم","",self.day,"home",items,"","ambiguous")
+        items["کوچک"]["master_id"]=self.skus["کوچک"]
+        iid=submit_invoice(self.db,"مشتری مشخص","",self.day,"home",items,"","selected")
+        self.assertTrue(iid)
+
+    def test_finance_open_invoices_lists_unpaid_only_and_unallocated_receipts(self):
+        from daily_sales_service.sister_invoices import submit_invoice
+        from daily_sales_service.sister_finance_api import open_invoice_balances
+        from daily_sales_service.app import app
+        iid=submit_invoice(self.db,"مشتری حساب باز","",self.day,"home",
+                           {"کوچک":{"qty":1,"purchase":40000,"sale":70000}},
+                           "","open-sample",initial_amount="30000",destination="mine",paid_on=self.day)
+        html=open_invoice_balances(conn=self.db).body.decode("utf-8")
+        self.assertIn("مشتری حساب باز",html)
+        self.assertIn("40,000",html)
+        self.assertIn("30,000",html)
+        self.assertIn("بانک نامشخص",html)
+        record_receipt(self.db,iid,40000,"mine",self.day,"full-payment")
+        html2=open_invoice_balances(conn=self.db).body.decode("utf-8")
+        self.assertNotIn("مشتری حساب باز",html2)
+
 if __name__=="__main__":
     unittest.main()
