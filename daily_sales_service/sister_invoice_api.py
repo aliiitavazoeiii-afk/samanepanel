@@ -229,6 +229,15 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
         item=next((r for r in mehr_open_items(conn) if r["kind"]=="invoice" and r["id"]==invoice_id),None)
         if item:
             body+='<p class="m2-hint">حساب تأمین‌کننده این فاکتور: بهای خرید '+fmt(item["gross"])+' تومان، وجوه مشتری نزد مهر '+fmt(item["credit"])+' تومان، پرداخت من به مهر '+fmt(item["paid"])+' تومان، <strong>مانده پرداخت این فاکتور به مهر: '+fmt(item["remaining"])+' تومان</strong>. این مبلغ با مانده مشتری فرق دارد.</p>'
+            linked=list(conn.execute("""SELECT l.occurred_on,l.debt_delta,l.notes
+                FROM sister_mehr_settlement_links a
+                JOIN sister_mehr_ledger l ON l.reference=a.reference
+                WHERE a.target_type='invoice' AND a.target_id=? AND l.kind='paid_to_mehr'
+                ORDER BY l.id DESC""",(invoice_id,)))
+            if linked:
+                body+='<h3>تاریخچه تسویه من با مهر برای این فاکتور</h3>'
+                for payment in linked:
+                    body+='<p>'+jal_label(payment["occurred_on"])+' — '+fmt(-payment["debt_delta"])+' تومان — '+e(payment["notes"])+'</p>'
     if inv["status"]=="draft":
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/dispatch"><button class="m2-btn" onclick="return confirm(\'ارسال قطعی شود؟ این عملیات بر موجودی یا بدهی مه هر اثر می‌گذارد.\')">تأیید ارسال قطعی</button></form>'
     body+='</section>'
