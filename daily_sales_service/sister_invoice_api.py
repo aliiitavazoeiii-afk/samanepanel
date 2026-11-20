@@ -300,7 +300,12 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     total=sum(r["qty"]*r["sale_unit"] for r in lines)
     cost=sum(r["qty"]*r["purchase_unit"] for r in lines)
     paid=sum(r["amount"] for r in receipts)
-    body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a></div>'
+    body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a>'
+    if not inv["is_void"]:
+        body+='<a href="'+ROOT+'/invoices/'+str(invoice_id)+'/edit">ویرایش فاکتور</a>'
+    body+='</div>'
+    if inv["is_void"]:
+        body+='<div class="m2-msg">این فاکتور ابطال شده و در فروش، سود و حساب‌های باز منظور نمی‌شود. سابقه همچنان قابل مشاهده است.</div>'
     body+='<section class="m2-card"><h3>'+e(inv["name"])+'</h3><p>'+e(inv["phone"])+' · '+jal_label(inv["invoice_date"])+' · '+("خانه" if inv["origin"]=="home" else "کارخانه")+' · '+("ارسال‌شده" if inv["status"]=="dispatched" else "پیش‌نویس")+'</p>'
     body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>تعداد</th><th>خرید هر عدد</th><th>فروش هر عدد</th><th>جمع فروش</th></tr></thead><tbody>'
     for r in lines:
@@ -323,14 +328,23 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
                 body+='<h3>تاریخچه تسویه من با مهر برای این فاکتور</h3>'
                 for payment in linked:
                     body+='<p>'+jal_label(payment["occurred_on"])+' — '+fmt(-payment["debt_delta"])+' تومان — '+e(payment["notes"])+'</p>'
-    if inv["status"]=="draft":
+    if inv["status"]=="draft" and not inv["is_void"]:
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/dispatch"><button class="m2-btn" onclick="return confirm(\'ارسال قطعی شود؟ این عملیات بر موجودی یا بدهی مه هر اثر می‌گذارد.\')">تأیید ارسال قطعی</button></form>'
     body+='</section>'
     body+='<section class="m2-card"><h3>پرداخت‌های مشتری</h3>'
     for r in receipts:
         label={"mine":"به حساب من","mehr":"به حساب مه هر","check_mehr":"چک تحویل مه هر"}[r["destination"]]
         body+='<p>'+jal_label(r["paid_on"])+' — '+e(label)+(' (بانک نامشخص)' if r["destination"]=="mine" and r["account_id"] is None else '')+' — '+fmt(r["amount"])+' تومان'+(' — تاریخ چک '+jal_label(r["check_date"]) if r["check_date"] else '')+' — '+e(r["notes"])+'</p>'
-    if total>paid:
+        if not inv["is_void"]:
+            body+='<details><summary>ویرایش این دریافتی</summary><form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipts/'+str(r["id"])+'/edit">'
+            body+='<input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
+            body+='<div><label>مبلغ صحیح (تومان)</label><input type="number" name="amount" min="1" value="'+str(r["amount"])+'" required></div>'
+            body+='<div><label>تاریخ دریافت</label><input type="date" name="paid_on" value="'+e(r["paid_on"])+'" required></div>'
+            body+='<div><label>توضیح</label><input name="notes" maxlength="350" value="'+e(r["notes"])+'"></div>'
+            if r["destination"]=="check_mehr":
+                body+='<div><label>تاریخ چک</label><input type="date" name="check_date" value="'+e(r["check_date"])+'" required></div>'
+            body+='</div><button class="m2-btn" onclick="return confirm(\'اصلاح مبلغ دریافت ثبت شود؟\')">ذخیره اصلاح دریافتی</button></form></details>'
+    if total>paid and not inv["is_void"]:
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipt"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
         body+='<div><label>مبلغ (تومان)</label><input type="number" min="1" max="'+str(total-paid)+'" name="amount" required></div>'
         body+='<div><label>دریافت‌کننده</label><select name="destination"><option value="mine">حساب من</option><option value="mehr">حساب مه هر</option><option value="check_mehr">چک تحویل مه هر</option></select></div>'
@@ -340,6 +354,18 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
         body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
         body+='</div><button class="m2-btn">ثبت پرداخت مشتری</button></form>'
     body+='</section>'
+    if not inv["is_void"]:
+        body+='<section class="m2-card"><h3>حذف / ابطال فاکتور</h3>'
+        body+='<p class="m2-hint">ابطال فقط وقتی مجاز است که هیچ دریافت مشتری و هیچ تسویه لینک‌شده مهر وجود نداشته باشد. موجودی یا بدهی ثبت‌شده با سند اصلاحی برگردانده می‌شود و سابقه باقی می‌ماند.</p>'
+        body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/cancel">'
+        body+='<input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
+        body+='<button class="m2-btn" style="background:#803640;color:#fff!important" onclick="return confirm(\'فاکتور ابطال شود؟ این کار اثر موجودی یا بدهی آن را اصلاح می‌کند و قابل بازگشت خودکار نیست.\')">حذف / ابطال فاکتور</button></form></section>'
+    history=invoice_audit(conn,invoice_id)
+    if history:
+        body+='<section class="m2-card"><h3>تاریخچه اصلاحات</h3>'
+        for entry in history:
+            body+='<p>'+e(entry["created_at"])+' — '+e({"edit":"ویرایش فاکتور","cancel":"ابطال فاکتور","receipt_edit":"اصلاح دریافتی"}.get(entry["action"],entry["action"]))+'</p>'
+        body+='</section>'
     return page_with_style("جزئیات فاکتور",body)
 
 @router.post(ROOT+"/invoices/{invoice_id}/dispatch")
