@@ -40,6 +40,23 @@ STYLE="""
 .m2-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
 .m2-fields label{font-size:12px;color:#cbd9e7;display:block}
 .m2-fields input,.m2-fields select{width:100%;min-width:0;background:#142d49!important;color:#fff!important;border:1px solid #365874!important;padding:10px;border-radius:9px}
+/* Browser-level light-form rules must never turn finance amounts white-on-white. */
+.m2-shell .m2-finance-form input:not([type=hidden]),
+.m2-shell .m2-finance-form select,
+.m2-shell .m2-finance-form textarea,
+.m2-shell input[name=amount],
+.m2-shell input[name=day]{
+  box-sizing:border-box;min-height:45px;width:100%;max-width:100%;
+  background:#142d49!important;color:#f7fbff!important;
+  -webkit-text-fill-color:#f7fbff;
+  border:1px solid #45647e!important;border-radius:9px;padding:10px 12px;
+  opacity:1!important;
+}
+.m2-shell .m2-finance-form input::placeholder,.m2-shell input[name=amount]::placeholder{color:#99aec3!important;opacity:1}
+.m2-shell .m2-finance-form input:focus,.m2-shell input[name=amount]:focus{
+  border-color:#ff933f!important;outline:2px solid rgba(255,147,63,.25)
+}
+
 .m2-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
 .m2-tags{display:flex;flex-wrap:wrap;gap:7px}.m2-tag{background:#21425d;border-radius:7px;padding:4px 9px;font-size:12px;color:#eaf2fa}
 .m2-table-scroll{width:100%;overflow:auto;border:1px solid #294867;border-radius:10px}
