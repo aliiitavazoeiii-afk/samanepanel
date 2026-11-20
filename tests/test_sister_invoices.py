@@ -157,16 +157,21 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertEqual(info["invoice_receivable"],70000)
         self.assertEqual(info["mehr_receivable"],100000)
         self.assertEqual(info["mehr_payable"],130000)
-        self.assertEqual(info["total_receivables_including_mehr"],170000)
-        self.assertEqual(info["total_liabilities_recorded"],130000)
+        self.assertEqual(info["mehr_net_receivable"],0)
+        self.assertEqual(info["mehr_net_payable"],30000)
+        self.assertEqual(info["total_receivables_including_mehr"],70000)
+        self.assertEqual(info["total_liabilities_recorded"],30000)
         self.assertEqual(info["cash_balance"],50000)
         self.assertEqual(info["sales"]["mold_profit"],90000)
         self.assertEqual(info["total_receivable"],0)  # Not a platform payout
         self.assertEqual(platform_balances(self.db)["mold"]["outstanding"],0)
         cap=financial_capital(self.db)
         self.assertEqual(cap["known_components_total"],90000)
-        self.assertEqual(cap["all_recorded_receivables"],170000)
-        self.assertEqual(cap["mehr_payable"],130000)
+        self.assertEqual(cap["all_recorded_receivables"],70000)
+        self.assertEqual(cap["mehr_payable"],30000)
+        self.assertEqual(cap["mehr_receivable"],0)
+        self.assertEqual(cap["mehr_customer_funds_held"],100000)
+        self.assertEqual(cap["mehr_gross_purchase_debt"],130000)
         self.assertIsNone(cap["total_capital"])  # historical opening balance not reconciled
 
     def test_mold_daily_sales_summary_includes_invoice_profit_but_hides_customer_details(self):
