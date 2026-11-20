@@ -544,7 +544,7 @@ class SisterInvoiceTests(unittest.TestCase):
             WHERE reference=?""",("invoice-receipt:"+str(rid),)).fetchone()
         self.assertEqual(linked[0],100000)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoice_receipts WHERE invoice_id=?",(iid,)).fetchone()[0],1)
-        with self.assertRaisesRegex(ImportErrorDetail,"مانده فاکتور"):
+        with self.assertRaisesRegex(ImportErrorDetail,"جمع دریافتی‌ها"):
             edit_invoice_receipt(self.db,iid,rid,300000,self.day,"",None,"over-receipt")
         self.assertEqual(mehr_balance(self.db)["credit"],100000)
 
