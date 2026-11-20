@@ -398,5 +398,79 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertNotIn("<small>کل بدهی خرید ثبت‌شده</small>",mehr)
         self.assertNotIn("<small>وجوه مشتری نزد مه هر</small>",mehr)
 
+
+    def test_holder_targeted_invoice_payment_reconciles_and_preserves_original_invoice(self):
+        from daily_sales_service.sister_invoices import mehr_open_items,invoice_detail
+        from daily_sales_service.sister_finance_api import finance_movements,add_outgoing
+        from daily_sales_service.sister_finance_logic import accounts
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,100000,"mehr",self.day,"invoice-money-to-mehr")
+        open_invoice=next(x for x in mehr_open_items(self.db) if x["target"]=="invoice:"+str(iid))
+        self.assertEqual((open_invoice["gross"],open_invoice["credit"],open_invoice["remaining"]),(130000,100000,30000))
+        bank_before=accounts(self.db)
+        response=add_outgoing(purpose="supplier:holder",amount="۳۰٬۰۰۰",paid_on=self.day,
+                              request_key="holder-linked-payment",notes="تسویه فاکتور",
+                              mehr_target="invoice:"+str(iid),conn=self.db)
+        self.assertEqual(response.status_code,303)
+        new_item=next(x for x in mehr_open_items(self.db) if x["target"]=="invoice:"+str(iid))
+        self.assertEqual((new_item["gross"],new_item["credit"],new_item["paid"],new_item["remaining"]),
+                         (130000,100000,30000,0))
+        self.assertEqual(mehr_balance(self.db)["net"],0)
+        self.assertEqual(accounts(self.db),bank_before)
+        inv,lines,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(len(receipts),1)
+        self.assertEqual(receipts[0]["amount"],100000)
+        r=self.db.execute("""SELECT target_type,target_id FROM sister_mehr_settlement_links
+            WHERE reference='holder-linked-payment'""").fetchone()
+        self.assertEqual((r["target_type"],r["target_id"]),("invoice",iid))
+        with self.assertRaisesRegex(ImportErrorDetail,"قبلاً ثبت"):
+            settlement(self.db,"paid_to_mehr",30000,self.day,"holder-linked-payment",target="invoice:"+str(iid))
+
+    def test_holder_open_items_include_separate_ledger_purchase(self):
+        from daily_sales_service.sister_purchases import register_purchase
+        from daily_sales_service.sister_invoices import mehr_open_items
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,100000,"mehr",self.day,"mehr-customer-purchase")
+        purchase_id=register_purchase(self.db,"مه هر",self.day,"home",
+                                      [(self.skus["بزرگ"],2,40000)],"mehr-other-purchase")
+        items={x["target"]:x for x in mehr_open_items(self.db)}
+        self.assertEqual(items["invoice:"+str(iid)]["remaining"],30000)
+        self.assertEqual(items["purchase:"+str(purchase_id)]["remaining"],80000)
+        settlement(self.db,"paid_to_mehr",30000,self.day,"invoice-match",target="invoice:"+str(iid))
+        self.assertEqual({x["target"]:x["remaining"] for x in mehr_open_items(self.db)},
+                         {"invoice:"+str(iid):0,"purchase:"+str(purchase_id):80000})
+        with self.assertRaisesRegex(ImportErrorDetail,"مانده فاکتور"):
+            settlement(self.db,"paid_to_mehr",80001,self.day,"purchase-too-large",target="purchase:"+str(purchase_id))
+        settlement(self.db,"paid_to_mehr",80000,self.day,"purchase-match",target="purchase:"+str(purchase_id))
+        self.assertEqual(mehr_balance(self.db)["net"],0)
+
+    def test_mehr_offset_keeps_net_debt_and_does_not_duplicate_invoice_receipt(self):
+        from daily_sales_service.sister_invoices import mehr_open_items
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,100000,"mehr",self.day,"customer-credited-once")
+        before=mehr_balance(self.db)["net"]
+        settlement(self.db,"offset","۱۰۰٬۰۰۰",self.day,"reconcile-offset")
+        self.assertEqual(mehr_balance(self.db)["net"],before)
+        item=next(x for x in mehr_open_items(self.db) if x["target"]=="invoice:"+str(iid))
+        self.assertEqual(item["remaining"],30000)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_invoice_receipts WHERE invoice_id=?",(iid,)).fetchone()[0],1)
+
+    def test_outgoing_amount_form_is_text_visible_and_proxy_post_is_allowed(self):
+        from daily_sales_service.sister_finance_api import finance_movements
+        from daily_sales_service.sister_invoice_api import supplier
+        from core.sister_sales import _POST,_ALLOWED
+        self.assertIn("finance/outgoings/add",_POST)
+        self.assertIn("finance/outgoings/add",_ALLOWED)
+        html=finance_movements(section="payment",conn=self.db).body.decode("utf-8")
+        self.assertIn('id="outgoing-amount" type="text"',html)
+        self.assertIn("outgoing-mehr-target-select",html)
+        self.assertIn("هولدر (تسویه فاکتورهای مهر)",html)
+        supplier_html=supplier(conn=self.db).body.decode("utf-8")
+        self.assertIn('id="mehr-target"',supplier_html)
+        self.assertIn('type="text" inputmode="numeric"',supplier_html)
+
 if __name__=="__main__":
     unittest.main()
