@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS sister_mehr_purchases (
 );
 CREATE INDEX IF NOT EXISTS idx_sister_invoice_customer ON sister_invoices(customer_id,invoice_date);
 CREATE INDEX IF NOT EXISTS idx_sister_receipt_invoice ON sister_invoice_receipts(invoice_id);
+CREATE TABLE IF NOT EXISTS sister_invoice_submission_keys (
+ request_key TEXT PRIMARY KEY, invoice_id INTEGER NOT NULL UNIQUE REFERENCES sister_invoices(id),
+ created_at TEXT NOT NULL
+);
 """
 def ensure_schema(conn):
     conn.executescript(SCHEMA)
@@ -83,7 +87,7 @@ def _bank(conn,account_id,kind,amount,day,reference,party_code,party_title):
       (kind,party_id,account_id,movement_date,amount_toman,reference,note,created_at)
       VALUES (?,?,?,?,?,?,?,?)""",(kind,pid,aid,day,amount,reference,"ثبت خودکار فاکتور / حساب مه هر",now()))
 
-def create_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes=""):
+def create_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes="",manage_tx=True):
     name=_text(customer_name,120)
     if len(name)<2:raise ImportErrorDetail("نام مشتری را کامل وارد کن.")
     phone=_text(phone,40)
@@ -105,7 +109,7 @@ def create_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes=""):
                 raise ImportErrorDetail("شناسه کالای فیزیکی با سایز "+size+" سازگار نیست.")
         normalized[size]=(int(master) if qty and origin=="home" else None,qty,purchase,sale)
     if not any(x[1] for x in normalized.values()):raise ImportErrorDetail("حداقل یک سایز با تعداد مثبت وارد کن.")
-    conn.execute("BEGIN IMMEDIATE")
+    if manage_tx:conn.execute("BEGIN IMMEDIATE")
     try:
         conn.execute("""INSERT INTO sister_invoice_customers(name,phone,created_at)
           VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET
@@ -120,13 +124,14 @@ def create_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes=""):
                 conn.execute("""INSERT INTO sister_invoice_lines
                  (invoice_id,size,master_id,qty,purchase_unit,sale_unit)
                  VALUES (?,?,?,?,?,?)""",(iid,size,mid,qty,purchase,sale))
-        conn.execute("COMMIT")
+        if manage_tx:conn.execute("COMMIT")
         return iid
     except Exception:
-        conn.execute("ROLLBACK");raise
+        if manage_tx:conn.execute("ROLLBACK")
+        raise
 
-def dispatch_invoice(conn,invoice_id):
-    conn.execute("BEGIN IMMEDIATE")
+def dispatch_invoice(conn,invoice_id,manage_tx=True):
+    if manage_tx:conn.execute("BEGIN IMMEDIATE")
     try:
         inv=conn.execute("SELECT * FROM sister_invoices WHERE id=?",(int(invoice_id),)).fetchone()
         if inv is None:raise ImportErrorDetail("فاکتور پیدا نشد.")
@@ -148,9 +153,10 @@ def dispatch_invoice(conn,invoice_id):
             cost=sum(int(r["qty"])*int(r["purchase_unit"]) for r in lines)
             _ledger(conn,today(),cost,0,"factory_invoice","factory-invoice:"+str(invoice_id))
         conn.execute("UPDATE sister_invoices SET status='dispatched',posted_at=? WHERE id=?",(now(),invoice_id))
-        conn.execute("COMMIT")
+        if manage_tx:conn.execute("COMMIT")
     except Exception:
-        conn.execute("ROLLBACK");raise
+        if manage_tx:conn.execute("ROLLBACK")
+        raise
 
 def receive_purchase(conn,master_id,quantity,unit_cost,purchase_date,request_key,notes=""):
     day=_date(purchase_date);qty=money(quantity);cost=money(unit_cost)
@@ -178,7 +184,7 @@ def receive_purchase(conn,master_id,quantity,unit_cost,purchase_date,request_key
     except Exception:
         conn.execute("ROLLBACK");raise
 
-def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,account_id=None,check_date="",notes=""):
+def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,account_id=None,check_date="",notes="",manage_tx=True):
     day=_date(paid_on);val=money(amount)
     if val<=0:raise ImportErrorDetail("مبلغ پرداخت مثبت باشد.")
     if destination not in ("mine","mehr","check_mehr"):raise ImportErrorDetail("نوع پرداخت نامعتبر است.")
@@ -186,7 +192,7 @@ def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,accoun
     if destination=="check_mehr" and cheque is None:raise ImportErrorDetail("تاریخ چک را وارد کن.")
     key=_text(request_key,100)
     if not key:raise ImportErrorDetail("شناسه درخواست لازم است.")
-    conn.execute("BEGIN IMMEDIATE")
+    if manage_tx:conn.execute("BEGIN IMMEDIATE")
     try:
         invoice=conn.execute("""SELECT i.*,c.name FROM sister_invoices i JOIN sister_invoice_customers c
             ON c.id=i.customer_id WHERE i.id=?""",(int(invoice_id),)).fetchone()
@@ -202,14 +208,19 @@ def record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,accoun
           day,cheque,_text(notes),key,now()))
         rid=cur.lastrowid
         if destination=="mine":
-            _bank(conn,account_id,"receipt",val,day,"invoice-receipt:"+str(rid),
-                  "sister-customer-"+str(invoice["customer_id"]),"مشتری فاکتور: "+invoice["name"])
+            # An unidentified receiving bank is NOT silently assigned to any account.
+            # Finance shows it separately as unallocated cash; receipt is still auditable.
+            if account_id not in (None,""):
+                _bank(conn,account_id,"receipt",val,day,"invoice-receipt:"+str(rid),
+                      "sister-customer-"+str(invoice["customer_id"]),"مشتری فاکتور: "+invoice["name"])
         else:
             _ledger(conn,day,0,val,"customer_to_mehr","invoice-receipt:"+str(rid),
                     ("چک به مه هر، تاریخ "+cheque+"؛ " if cheque else "واریز مشتری به مه هر؛ ")+_text(notes))
-        conn.execute("COMMIT");return rid
+        if manage_tx:conn.execute("COMMIT")
+        return rid
     except Exception:
-        conn.execute("ROLLBACK");raise
+        if manage_tx:conn.execute("ROLLBACK")
+        raise
 
 def settlement(conn,kind,amount,day,request_key,account_id=None,notes=""):
     if kind not in ("offset","paid_to_mehr","received_from_mehr"):raise ImportErrorDetail("نوع تسویه نامعتبر است.")
@@ -242,6 +253,78 @@ def mehr_balance(conn):
     row=conn.execute("SELECT COALESCE(SUM(debt_delta),0),COALESCE(SUM(credit_delta),0) FROM sister_mehr_ledger").fetchone()
     debt,credit=int(row[0]),int(row[1])
     return {"debt":debt,"credit":credit,"net":credit-debt}
+
+
+def submit_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes,
+                   request_key,initial_amount="0",destination="mine",
+                   paid_on="",check_date="",receipt_notes=""):
+    """One atomic, idempotent creation + confirmation + optional initial payment.
+
+    Existing invoice/dispatch/receipt operations remain separately supported
+    for historical drafts and additional payments.
+    """
+    key=_text(request_key,100)
+    if not key:raise ImportErrorDetail("شناسه ثبت فاکتور لازم است.")
+    if origin not in ("home","factory"):raise ImportErrorDetail("مبدأ ارسال نامعتبر است.")
+    amount=money(initial_amount or 0)
+    if amount<0:raise ImportErrorDetail("مبلغ دریافتی نمی‌تواند منفی باشد.")
+    if amount and destination not in ("mine","mehr","check_mehr"):
+        raise ImportErrorDetail("دریافت‌کننده وجه نامعتبر است.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        previous=conn.execute("""SELECT invoice_id FROM sister_invoice_submission_keys
+            WHERE request_key=?""",(key,)).fetchone()
+        if previous:
+            conn.execute("COMMIT")
+            return int(previous[0])
+        normalized={}
+        for size in SIZES:
+            item=dict(lines.get(size,{}) or {})
+            qty=money(item.get("qty") or 0)
+            if qty and origin=="home" and not item.get("master_id"):
+                rows=list(conn.execute("""SELECT id FROM master_products
+                    WHERE category='قالب' AND size=? AND active=1""",(size,)))
+                if len(rows)!=1:
+                    reason="هیچ کالای فعالی" if not rows else "چند کالای واقعی"
+                    raise ImportErrorDetail(
+                        f"برای سایز {size} {reason} تعریف شده است؛ انتخاب خودکار امن نیست. "
+                        "ابتدا محصولات اصلی قالب را بررسی کن.")
+                item["master_id"]=int(rows[0][0])
+            normalized[size]=item
+        invoice_id=create_invoice(conn,customer_name,phone,invoice_date,origin,
+                                  normalized,notes,manage_tx=False)
+        dispatch_invoice(conn,invoice_id,manage_tx=False)
+        if amount:
+            record_receipt(conn,invoice_id,amount,destination,paid_on or invoice_date,
+                           "initial:"+key,check_date=check_date,
+                           notes=receipt_notes,manage_tx=False)
+        conn.execute("""INSERT INTO sister_invoice_submission_keys
+           (request_key,invoice_id,created_at) VALUES (?,?,?)""",(key,invoice_id,now()))
+        conn.execute("COMMIT")
+        return invoice_id
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
+def open_customer_invoices(conn,limit=100):
+    """Confirmed only: unpaid invoices are real receivables, not draft advances."""
+    return [dict(r) for r in conn.execute("""
+        SELECT i.id,i.invoice_date,c.name,c.phone,
+          COALESCE((SELECT SUM(l.qty*l.sale_unit)
+                    FROM sister_invoice_lines l WHERE l.invoice_id=i.id),0) AS gross,
+          COALESCE((SELECT SUM(r.amount)
+                    FROM sister_invoice_receipts r WHERE r.invoice_id=i.id),0) AS paid
+        FROM sister_invoices i
+        JOIN sister_invoice_customers c ON c.id=i.customer_id
+        WHERE i.status='dispatched'
+          AND COALESCE((SELECT SUM(l.qty*l.sale_unit)
+                         FROM sister_invoice_lines l WHERE l.invoice_id=i.id),0)
+              > COALESCE((SELECT SUM(r.amount)
+                           FROM sister_invoice_receipts r WHERE r.invoice_id=i.id),0)
+        ORDER BY i.invoice_date DESC,i.id DESC LIMIT ?
+    """,(int(limit),))]
+
 
 def invoices(conn,query=""):
     q="%"+str(query or "").strip()+"%"
