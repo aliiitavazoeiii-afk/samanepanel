@@ -89,7 +89,7 @@ def open_invoice_balances(conn=Depends(conn_dep)):
     from .sister_invoices import open_customer_invoices,mehr_balance
     from .sister_purchases import suppliers
     from .calendar_jalali import label as jal_label
-    rows=open_customer_invoices(conn,200)
+    rows=open_customer_invoices(conn)
     supplier_rows=[x for x in suppliers(conn) if int(x["due"])>0]
     mehr=mehr_balance(conn)
     unallocated=conn.execute("""SELECT COALESCE(SUM(amount),0),COUNT(*)
@@ -105,7 +105,7 @@ def open_invoice_balances(conn=Depends(conn_dep)):
     body+='<section class="m2-card"><h3>فاکتورهای باز مشتریان</h3>'
     if rows:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>جمع</th><th>دریافتی</th><th>مانده</th></tr></thead><tbody>'
-        for r in rows:
+        for r in rows[:200]:
             body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td></tr>'
         body+='</tbody></table></div>'
     else:body+='<p class="m2-hint">فاکتور ارسال‌شدهٔ تسویه‌نشده‌ای ثبت نشده است.</p>'
