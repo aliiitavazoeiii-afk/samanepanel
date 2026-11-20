@@ -86,6 +86,9 @@ def supplier_totals(conn,supplier_id):
         FROM sister_purchase_orders WHERE supplier_id=?""",(sid,)).fetchone()[0])
     paid=int(conn.execute("""SELECT COALESCE(SUM(amount_toman),0)
         FROM sister_purchase_payments WHERE supplier_id=?""",(sid,)).fetchone()[0])
+    paid+=int(conn.execute("""SELECT COALESCE(SUM(amount_toman),0)
+        FROM sister_manual_outgoings
+        WHERE linked_supplier_id=? AND cancelled_at IS NULL""",(sid,)).fetchone()[0])
     return {"id":sid,"name":row["name"],"purchased":purchased,"paid":paid,"due":purchased-paid}
 
 def suppliers(conn):
