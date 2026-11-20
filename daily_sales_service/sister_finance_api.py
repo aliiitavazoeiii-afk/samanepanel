@@ -182,7 +182,7 @@ def outgoing_payment_page(conn):
     body+='<div><label>بابت چه چیزی پرداخت شده؟</label><select name="purpose" id="outgoing-purpose" required>'
     body+='<optgroup label="تأمین‌کننده / خرید"><option value="supplier:mehr">مهر (تسویه بدهی قالب)</option>'
     for code,label in SUPPLIER_SHORTCUTS:
-        body+='<option value="supplier:'+e(code)+'">'+e(label)+'</option>'
+        body+='<option value="supplier:'+e(code)+'">'+e("هولدر (تسویه فاکتورهای مهر)" if code=="holder" else label)+'</option>'
     body+='<option value="supplier:other">تأمین‌کننده دیگر</option></optgroup><optgroup label="هزینه‌های جاری">'
     for code,label in EXPENSES:
         body+='<option value="expense:'+e(code)+'">'+e(label)+'</option>'
@@ -225,7 +225,7 @@ def outgoing_payment_page(conn):
     else:body+='<p class="m2-hint">هنوز پرداخت به مهر ثبت نشده است.</p>'
     body+='</section>'
     body+='<p class="m2-hint">سوابق قدیمی پرداخت‌های بانکی حذف نشده‌اند. برای دیدن پرداخت‌های قبل از این تغییر، به <a href="'+ROOT+'/finance/accounts">حساب‌ها</a> مراجعه کن.</p>'
-    body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier"),m=document.getElementById("outgoing-mehr-target"),t=document.getElementById("outgoing-mehr-target-select"),x=document.getElementById("outgoing-amount");if(!f)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";m.style.display=f.value==="supplier:mehr"?"":"none";t.required=f.value==="supplier:mehr";}f.addEventListener("change",show);show();var form=f.closest("form");form.addEventListener("submit",function(ev){var v=x.value.replace(/[۰-۹]/g,function(n){return String(n.charCodeAt(0)-1776);}).replace(/[٠-٩]/g,function(n){return String(n.charCodeAt(0)-1632);}).replace(/[٬,\\s]/g,"");if(!/^\\d+$/.test(v)||Number(v)<=0){ev.preventDefault();alert("مبلغ پرداختی معتبر نیست.");return;}x.value=v;});})();</script>'
+    body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier"),m=document.getElementById("outgoing-mehr-target"),t=document.getElementById("outgoing-mehr-target-select"),x=document.getElementById("outgoing-amount");if(!f)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";m.style.display=(f.value==="supplier:mehr"||f.value==="supplier:holder")?"":"none";t.required=(f.value==="supplier:mehr"||f.value==="supplier:holder");}f.addEventListener("change",show);show();var form=f.closest("form");form.addEventListener("submit",function(ev){var v=x.value.replace(/[۰-۹]/g,function(n){return String(n.charCodeAt(0)-1776);}).replace(/[٠-٩]/g,function(n){return String(n.charCodeAt(0)-1632);}).replace(/[٬,\\s]/g,"");if(!/^\\d+$/.test(v)||Number(v)<=0){ev.preventDefault();alert("مبلغ پرداختی معتبر نیست.");return;}x.value=v;});})();</script>'
     return page_with_style("پرداختی‌ها",body)
 
 @router.post(ROOT+"/finance/outgoings/add")
@@ -233,7 +233,7 @@ def add_outgoing(purpose:str=Form(...),amount:str=Form(...),paid_on:str=Form(...
                  request_key:str=Form(...),notes:str=Form(""),other_supplier:str=Form(""),
                  mehr_target:str=Form(""),conn=Depends(conn_dep)):
     try:
-        if purpose=="supplier:mehr":
+        if purpose in ("supplier:mehr","supplier:holder"):
             if not mehr_target:
                 raise ImportErrorDetail("فاکتور یا خرید هولدر را برای تسویه انتخاب کن.")
             settle_mehr(conn,"paid_to_mehr",amount,paid_on,request_key,notes=notes,target=mehr_target)
