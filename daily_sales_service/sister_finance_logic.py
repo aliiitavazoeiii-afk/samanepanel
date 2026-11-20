@@ -329,14 +329,20 @@ def overview(conn):
     mehr=mehr_balance(conn)
     claims=invoice_claims(conn)
     other_suppliers=sum(x["due"] for x in suppliers(conn))
+    # Keep historical gross ledger amounts for audit/Mehr detail, but finance
+    # claim/liability totals include only the SINGLE net exposure to Mehr.
+    mehr_net_receivable=max(0,int(mehr["net"]))
+    mehr_net_payable=max(0,-int(mehr["net"]))
     return {"platforms":by_platform,"accounts":cash,
             "invoice_receivable":claims["customer_receivable"],
             "customer_advances":claims["customer_advances"],
             "mehr_receivable":mehr["credit"],
             "mehr_payable":mehr["debt"],
+            "mehr_net_receivable":mehr_net_receivable,
+            "mehr_net_payable":mehr_net_payable,
             "supplier_payable":other_suppliers,
-            "total_receivables_including_mehr":total_due+claims["customer_receivable"]+mehr["credit"],
-            "total_liabilities_recorded":mehr["debt"]+other_suppliers+claims["customer_advances"],
+            "total_receivables_including_mehr":total_due+claims["customer_receivable"]+mehr_net_receivable,
+            "total_liabilities_recorded":mehr_net_payable+other_suppliers+claims["customer_advances"],
             "total_receivable":total_due,
             "cash_balance":sum(x["balance"] for x in cash),
             "sales":{k:v for k,v in all_sales.items() if k!="lines"},
