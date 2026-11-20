@@ -27,7 +27,7 @@ def financial_capital(conn,as_of=None):
     business_debt=int(finance["total_liabilities_recorded"])
     equipment=sum(int(extras.get(k) or 0) for k in ("raw_materials","equipment","other_assets"))
     liabilities=int(extras.get("other_liabilities") or 0)
-    invoice_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_invoices").fetchone()[0])
+    invoice_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_invoices WHERE is_void=0").fetchone()[0])
     purchases_pending=bool(conn.execute("SELECT COUNT(*) FROM sister_purchase_orders").fetchone()[0])
     inventory=stock["total_value"]
     known_total=(int(stock["known_value"])+cash+claim+customer_claim+mehr_claim
