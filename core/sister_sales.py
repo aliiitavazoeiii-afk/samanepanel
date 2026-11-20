@@ -224,6 +224,10 @@ def invoice_proxy(request, invoice_id, action=""):
     return digikala_proxy(request, "invoices/" + str(invoice_id) + ("/" + action if action else ""))
 
 
+def invoice_receipt_edit_proxy(request, invoice_id, receipt_id):
+    return digikala_proxy(request, "invoices/"+str(invoice_id)+"/receipts/"+str(receipt_id)+"/edit")
+
+
 @login_required
 def digikala_proxy(request, tail=""):
     if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|cancel|receipts/\d+/edit))?",tail):
