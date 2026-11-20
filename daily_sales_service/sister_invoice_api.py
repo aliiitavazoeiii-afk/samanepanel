@@ -143,21 +143,21 @@ async def create(request:Request,conn=Depends(conn_dep)):
 @router.get(ROOT+"/invoices/mehr")
 def supplier(conn=Depends(conn_dep)):
     b=mehr_balance(conn)
-    body='<h1>حساب مه هر</h1><p class="m2-hint">بدهی خرید و طلب واریز مشتری جدا هستند. تهاتر فقط با ثبت تو انجام می‌شود.</p>'
+    body='<h1>حساب مه هر</h1><p class="m2-hint">واریزی مشتری به حساب مهر، پولی برای تسویه بدهی خرید از مهر است؛ تا وقتی بدهی بیشتر باشد، تو از مهر طلب خالص نداری. ثبت تهاتر عملیاتی جداگانه است.</p>'
     body+='<div class="m2-msg">مانده قدیمی مه هر هنوز با دفتر جدید تطبیق داده نشده است؛ عدد فعلی، مانده قطعی همه سال‌ها نیست.</div>'
-    body+='<div class="m2-finance-cards"><div class="m2-card"><small>بدهی من به مه هر</small><strong>'+fmt(b["debt"])+'</strong></div>'
-    body+='<div class="m2-card"><small>طلب من از مه هر</small><strong>'+fmt(b["credit"])+'</strong></div>'
-    body+='<div class="m2-card"><small>خالص (مثبت: طلبکار)</small><strong>'+fmt(b["net"])+'</strong></div></div>'
+    body+='<div class="m2-finance-cards"><div class="m2-card"><small>'+("بدهی خالص من به مه هر" if b["net"]<0 else ("طلب خالص من از مه هر" if b["net"]>0 else "حساب مه هر تسویه است"))+'</small><strong>'+fmt(abs(b["net"]))+'</strong><span class="m2-unit">تومان · مانده محاسباتی قبل از ثبت تهاتر دستی</span></div>'
+    body+='<div class="m2-card"><small>کل بدهی خرید ثبت‌شده به مه هر</small><strong>'+fmt(b["debt"])+'</strong></div>'
+    body+='<div class="m2-card"><small>وجوه مشتری واریزشده نزد مه هر</small><strong>'+fmt(b["credit"])+'</strong></div></div>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/purchases">ثبت خرید کالا</a></div>'
     body+='<section class="m2-card"><h3>ثبت تسویه یا تهاتر</h3>'
     body+='<form method="post" action="'+ROOT+'/invoices/mehr/settle"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
-    body+='<div><label>نوع عملیات</label><select name="kind"><option value="offset">تهاتر از طلب من</option><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
+    body+='<div><label>نوع عملیات</label><select name="kind"><option value="offset">تهاتر وجوه مشتری با بدهی خرید من</option><option value="paid_to_mehr">پرداخت من به مه هر</option><option value="received_from_mehr">واریز مه هر به من</option></select></div>'
     body+='<div><label>مبلغ (تومان)</label><input type="number" name="amount" min="1" required></div>'
     body+='<div><label>تاریخ ثبت</label><input type="date" name="day" value="'+today()+'" required></div>'
     body+='<div><label>حساب بانکی (فقط برای واریز واقعی)</label><select name="account_id"><option value="">انتخاب حساب</option>'+receipt_bank_options(conn)+'</select></div>'
     body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
     body+='</div><button class="m2-btn">ثبت تسویه</button></form></section>'
-    body+='<section class="m2-card"><h3>گردش حساب مه هر</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>نوع</th><th>تغییر بدهی</th><th>تغییر طلب</th><th>توضیحات</th></tr></thead><tbody>'
+    body+='<section class="m2-card"><h3>گردش حساب مه هر</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>نوع</th><th>تغییر بدهی خرید</th><th>تغییر وجه مشتری نزد مهر</th><th>توضیحات</th></tr></thead><tbody>'
     labels={"purchase_general":"خرید کالا","purchase":"خرید خانه","factory_invoice":"ارسال کارخانه","customer_to_mehr":"واریز/چک مشتری","offset":"تهاتر","paid_to_mehr":"پرداخت به مه هر","received_from_mehr":"دریافت از مه هر"}
     for r in conn.execute("SELECT * FROM sister_mehr_ledger ORDER BY id DESC LIMIT 200"):
         body+='<tr><td>'+jal_label(r["occurred_on"])+'</td><td>'+e(labels.get(r["kind"],r["kind"]))+'</td><td>'+fmt(r["debt_delta"])+'</td><td>'+fmt(r["credit_delta"])+'</td><td>'+e(r["notes"])+'</td></tr>'
