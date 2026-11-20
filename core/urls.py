@@ -115,6 +115,7 @@ urlpatterns = [
 
     path("finance/", sister_sales.digikala_proxy, {"tail": "finance"}, name="finance"),
     path("finance/accounts/", sister_sales.digikala_proxy, {"tail": "finance/accounts"}, name="finance_accounts"),
+    path("finance/open-invoices/", sister_sales.digikala_proxy, {"tail": "finance/open-invoices"}, name="sister_finance_open_invoices"),
     path("finance/sales/", sister_sales.digikala_proxy, {"tail": "finance/sales"}, name="sister_finance_sales"),
     path("finance/accounts/action/", finance_center_v97.accounts_action, name="finance_accounts_action"),
     path("payments/", sister_sales.digikala_proxy, {"tail": "finance/movements"}, name="payments"),
