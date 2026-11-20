@@ -307,9 +307,9 @@ def submit_invoice(conn,customer_name,phone,invoice_date,origin,lines,notes,
         raise
 
 
-def open_customer_invoices(conn,limit=100):
+def open_customer_invoices(conn,limit=None):
     """Confirmed only: unpaid invoices are real receivables, not draft advances."""
-    return [dict(r) for r in conn.execute("""
+    sql="""
         SELECT i.id,i.invoice_date,c.name,c.phone,
           COALESCE((SELECT SUM(l.qty*l.sale_unit)
                     FROM sister_invoice_lines l WHERE l.invoice_id=i.id),0) AS gross,
@@ -322,8 +322,11 @@ def open_customer_invoices(conn,limit=100):
                          FROM sister_invoice_lines l WHERE l.invoice_id=i.id),0)
               > COALESCE((SELECT SUM(r.amount)
                            FROM sister_invoice_receipts r WHERE r.invoice_id=i.id),0)
-        ORDER BY i.invoice_date DESC,i.id DESC LIMIT ?
-    """,(int(limit),))]
+        ORDER BY i.invoice_date DESC,i.id DESC
+    """
+    if limit is not None:
+        return [dict(r) for r in conn.execute(sql+" LIMIT ?",(int(limit),))]
+    return [dict(r) for r in conn.execute(sql)]
 
 
 def invoices(conn,query=""):
