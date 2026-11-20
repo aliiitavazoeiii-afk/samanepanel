@@ -83,12 +83,16 @@ for route in ("/purchases","/purchases/add","/purchases/payments/add",
               "/invoices/mehr","/invoices/mehr/settle",
               "/invoices/purchases","/invoices/purchases/add",
               "/invoices/{invoice_id}","/invoices/{invoice_id}/dispatch",
-              "/invoices/{invoice_id}/receipt"):
+              "/invoices/{invoice_id}/receipt","/invoices/{invoice_id}/edit",
+              "/invoices/{invoice_id}/cancel",
+              "/invoices/{invoice_id}/receipts/{receipt_id}/edit"):
     assert root+route in paths, "Missing route: "+route
 for route in ("/purchases/add","/purchases/payments/add",
               "/invoices/create","/invoices/mehr/settle",
               "/invoices/purchases/add","/invoices/{invoice_id}/dispatch",
-              "/invoices/{invoice_id}/receipt"):
+              "/invoices/{invoice_id}/receipt","/invoices/{invoice_id}/edit",
+              "/invoices/{invoice_id}/cancel",
+              "/invoices/{invoice_id}/receipts/{receipt_id}/edit"):
     assert "post" in paths[root+route], "Missing POST route: "+route
 print("INVOICE_API_ROUTES_OK")
 PY
@@ -124,15 +128,19 @@ for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoic
             assert b'id="outgoing-amount" type="text"' in html, "Readable payment amount missing"
         if route=="/invoices/new":
             assert b'id="invoice-gross-profit"' in html, "Invoice profit missing"
+        if route=="/invoices":
+            assert "ویرایش".encode() in html and "ابطال".encode() in html, "Invoice correction links missing"
     print("INVOICE_HTTP_OK",route)
 conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 required={"sister_invoice_customers","sister_invoices","sister_invoice_lines",
           "sister_invoice_receipts","sister_mehr_ledger","sister_mehr_purchases",
           "sister_purchase_suppliers","sister_purchase_orders","sister_purchase_lines",
           "sister_purchase_payments","sister_manual_outgoings",
-          "sister_mehr_settlement_links"}
+          "sister_mehr_settlement_links","sister_invoice_audit"}
 tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 assert required.issubset(tables),required-tables
+columns={r[1] for r in conn.execute("PRAGMA table_info(sister_invoices)")}
+assert {"is_void","version","voided_at"}.issubset(columns),columns
 print("INVOICE_SCHEMA_READY")
 conn.close()
 PY
