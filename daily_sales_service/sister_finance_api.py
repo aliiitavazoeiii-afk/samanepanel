@@ -168,6 +168,8 @@ def post_account(title:str=Form(...),opening:str=Form("0"),conn=Depends(conn_dep
 def outgoing_payment_page(conn):
     from .calendar_jalali import label as jal_label
     rows=outgoing_history(conn)
+    mehr_payments=[dict(r) for r in conn.execute("""SELECT id,occurred_on,debt_delta,notes
+        FROM sister_mehr_ledger WHERE kind='paid_to_mehr' ORDER BY id DESC LIMIT 150""")]
     body='<h1>پرداختی‌ها و هزینه‌ها</h1>'
     body+='<p class="m2-hint">این صفحه برای پرداخت به تأمین‌کننده و هزینه‌های جاری مثل پست، اسنپ، کارتن و بسته‌بندی است؛ نه پلتفرم‌های فروش. انتخاب حساب بانکی لازم نیست.</p>'
     body+=nav("finance/movements?section=payment")
@@ -205,6 +207,14 @@ def outgoing_payment_page(conn):
         body+='</tbody></table></div>'
     else:
         body+='<p class="m2-hint">پرداخت جدیدی در دفتر بدون بانک ثبت نشده است.</p>'
+    body+='</section>'
+    body+='<section class="m2-card m2-finance-section"><h3>پرداخت‌های ثبت‌شده به مهر</h3>'
+    if mehr_payments:
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>بابت</th><th>مبلغ</th><th>توضیحات</th></tr></thead><tbody>'
+        for r in mehr_payments:
+            body+='<tr><td>'+jal_label(r["occurred_on"])+'</td><td>تسویه بدهی مهر</td><td>'+fmt(-r["debt_delta"])+'</td><td>'+e(r["notes"])+'</td></tr>'
+        body+='</tbody></table></div>'
+    else:body+='<p class="m2-hint">هنوز پرداخت به مهر ثبت نشده است.</p>'
     body+='</section>'
     body+='<p class="m2-hint">سوابق قدیمی پرداخت‌های بانکی حذف نشده‌اند. برای دیدن پرداخت‌های قبل از این تغییر، به <a href="'+ROOT+'/finance/accounts">حساب‌ها</a> مراجعه کن.</p>'
     body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier");if(!f||!a)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";}f.addEventListener("change",show);show();})();</script>'
