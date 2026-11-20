@@ -288,5 +288,52 @@ class SisterInvoiceTests(unittest.TestCase):
         html2=open_invoice_balances(conn=self.db).body.decode("utf-8")
         self.assertNotIn("مشتری حساب باز",html2)
 
+
+    def test_mehr_net_receivable_and_bank_free_18m_payment(self):
+        from daily_sales_service.app import app
+        from daily_sales_service.sister_invoice_api import supplier
+        from daily_sales_service.sister_finance_api import finance_home,open_invoice_balances
+        from daily_sales_service.sister_finance_logic import overview
+        # Mirror the user's verified ledger totals; no purchases or stock writes.
+        from daily_sales_service.sister_invoices import _ledger
+        self.db.execute("BEGIN IMMEDIATE")
+        _ledger(self.db,self.day,76000000,0,"factory_invoice","test-factory-mehr")
+        _ledger(self.db,self.day,41496000,0,"purchase_general","test-extra-mehr")
+        _ledger(self.db,self.day,0,58000000,"customer_to_mehr","test-customer-mehr")
+        self.db.execute("COMMIT")
+        self.assertEqual(mehr_balance(self.db),{"debt":117496000,"credit":58000000,"net":-59496000})
+        home=finance_home(conn=self.db).body.decode("utf-8")
+        self.assertIn("بدهی خالص من به مه هر",home)
+        self.assertIn("59,496,000",home)
+        self.assertIn("طلب خالص من از مه هر",home)
+        accounts=open_invoice_balances(conn=self.db).body.decode("utf-8")
+        self.assertIn("59,496,000",accounts)
+        form=supplier(conn=self.db).body.decode("utf-8")
+        self.assertIn("59,496,000",form)
+        self.assertIn("طلب خالص من از مه هر",form)
+        self.assertNotIn('name="account_id"',form)
+        before=self.db.execute("SELECT COUNT(*) FROM sister_finance_movements").fetchone()[0]
+        settlement(self.db,"paid_to_mehr",18000000,self.day,"test-paid-18m",notes="تسویه بخشی")
+        self.assertEqual(mehr_balance(self.db),{"debt":99496000,"credit":58000000,"net":-41496000})
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_finance_movements").fetchone()[0],before)
+        row=self.db.execute("""SELECT notes FROM sister_mehr_ledger WHERE reference='test-paid-18m'""").fetchone()
+        self.assertIn("حساب بانکی نامشخص",row["notes"])
+        with self.assertRaisesRegex(ImportErrorDetail,"قبلاً ثبت"):
+            settlement(self.db,"paid_to_mehr",18000000,self.day,"test-paid-18m")
+        with self.assertRaisesRegex(ImportErrorDetail,"بدهی خالص"):
+            settlement(self.db,"paid_to_mehr",41496001,self.day,"test-overpay")
+
+    def test_mehr_bank_free_received_only_if_net_credit_exists(self):
+        from daily_sales_service.sister_invoices import _ledger
+        with self.assertRaisesRegex(ImportErrorDetail,"طلب خالص"):
+            settlement(self.db,"received_from_mehr",10000,self.day,"not-due")
+        self.db.execute("BEGIN IMMEDIATE")
+        _ledger(self.db,self.day,20000,0,"purchase_general","debt-min")
+        _ledger(self.db,self.day,0,30000,"customer_to_mehr","credit-plus")
+        self.db.execute("COMMIT")
+        settlement(self.db,"received_from_mehr",10000,self.day,"bank-free-credit")
+        self.assertEqual(mehr_balance(self.db)["net"],0)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_finance_movements").fetchone()[0],0)
+
 if __name__=="__main__":
     unittest.main()
