@@ -18,7 +18,7 @@ from .sister_finance_logic import (
 
 from .sister_outgoings import (EXPENSES,SUPPLIER_SHORTCUTS,record_outgoing,
     cancel_outgoing,outgoing_history,expense_total,unmatched_supplier_total)
-from .sister_invoices import settlement as settle_mehr
+from .sister_invoices import settlement as settle_mehr,mehr_open_items,mehr_balance
 
 router=APIRouter()
 
@@ -168,6 +168,9 @@ def post_account(title:str=Form(...),opening:str=Form("0"),conn=Depends(conn_dep
 def outgoing_payment_page(conn):
     from .calendar_jalali import label as jal_label
     rows=outgoing_history(conn)
+    mehr_items=mehr_open_items(conn)
+    mehr_open=[r for r in mehr_items if r["remaining"]>0]
+    mehr_net=mehr_balance(conn)
     mehr_payments=[dict(r) for r in conn.execute("""SELECT id,occurred_on,debt_delta,notes
         FROM sister_mehr_ledger WHERE kind='paid_to_mehr' ORDER BY id DESC LIMIT 150""")]
     body='<h1>پرداختی‌ها و هزینه‌ها</h1>'
@@ -185,10 +188,15 @@ def outgoing_payment_page(conn):
         body+='<option value="expense:'+e(code)+'">'+e(label)+'</option>'
     body+='</optgroup></select></div>'
     body+='<div id="outgoing-other-supplier" style="display:none"><label>نام تأمین‌کننده دیگر</label><input name="other_supplier" maxlength="120"></div>'
-    body+='<div><label>مبلغ پرداختی (تومان)</label><input name="amount" type="number" min="1" required></div>'
+    body+='<div id="outgoing-mehr-target"><label>بدهی یا فاکتور هولدر برای تسویه</label><select name="mehr_target" id="outgoing-mehr-target-select"><option value="">انتخاب فاکتور یا خرید</option>'
+    for item in mehr_open:
+        body+='<option value="'+e(item["target"])+'" data-remaining="'+str(item["remaining"])+'">'+e(item["label"])+' · مانده '+fmt(item["remaining"])+' تومان</option>'
+    body+='</select><small class="m2-hint">پرداخت به مهر به همین سند متصل می‌شود و مانده آن کاهش می‌یابد.</small></div>'
+    body+='<div><label>مبلغ پرداختی (تومان)</label><input name="amount" id="outgoing-amount" type="text" inputmode="numeric" dir="ltr" placeholder="مثلاً 18000000" required autocomplete="off"></div>'
     body+='<div><label>تاریخ پرداخت</label><input name="paid_on" type="date" value="'+today()+'" required></div>'
     body+='<div><label>توضیحات (اختیاری)</label><input name="notes" maxlength="350"></div>'
     body+='<div><button class="m2-btn" type="submit">ثبت پرداخت</button></div></form>'
+    body+='<p class="m2-hint">مانده خالص بدهی فعلی به مهر: '+fmt(max(0,-mehr_net["net"]))+' تومان. مبلغ انتخابی نباید از مانده سند یا بدهی خالص بیشتر باشد. وجوهی که مشتری مستقیم به مهر داده قبلاً از مانده فاکتور کسر شده‌اند.</p>'
     body+='<p class="m2-hint">پرداخت مهر در دفتر اختصاصی خودش ثبت می‌شود. پرداخت به سایر تأمین‌کنندگان فقط وقتی خودکار از بدهی کم می‌شود که نام دقیقاً با یک تأمین‌کننده خرید مطابقت داشته باشد و مانده کافی باشد؛ در غیر این صورت به‌عنوان پرداختِ نیازمند تطبیق می‌ماند. از موجودی بانک مبلغی کم نمی‌شود تا حساب واقعی مشخص شود.</p>'
     body+='</section>'
     body+='<section class="m2-card m2-finance-section"><h3>سوابق پرداخت‌های بدون تعیین بانک</h3>'
@@ -217,16 +225,18 @@ def outgoing_payment_page(conn):
     else:body+='<p class="m2-hint">هنوز پرداخت به مهر ثبت نشده است.</p>'
     body+='</section>'
     body+='<p class="m2-hint">سوابق قدیمی پرداخت‌های بانکی حذف نشده‌اند. برای دیدن پرداخت‌های قبل از این تغییر، به <a href="'+ROOT+'/finance/accounts">حساب‌ها</a> مراجعه کن.</p>'
-    body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier");if(!f||!a)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";}f.addEventListener("change",show);show();})();</script>'
+    body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier"),m=document.getElementById("outgoing-mehr-target"),t=document.getElementById("outgoing-mehr-target-select"),x=document.getElementById("outgoing-amount");if(!f)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";m.style.display=f.value==="supplier:mehr"?"":"none";t.required=f.value==="supplier:mehr";}f.addEventListener("change",show);show();var form=f.closest("form");form.addEventListener("submit",function(ev){var v=x.value.replace(/[۰-۹]/g,function(n){return String(n.charCodeAt(0)-1776);}).replace(/[٠-٩]/g,function(n){return String(n.charCodeAt(0)-1632);}).replace(/[٬,\\s]/g,"");if(!/^\\d+$/.test(v)||Number(v)<=0){ev.preventDefault();alert("مبلغ پرداختی معتبر نیست.");return;}x.value=v;});})();</script>'
     return page_with_style("پرداختی‌ها",body)
 
 @router.post(ROOT+"/finance/outgoings/add")
 def add_outgoing(purpose:str=Form(...),amount:str=Form(...),paid_on:str=Form(...),
                  request_key:str=Form(...),notes:str=Form(""),other_supplier:str=Form(""),
-                 conn=Depends(conn_dep)):
+                 mehr_target:str=Form(""),conn=Depends(conn_dep)):
     try:
         if purpose=="supplier:mehr":
-            settle_mehr(conn,"paid_to_mehr",amount,paid_on,request_key,notes=notes)
+            if not mehr_target:
+                raise ImportErrorDetail("فاکتور یا خرید هولدر را برای تسویه انتخاب کن.")
+            settle_mehr(conn,"paid_to_mehr",amount,paid_on,request_key,notes=notes,target=mehr_target)
         else:
             record_outgoing(conn,purpose,amount,paid_on,request_key,notes,other_supplier)
     except (ImportErrorDetail,ValueError,TypeError) as exc:
