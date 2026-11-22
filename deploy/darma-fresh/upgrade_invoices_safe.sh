@@ -80,6 +80,7 @@ paths=app.openapi()["paths"]
 root="/daily-sales"
 for route in ("/purchases","/purchases/add","/purchases/payments/add",
               "/invoices","/invoices/new","/invoices/create",
+              "/invoices/origins","/invoices/origins/convert",
               "/invoices/mehr","/invoices/mehr/settle",
               "/invoices/purchases","/invoices/purchases/add",
               "/invoices/{invoice_id}","/invoices/{invoice_id}/dispatch",
@@ -88,7 +89,7 @@ for route in ("/purchases","/purchases/add","/purchases/payments/add",
               "/invoices/{invoice_id}/receipts/{receipt_id}/edit"):
     assert root+route in paths, "Missing route: "+route
 for route in ("/purchases/add","/purchases/payments/add",
-              "/invoices/create","/invoices/mehr/settle",
+              "/invoices/create","/invoices/origins/convert","/invoices/mehr/settle",
               "/invoices/purchases/add","/invoices/{invoice_id}/dispatch",
               "/invoices/{invoice_id}/receipt","/invoices/{invoice_id}/edit",
               "/invoices/{invoice_id}/cancel",
@@ -116,7 +117,7 @@ for attempt in range(25):
         time.sleep(2)
 else:
     raise RuntimeError("Sister service did not become healthy")
-for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoices/purchases",
+for route in ("/purchases","/invoices","/invoices/new","/invoices/origins","/invoices/mehr","/invoices/purchases",
               "/finance/movements?section=payment","/finance/open-invoices"):
     req=urllib.request.Request(base+route,headers={"Authorization":auth})
     with urllib.request.urlopen(req,timeout=10) as res:
@@ -128,6 +129,8 @@ for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoic
             assert b'id="outgoing-amount" type="text"' in html, "Readable payment amount missing"
         if route=="/invoices/new":
             assert b'id="invoice-gross-profit"' in html, "Invoice profit missing"
+        if route=="/invoices/origins":
+            assert "اصلاح مبدأ".encode() in html, "Factory-origin preview missing"
         if route=="/invoices":
             assert "ویرایش".encode() in html and "ابطال".encode() in html, "Invoice correction links missing"
             assert b'm2-invoice-actions' in html, "Prominent edit action missing from invoice list"
