@@ -64,6 +64,11 @@ STYLE="""
 .m2-table th,.m2-table td{border:1px solid #29435b;padding:11px 13px;white-space:nowrap;text-align:center!important;background:#10263c}
 .m2-table th{background:#1a3855;color:#fff;font-weight:800}
 .m2-table th:first-child{position:sticky;right:0;z-index:2;min-width:140px;text-align:right!important;background:#213b56}
+.m2-invoice-actions{display:flex;flex-direction:column;align-items:stretch;gap:7px;min-width:145px}
+.m2-invoice-actions a{display:block;padding:7px 9px;border-radius:7px;text-decoration:none!important;text-align:center;color:#e8f4ff!important}
+.m2-invoice-actions .m2-invoice-edit,.m2-invoice-edit{background:#e77d2b!important;color:#132235!important;border:1px solid #ffb977;font-weight:900}
+.m2-invoice-actions .m2-invoice-void{color:#ffced1!important;border:1px solid #b96970;background:#432631}
+
 .m2-table .m2-subtotal td,.m2-table .m2-subtotal th{background:#3b2f2e!important;font-weight:800}
 .m2-table .m2-capital td,.m2-table .m2-capital th{background:#193e3b!important;font-weight:800}
 .m2-table .m2-negative{background:#8a1937!important;color:#fff;font-weight:900}
