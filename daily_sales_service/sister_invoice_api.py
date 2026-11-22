@@ -37,9 +37,13 @@ def page_invoices(conn,query=""):
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
-    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th><th>عملیات</th></tr></thead><tbody>'
+    body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
     for r in rows:
-        body+='<tr><td><a href="'+ROOT+'/invoices/'+str(r["id"])+'">#'+str(r["id"])+'</a></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td><td>'+("ابطال‌شده" if r["is_void"] else '<a href="'+ROOT+'/invoices/'+str(r["id"])+'/edit">ویرایش</a> · <a href="'+ROOT+'/invoices/'+str(r["id"])+'">حذف / ابطال</a>')+'</td></tr>'
+        body+='<tr><td><div class="m2-invoice-actions"><a href="/invoices/'+str(r["id"])+'/">#'+str(r["id"])+'</a>'
+        if not r["is_void"]:
+            body+='<a class="m2-invoice-edit" href="/invoices/'+str(r["id"])+'/edit/">✎ ویرایش</a>'
+            body+='<a class="m2-invoice-void" href="/invoices/'+str(r["id"])+'/#invoice-cancel">حذف</a>'
+        body+='</div></td>'<td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
 
@@ -182,7 +186,7 @@ def edit_form(invoice_id:int,conn=Depends(conn_dep)):
     body+='<div class="m2-card"><small>سود ناخالص جدید</small><strong id="edit-profit">۰</strong></div></div>'
     body+='<p class="m2-hint">جمع دریافتی ثبت‌شده: '+fmt(sum(x["amount"] for x in receipts))+' تومان. جمع فروش اصلاح‌شده نباید کمتر از این عدد باشد.</p>'
     body+='<button class="m2-btn" type="submit" onclick="return confirm(\'تغییرات فاکتور و اثر آن بر حساب و انبار ثبت شود؟\')">ذخیره اصلاح فاکتور</button> '
-    body+='<a class="m2-btn" href="'+ROOT+'/invoices/'+str(invoice_id)+'">انصراف</a></section></form>'
+    body+='<a class="m2-btn" href="/invoices/'+str(invoice_id)+'/">انصراف</a></section></form>'
     body+=r'''<script>(function(){var f=document.getElementById("invoice-edit-form");if(!f)return;
     var q=f.querySelectorAll("[data-edit-qty]"),c=f.querySelectorAll("[data-edit-cost]"),s=f.querySelectorAll("[data-edit-sale]");
     function refresh(){var total=0,cost=0;for(var i=0;i<q.length;i++){
@@ -302,7 +306,7 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     paid=sum(r["amount"] for r in receipts)
     body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a>'
     if not inv["is_void"]:
-        body+='<a href="'+ROOT+'/invoices/'+str(invoice_id)+'/edit">ویرایش فاکتور</a>'
+        body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/edit/">✎ ویرایش فاکتور</a>'
     body+='</div>'
     if inv["is_void"]:
         body+='<div class="m2-msg">این فاکتور ابطال شده و در فروش، سود و حساب‌های باز منظور نمی‌شود. سابقه همچنان قابل مشاهده است.</div>'
@@ -355,7 +359,7 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
         body+='</div><button class="m2-btn">ثبت پرداخت مشتری</button></form>'
     body+='</section>'
     if not inv["is_void"]:
-        body+='<section class="m2-card"><h3>حذف / ابطال فاکتور</h3>'
+        body+='<section class="m2-card" id="invoice-cancel"><h3>حذف / ابطال فاکتور</h3>'
         body+='<p class="m2-hint">ابطال فقط وقتی مجاز است که هیچ دریافت مشتری و هیچ تسویه لینک‌شده مهر وجود نداشته باشد. موجودی یا بدهی ثبت‌شده با سند اصلاحی برگردانده می‌شود و سابقه باقی می‌ماند.</p>'
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/cancel">'
         body+='<input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
