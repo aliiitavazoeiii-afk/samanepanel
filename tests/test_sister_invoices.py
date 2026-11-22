@@ -612,5 +612,60 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn('m2-invoice-actions',listed)
         self.assertIn("/invoices/"+str(iid)+"/#invoice-cancel",listed)
 
+
+    def test_factory_origin_correction_restores_stock_once_and_posts_mehr_once(self):
+        from daily_sales_service.sister_invoices import (
+            correct_invoice_origins_to_factory,invoice_detail,mehr_open_items,invoice_audit)
+        from daily_sales_service.sister_finance_logic import sales_report
+        iid=self._invoice("home")
+        self.db.execute("UPDATE master_products SET seller_stock=25 WHERE id=?",(self.skus["کوچک"],))
+        self.db.execute("UPDATE master_products SET seller_stock=15 WHERE id=?",(self.skus["متوسط"],))
+        dispatch_invoice(self.db,iid)
+        record_receipt(self.db,iid,100000,"mehr",self.day,"factory-origin-r")
+        before=self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0]
+        gross=sales_report(self.db,"mold")["gross"]
+        outcome=correct_invoice_origins_to_factory(self.db,[(iid,0)],"origin-fix")
+        self.assertEqual(outcome[0]["cost"],130000)
+        inv,lines,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(inv["origin"],"factory")
+        self.assertEqual(inv["version"],1)
+        self.assertTrue(all(x["master_id"] is None for x in lines))
+        self.assertEqual(self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0],before+2)
+        self.assertEqual(mehr_balance(self.db),{"debt":130000,"credit":100000,"net":-30000})
+        self.assertEqual(sales_report(self.db,"mold")["gross"],gross)
+        self.assertEqual(len(receipts),1)
+        self.assertEqual(next(x for x in mehr_open_items(self.db) if x["id"]==iid and x["kind"]=="invoice")["remaining"],30000)
+        self.assertEqual(len(invoice_audit(self.db,iid)),1)
+        with self.assertRaises(ImportErrorDetail):
+            correct_invoice_origins_to_factory(self.db,[(iid,0)],"origin-fix-repeat")
+        self.assertEqual(mehr_balance(self.db)["debt"],130000)
+
+    def test_factory_origin_correction_bulk_rolls_back_when_one_invoice_is_invalid(self):
+        from daily_sales_service.sister_invoices import correct_invoice_origins_to_factory,invoice_detail
+        a=self._invoice("home");dispatch_invoice(self.db,a)
+        self.db.execute("INSERT INTO sister_invoice_customers(name,created_at) VALUES ('مشتری دوم',?)",(self.day,))
+        b=create_invoice(self.db,"مشتری دوم","",self.day,"home",{
+            "کوچک":{"master_id":self.skus["کوچک"],"qty":1,"purchase":40000,"sale":70000}
+        })
+        dispatch_invoice(self.db,b)
+        self.db.execute("""DELETE FROM master_stock_events
+            WHERE reference=?""",("sister-invoice:"+str(b),))
+        original=self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0]
+        with self.assertRaisesRegex(ImportErrorDetail,"تطبیق"):
+            correct_invoice_origins_to_factory(self.db,[(a,0),(b,0)],"bulk-broken")
+        self.assertEqual(invoice_detail(self.db,a)[0]["origin"],"home")
+        self.assertEqual(invoice_detail(self.db,b)[0]["origin"],"home")
+        self.assertEqual(self.db.execute("SELECT seller_stock FROM master_products WHERE id=?",(self.skus["کوچک"],)).fetchone()[0],original)
+        self.assertEqual(mehr_balance(self.db)["debt"],0)
+
+    def test_origin_correction_preview_displays_only_home_invoices(self):
+        from daily_sales_service.sister_invoice_api import origin_correction_form
+        from daily_sales_service.sister_invoices import invoice_detail
+        iid=self._invoice("home")
+        html=origin_correction_form(conn=self.db).body.decode("utf8")
+        self.assertIn('name="invoice_ids"',html)
+        self.assertIn(str(iid),html)
+        self.assertIn('اصلاح مبدأ فاکتور',html)
+
 if __name__=="__main__":
     unittest.main()
