@@ -61,7 +61,7 @@ def new_invoice(conn=Depends(conn_dep)):
     body+='<datalist id="sister-customer-list">'+''.join('<option value="'+e(x[0])+'"></option>' for x in conn.execute("SELECT name FROM sister_invoice_customers ORDER BY name"))+'</datalist>'
     body+='<div><label>شماره تماس</label><input name="phone" maxlength="40"></div>'
     body+='<div><label>تاریخ فاکتور</label><input type="date" name="invoice_date" value="'+today()+'" required></div>'
-    body+='<div><label>محل کسر کالا / ارسال (فقط یک‌بار)</label><select name="origin" id="invoice-origin"><option value="home">خانه (کسر از موجودی خانه)</option><option value="factory">کارخانه (خرید مستقیم از مه هر، بدون کسر از خانه)</option></select></div>'
+    body+='<div><label>محل کسر کالا / ارسال (فقط یک‌بار)</label><select name="origin" id="invoice-origin"><option value="factory" selected>کارخانه (خرید مستقیم از مه هر، بدون کسر از خانه)</option><option value="home">خانه (کسر از موجودی خانه)</option></select></div>'
     body+='</div></section>'
     body+='<section class="m2-card"><h3>اقلام فاکتور</h3>'
     body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سایز</th><th>تعداد</th><th>قیمت خرید هر عدد از مه هر</th><th>قیمت فروش هر عدد</th><th>جمع ردیف</th></tr></thead><tbody>'
