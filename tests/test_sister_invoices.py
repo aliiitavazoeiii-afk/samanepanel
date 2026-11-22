@@ -607,6 +607,10 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn("ویرایش این دریافتی",updated)
         listing=page_invoices(self.db)
         self.assertIn("ویرایش",listing.body.decode("utf-8"))
+        listed=listing.body.decode("utf-8")
+        self.assertIn("/invoices/"+str(iid)+"/edit/",listed)
+        self.assertIn('m2-invoice-actions',listed)
+        self.assertIn("/invoices/"+str(iid)+"/#invoice-cancel",listed)
 
 if __name__=="__main__":
     unittest.main()
