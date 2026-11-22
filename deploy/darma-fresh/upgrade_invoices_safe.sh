@@ -130,6 +130,7 @@ for route in ("/purchases","/invoices","/invoices/new","/invoices/mehr","/invoic
             assert b'id="invoice-gross-profit"' in html, "Invoice profit missing"
         if route=="/invoices":
             assert "ویرایش".encode() in html and "ابطال".encode() in html, "Invoice correction links missing"
+            assert b'm2-invoice-actions' in html, "Prominent edit action missing from invoice list"
     print("INVOICE_HTTP_OK",route)
 conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 required={"sister_invoice_customers","sister_invoices","sister_invoice_lines",
