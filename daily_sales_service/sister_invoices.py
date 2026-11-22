@@ -583,8 +583,14 @@ def edit_invoice(conn,invoice_id,customer_name,phone,invoice_date,lines,notes,
         raise
 
 
-def edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,request_key):
-    """Only correct amount/date/note; destination and bank stay unchanged."""
+def edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,
+                         request_key,destination=None):
+    """Correct one existing receipt without adding another receipt or changing stock.
+
+    A bank-unallocated receipt can move between mine and Mehr. Its linked Mehr
+    posting is inserted or corrected in the SAME transaction. Existing bank-
+    linked receipts cannot be reclassified without explicit bank reconciliation.
+    """
     key=_text(request_key,100)
     if not key:raise ImportErrorDetail("شناسه اصلاح دریافت لازم است.")
     val=money(amount)
@@ -594,33 +600,66 @@ def edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_d
     try:
         iid=int(invoice_id);rid=int(receipt_id)
         before=_invoice_snapshot(conn,iid)
-        if before["invoice"]["is_void"]:raise ImportErrorDetail("فاکتور ابطال‌شده قابل اصلاح نیست.")
+        if before["invoice"]["is_void"]:
+            raise ImportErrorDetail("فاکتور ابطال‌شده قابل اصلاح نیست.")
         receipt=next((x for x in before["receipts"] if x["id"]==rid),None)
         if receipt is None:raise ImportErrorDetail("این دریافت متعلق به فاکتور نیست.")
         if conn.execute("SELECT 1 FROM sister_invoice_audit WHERE request_key=?",(key,)).fetchone():
             raise ImportErrorDetail("این ویرایش قبلاً انجام شده است.")
+
+        old_destination=receipt["destination"]
+        new_destination=_text(destination,30) if destination not in (None,"") else old_destination
+        if new_destination not in ("mine","mehr","check_mehr"):
+            raise ImportErrorDetail("دریافت‌کننده انتخاب‌شده معتبر نیست.")
+        if new_destination!=old_destination and receipt["account_id"] is not None:
+            raise ImportErrorDetail("این دریافت به بانک مشخص وصل شده؛ تغییر دریافت‌کننده نیازمند تطبیق حساب بانکی است.")
+
         total=sum(int(x["qty"])*int(x["sale_unit"]) for x in before["lines"])
         others=sum(int(x["amount"]) for x in before["receipts"] if x["id"]!=rid)
-        if others+val>total:raise ImportErrorDetail("جمع دریافتی‌ها نمی‌تواند از مبلغ فاکتور بیشتر شود.")
-        cheque=_date(check_date,allow_future=True) if receipt["destination"]=="check_mehr" else None
-        if receipt["destination"]=="check_mehr" and not cheque:
+        if others+val>total:
+            raise ImportErrorDetail("جمع دریافتی‌ها نمی‌تواند از مبلغ فاکتور بیشتر شود.")
+        cheque=_date(check_date,allow_future=True) if new_destination=="check_mehr" else None
+        if new_destination=="check_mehr" and not cheque:
             raise ImportErrorDetail("تاریخ چک لازم است.")
+
         ref="invoice-receipt:"+str(rid)
-        if receipt["destination"]=="mine" and receipt["account_id"] is not None:
+        old_credit=int(receipt["amount"]) if old_destination in ("mehr","check_mehr") else 0
+        new_credit=val if new_destination in ("mehr","check_mehr") else 0
+        ledger=conn.execute("""SELECT id,kind,credit_delta FROM sister_mehr_ledger
+            WHERE reference=?""",(ref,)).fetchone()
+        if old_credit:
+            if ledger is None or ledger["kind"]!="customer_to_mehr" or int(ledger["credit_delta"])!=old_credit:
+                raise ImportErrorDetail("سند واریز قبلی نزد مهر با رسید مطابقت ندارد؛ اصلاح انجام نشد.")
+        elif ledger is not None and (ledger["kind"]!="customer_to_mehr" or int(ledger["credit_delta"])!=0):
+            raise ImportErrorDetail("این دریافت سند دیگری در دفتر مهر دارد؛ اصلاح انجام نشد.")
+        if mehr_balance(conn)["credit"]+new_credit-old_credit<0:
+            raise ImportErrorDetail("اصلاح دریافت با تهاترهای قبلی مهر سازگار نیست.")
+
+        if old_destination=="mine" and receipt["account_id"] is not None:
             bank=conn.execute("""UPDATE sister_finance_movements
                 SET amount_toman=?,movement_date=?
                 WHERE reference=? AND kind='receipt' AND cancelled_at IS NULL""",(val,day,ref))
             if bank.rowcount!=1:raise ImportErrorDetail("گردش بانکی مرتبط با دریافت پیدا نشد.")
-        elif receipt["destination"] in ("mehr","check_mehr"):
-            old_credit=int(receipt["amount"])
-            if mehr_balance(conn)["credit"]+val-old_credit<0:
-                raise ImportErrorDetail("مبلغ جدید با تهاتر قبلی مهر سازگار نیست؛ ابتدا تهاتر را بررسی کن.")
-            entry=conn.execute("""UPDATE sister_mehr_ledger SET credit_delta=?,occurred_on=?
-                WHERE reference=? AND kind='customer_to_mehr'""",(val,day,ref))
-            if entry.rowcount!=1:raise ImportErrorDetail("ثبت واریز مشتری نزد مهر پیدا نشد.")
+        else:
+            bank=conn.execute("""SELECT 1 FROM sister_finance_movements
+                WHERE reference=? AND kind='receipt' AND cancelled_at IS NULL""",(ref,)).fetchone()
+            if bank:raise ImportErrorDetail("این دریافت گردش بانکی دارد؛ اصلاح نیازمند تطبیق بانک است.")
+
+        if new_credit or ledger is not None:
+            if ledger is None:
+                _ledger(conn,day,0,new_credit,"customer_to_mehr",ref,
+                        "اصلاح مقصد رسید قبلی به حساب مهر؛ بدون ثبت دریافت جدید")
+            else:
+                conn.execute("""UPDATE sister_mehr_ledger
+                    SET credit_delta=?,occurred_on=?,notes=? WHERE reference=?""",
+                    (new_credit,day,
+                     "اصلاح مقصد رسید به مهر" if new_credit else
+                     "اصلاح مقصد رسید به حساب من؛ مانده سند مهر صفر شد",
+                     ref))
         conn.execute("""UPDATE sister_invoice_receipts
-            SET amount=?,paid_on=?,notes=?,check_date=? WHERE id=? AND invoice_id=?""",
-            (val,day,memo,cheque,rid,iid))
+            SET amount=?,destination=?,paid_on=?,notes=?,check_date=?
+            WHERE id=? AND invoice_id=?""",
+            (val,new_destination,day,memo,cheque,rid,iid))
         conn.execute("UPDATE sister_invoices SET version=version+1 WHERE id=?",(iid,))
         after=_invoice_snapshot(conn,iid)
         _audit_invoice(conn,iid,"receipt_edit",before,after,key)
