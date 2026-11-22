@@ -10,7 +10,8 @@ from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
 from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
     receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail,
-    edit_invoice,edit_invoice_receipt,cancel_invoice,invoice_audit)
+    edit_invoice,edit_invoice_receipt,cancel_invoice,invoice_audit,
+    correct_invoice_origins_to_factory)
 from .sister_finance_logic import accounts
 
 router=APIRouter()
@@ -37,6 +38,7 @@ def page_invoices(conn,query=""):
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
+    body+='<p><a class="m2-btn" href="/invoices/origins/">اصلاح فاکتورهای اشتباه «خانه» به «کارخانه»</a></p>'
     body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
     for r in rows:
         body+='<tr><td><div class="m2-invoice-actions"><a href="/invoices/'+str(r["id"])+'/">#'+str(r["id"])+'</a>'
@@ -50,6 +52,54 @@ def page_invoices(conn,query=""):
 @router.get(ROOT+"/invoices")
 def index(q:str="",conn=Depends(conn_dep)):
     return page_invoices(conn,q)
+
+
+@router.get(ROOT+"/invoices/origins")
+def origin_correction_form(conn=Depends(conn_dep)):
+    rows=list(conn.execute("""SELECT i.id,i.invoice_date,i.status,i.version,
+          c.name,COALESCE(SUM(l.qty*l.purchase_unit),0) AS cost,
+          COALESCE(SUM(l.qty*l.sale_unit),0) AS gross,
+          COALESCE((SELECT SUM(r.amount) FROM sister_invoice_receipts r
+             WHERE r.invoice_id=i.id),0) AS paid
+        FROM sister_invoices i
+        JOIN sister_invoice_customers c ON c.id=i.customer_id
+        JOIN sister_invoice_lines l ON l.invoice_id=i.id
+        WHERE i.origin='home' AND i.is_void=0
+        GROUP BY i.id ORDER BY i.id DESC LIMIT 100"""))
+    body='<h1>اصلاح مبدأ فاکتور از خانه به کارخانه</h1>'
+    body+='<p class="m2-hint">فقط فاکتورهایی را انتخاب کن که واقعاً از کارخانه برای مشتری ارسال شدند. پیش‌نمایش: مقدار کسرشده از موجودی خانه به همان انبار برمی‌گردد و بهای خرید کالا فقط یک بار به بدهی مهر افزوده می‌شود. مبلغ فروش، دریافت‌های مشتری و سود تغییر نمی‌کنند.</p>'
+    if rows:
+        body+='<form method="post" action="'+ROOT+'/invoices/origins/convert">'
+        body+='<input type="hidden" name="request_key" value="'+token()+'">'
+        body+='<section class="m2-card"><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>اصلاح</th><th>فاکتور</th><th>مشتری</th><th>تاریخ</th><th>وضعیت</th><th>جمع فروش</th><th>بهای خریدی که به مهر اضافه می‌شود</th><th>دریافت ثبت‌شده</th></tr></thead><tbody>'
+        for r in rows:
+            body+='<tr><td><input type="checkbox" name="invoice_ids" value="'+str(r["id"])+'"></td>'
+            body+='<td><a href="/invoices/'+str(r["id"])+'/">#'+str(r["id"])+'</a></td>'
+            body+='<td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td>'
+            body+='<td>'+("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس")+'</td>'
+            body+='<td>'+fmt(r["gross"])+'</td><td>'+fmt(r["cost"] if r["status"]=="dispatched" else 0)+'</td>'
+            body+='<td>'+fmt(r["paid"])+'</td></tr>'
+            body+='<input type="hidden" name="version_'+str(r["id"])+'" value="'+str(r["version"])+'">'
+        body+='</tbody></table></div>'
+        body+='<p class="m2-hint">اصلاح انتخاب‌شده‌ها یک‌جا و تراکنشی انجام می‌شود. اگر حتی یک سند موجودی یا نسخه فاکتور تطبیق نداشته باشد، هیچ تغییری ثبت نخواهد شد.</p>'
+        body+='<button class="m2-btn" onclick="return confirm(\'آیا تأیید می‌کنی که فقط فاکتورهای انتخاب‌شده از کارخانه بوده‌اند؟ این کار موجودی خانه و بدهی مهر را اصلاح می‌کند.\')">تأیید اصلاح مبدأ فاکتورهای انتخاب‌شده</button></section></form>'
+    else:
+        body+='<section class="m2-card"><p>فاکتور فعالی با مبدأ «خانه» پیدا نشد.</p></section>'
+    body+='<p><a class="m2-btn" href="/invoices/">بازگشت به فاکتورها</a></p>'
+    return page_with_style("اصلاح مبدأ فاکتورها",body)
+
+
+@router.post(ROOT+"/invoices/origins/convert")
+async def origin_correction_post(request:Request,conn=Depends(conn_dep)):
+    form=await request.form()
+    ids=form.getlist("invoice_ids")
+    try:
+        versions=[(int(i),form.get("version_"+i)) for i in ids]
+        correct_invoice_origins_to_factory(conn,versions,form.get("request_key"))
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/origins")
+    return RedirectResponse(ROOT+"/invoices/origins",status_code=303)
+
 
 @router.get(ROOT+"/invoices/new")
 def new_invoice(conn=Depends(conn_dep)):
