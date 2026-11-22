@@ -43,7 +43,7 @@ def page_invoices(conn,query=""):
         if not r["is_void"]:
             body+='<a class="m2-invoice-edit" href="/invoices/'+str(r["id"])+'/edit/">✎ ویرایش</a>'
             body+='<a class="m2-invoice-void" href="/invoices/'+str(r["id"])+'/#invoice-cancel">حذف</a>'
-        body+='</div></td>'<td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td></tr>'
+        body+='</div></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
 
