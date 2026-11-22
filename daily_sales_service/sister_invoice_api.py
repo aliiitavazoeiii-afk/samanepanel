@@ -102,15 +102,16 @@ def new_invoice(conn=Depends(conn_dep)):
   var form=document.getElementById("sister-one-invoice");
   if(!form)return;
   var fmt=function(n){return new Intl.NumberFormat("fa-IR").format(n);};
-  var number=function(name){var x=form.elements[name];return x?Math.max(0,Number(x.value)||0):0;};
+  var monetary=function(value){var s=String(value||"").replace(/[۰-۹]/g,function(x){return String(x.charCodeAt(0)-1776);}).replace(/[٠-٩]/g,function(x){return String(x.charCodeAt(0)-1632);}).replace(/[٬,\s]/g,"");return Number(s)||0;};
+  var number=function(name){var x=form.elements[name];return x?Math.max(0,monetary(x.value)):0;};
   var qty=form.querySelectorAll("[data-invoice-qty]"),sales=form.querySelectorAll("[data-invoice-sale]");
   var total=document.getElementById("invoice-grand-total"),profit=document.getElementById("invoice-gross-profit"),paid=document.getElementById("invoice-paid-total"),balance=document.getElementById("invoice-remaining");
   function refresh(){
     var sum=0,cost=0;
     for(var i=0;i<qty.length;i++){
-      var line=(Number(qty[i].value)||0)*(Number(sales[i].value)||0);
+      var line=(Number(qty[i].value)||0)*(monetary(sales[i].value));
       var purchase=qty[i].closest("tr").querySelector('input[name^="purchase_"]');
-      cost+=(Number(qty[i].value)||0)*(Number(purchase.value)||0);
+      cost+=(Number(qty[i].value)||0)*(monetary(purchase.value));
       qty[i].closest("tr").querySelector("[data-invoice-row]").textContent=fmt(line);
       sum+=line;
     }
@@ -124,7 +125,7 @@ def new_invoice(conn=Depends(conn_dep)):
   form.addEventListener("input",refresh);form.addEventListener("change",refresh);
   form.addEventListener("submit",function(ev){
     var grand=0;
-    for(var i=0;i<qty.length;i++)grand+=(Number(qty[i].value)||0)*(Number(sales[i].value)||0);
+    for(var i=0;i<qty.length;i++)grand+=(Number(qty[i].value)||0)*(monetary(sales[i].value));
     if(grand<=0||number("initial_amount")>grand){ev.preventDefault();alert("جمع فاکتور و مبلغ دریافتی را بررسی کن.");return;}
     document.getElementById("invoice-save-button").disabled=true;
   });
@@ -190,8 +191,8 @@ def edit_form(invoice_id:int,conn=Depends(conn_dep)):
     body+=r'''<script>(function(){var f=document.getElementById("invoice-edit-form");if(!f)return;
     var q=f.querySelectorAll("[data-edit-qty]"),c=f.querySelectorAll("[data-edit-cost]"),s=f.querySelectorAll("[data-edit-sale]");
     function refresh(){var total=0,cost=0;for(var i=0;i<q.length;i++){
-    var qty=Number(q[i].value)||0,amount=qty*(Number(s[i].value)||0);
-    cost+=qty*(Number(c[i].value)||0);total+=amount;
+    var qty=Number(q[i].value)||0,amount=qty*(Number(String(s[i].value).replace(/[٬,\s]/g,""))||0);
+    cost+=qty*(Number(String(c[i].value).replace(/[٬,\s]/g,""))||0);total+=amount;
     q[i].closest("tr").querySelector("[data-edit-row]").textContent=new Intl.NumberFormat("fa-IR").format(amount);}
     document.getElementById("edit-total").textContent=new Intl.NumberFormat("fa-IR").format(total);
     document.getElementById("edit-profit").textContent=new Intl.NumberFormat("fa-IR").format(total-cost);}
