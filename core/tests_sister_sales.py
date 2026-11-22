@@ -137,6 +137,14 @@ class SalesChannelRoutesTest(SimpleTestCase):
             self.assertEqual(self.client.post(url).status_code,302)
         self.assertEqual(sister_sales.invoice_proxy.__name__,"invoice_proxy")
 
+    def test_factory_origin_correction_route_requires_auth_and_post_allowlist(self):
+        self.assertEqual(reverse("sister_invoice_origins"),"/invoices/origins/")
+        self.assertEqual(resolve("/invoices/origins/").func,sister_sales.digikala_proxy)
+        self.assertEqual(self.client.get("/invoices/origins/").status_code,302)
+        self.assertIn("invoices/origins",sister_sales._ALLOWED)
+        self.assertIn("invoices/origins/convert",sister_sales._ALLOWED)
+        self.assertIn("invoices/origins/convert",sister_sales._POST)
+
     def test_new_purchasing_replaces_old_takvin_menu_but_preserves_old_route(self):
         from django.template.loader import get_template
         raw=get_template("base.html").template.source
