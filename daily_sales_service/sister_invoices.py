@@ -493,6 +493,106 @@ def _adjust_invoice_stock(conn,invoice_id,previous,revised,request_key):
              "sister-invoice-correction:"+str(invoice_id)+":"+request_key))
 
 
+def _correct_one_invoice_origin_to_factory(conn,invoice_id,expected_version,request_key):
+    """Convert a mistakenly home-dispatched mold sale to direct factory delivery.
+
+    Sales, existing customer receipts, payment destinations, COGS snapshots and
+    financial bank records stay unchanged. Reverse only the exact warehouse
+    effect of THIS invoice and post its factory procurement ONCE.
+    """
+    try:
+        iid=int(invoice_id);version=int(expected_version)
+    except (TypeError,ValueError):
+        raise ImportErrorDetail("شماره یا نسخه فاکتور نامعتبر است.")
+    if iid<=0:raise ImportErrorDetail("شماره فاکتور نامعتبر است.")
+    before=_invoice_snapshot(conn,iid)
+    inv=before["invoice"]
+    if inv["is_void"]:raise ImportErrorDetail("فاکتور ابطال‌شده قابل اصلاح نیست.")
+    if int(inv["version"])!=version:
+        raise ImportErrorDetail("نسخه فاکتور #"+str(iid)+" تغییر کرده؛ صفحه را تازه‌سازی کن.")
+    if inv["origin"]!="home":
+        raise ImportErrorDetail("فاکتور #"+str(iid)+" قبلاً از کارخانه ثبت شده یا مبدأ دیگری دارد.")
+    if not before["lines"]:
+        raise ImportErrorDetail("فاکتور بدون ردیف قابل اصلاح نیست.")
+    if conn.execute("""SELECT 1 FROM sister_mehr_ledger
+                      WHERE reference=?""",("factory-invoice:"+str(iid),)).fetchone():
+        raise ImportErrorDetail("برای این فاکتور قبلاً خرید کارخانه ثبت شده؛ اصلاح متوقف شد.")
+    if conn.execute("""SELECT 1 FROM sister_mehr_settlement_links
+              WHERE target_type='invoice' AND target_id=?""",(iid,)).fetchone():
+        raise ImportErrorDetail("فاکتور تسویه متصل مهر دارد؛ اصلاح دستی لازم است.")
+    quantities={}
+    for line in before["lines"]:
+        if line["master_id"] is None:
+            raise ImportErrorDetail("فاکتور خانه فاقد شناسه کالای انبار است؛ اصلاح متوقف شد.")
+        master_id=int(line["master_id"])
+        quantities[master_id]=quantities.get(master_id,0)+int(line["qty"])
+    if inv["status"]=="dispatched":
+        # A proof of the original signed movement is mandatory: restore stock
+        # only when invoice + its later edits net to the current quantities.
+        refs=("sister-invoice:"+str(iid),
+              "sister-invoice-correction:"+str(iid)+":")
+        events=conn.execute("""SELECT master_id,SUM(delta) AS delta
+            FROM master_stock_events WHERE source='home' AND
+            (reference=? OR substr(reference,1,?)=?)
+            GROUP BY master_id""",
+            (refs[0],len(refs[1]),refs[1])).fetchall()
+        actual={int(x["master_id"]):int(x["delta"]) for x in events}
+        expected={mid:-qty for mid,qty in quantities.items()}
+        if actual!=expected:
+            raise ImportErrorDetail("حرکت انبار فاکتور #"+str(iid)+
+                  " با مقادیر فعلی تطبیق ندارد؛ موجودی تغییر نکرد.")
+        for mid,qty in sorted(quantities.items()):
+            row=conn.execute("""SELECT seller_stock FROM master_products
+                WHERE id=? AND category='قالب'""",(mid,)).fetchone()
+            if row is None:raise ImportErrorDetail("قالب فیزیکی این فاکتور در انبار پیدا نشد.")
+            after=int(row["seller_stock"])+qty
+            conn.execute("UPDATE master_products SET seller_stock=?,updated_at=? WHERE id=?",
+                         (after,now(),mid))
+            conn.execute("""INSERT INTO master_stock_events
+              (occurred_at,master_id,source,delta,balance_after,reference)
+              VALUES (?,?,?,?,?,?)""",
+              (now(),mid,"home",qty,after,
+               "sister-invoice-origin-factory:"+str(iid)+":"+request_key))
+        cost=sum(int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"])
+        _ledger(conn,today(),cost,0,"factory_invoice",
+                "factory-invoice:"+str(iid),
+                "اصلاح مبدأ فاکتور #"+str(iid)+" از خانه به کارخانه؛ بدون ثبت مجدد فروش")
+    conn.execute("UPDATE sister_invoice_lines SET master_id=NULL WHERE invoice_id=?",(iid,))
+    conn.execute("""UPDATE sister_invoices SET origin='factory',version=version+1
+                    WHERE id=?""",(iid,))
+    after=_invoice_snapshot(conn,iid)
+    _audit_invoice(conn,iid,"edit",before,after,
+                   "origin-factory:"+str(iid)+":"+request_key)
+    return {"id":iid,"cost":sum(int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"]),
+            "quantities":quantities,"posted":inv["status"]=="dispatched"}
+
+
+def correct_invoice_origins_to_factory(conn,invoice_versions,request_key):
+    """One locked transaction for selected invoices: all succeed or none do."""
+    key=_text(request_key,70)
+    if not key:raise ImportErrorDetail("شناسه اصلاح لازم است.")
+    if isinstance(invoice_versions,dict):pairs=list(invoice_versions.items())
+    else:pairs=list(invoice_versions)
+    if not pairs or len(pairs)>100:
+        raise ImportErrorDetail("یک تا صد فاکتور خانه را برای اصلاح انتخاب کن.")
+    try:
+        ids=[int(i) for i,_ in pairs]
+    except (TypeError,ValueError):
+        raise ImportErrorDetail("شماره فاکتور نامعتبر است.")
+    if len(ids)!=len(set(ids)):
+        raise ImportErrorDetail("فاکتور تکراری در انتخاب‌ها وجود دارد.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        results=[]
+        for iid,ver in pairs:
+            results.append(_correct_one_invoice_origin_to_factory(conn,iid,ver,key))
+        conn.execute("COMMIT")
+        return results
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
 def edit_invoice(conn,invoice_id,customer_name,phone,invoice_date,lines,notes,
                  expected_version,request_key):
     """Correct an existing invoice atomically; never create a second sale."""
