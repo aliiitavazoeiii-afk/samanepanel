@@ -230,7 +230,7 @@ def invoice_receipt_edit_proxy(request, invoice_id, receipt_id):
 
 @login_required
 def digikala_proxy(request, tail=""):
-    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|cancel|receipts/\d+/edit))?",tail):
+    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|cancel|origin|receipts/\d+/edit))?",tail):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     if request.method not in ("GET", "POST"):
         return HttpResponse("متد غیرمجاز است.", status=405)
