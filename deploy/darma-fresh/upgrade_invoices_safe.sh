@@ -132,8 +132,10 @@ for route in ("/purchases","/invoices","/invoices/new","/invoices/origins","/inv
         if route=="/invoices/origins":
             assert "اصلاح مبدأ".encode() in html, "Factory-origin preview missing"
         if route=="/invoices":
-            assert "ویرایش".encode() in html and "ابطال".encode() in html, "Invoice correction links missing"
-            assert b'm2-invoice-actions' in html, "Prominent edit action missing from invoice list"
+            assert b'm2-invoice-actions' in html, "Invoice detail links missing from list"
+            assert "مشاهده فاکتور".encode() in html, "Invoice detail entry missing"
+            assert b'/invoices/' in html, "Invoice detail link missing"
+            assert b'm2-invoice-edit' not in html, "Edit must be inside invoice details"
     print("INVOICE_HTTP_OK",route)
 conn=sqlite3.connect("file:/data/sales.sqlite3?mode=ro",uri=True)
 required={"sister_invoice_customers","sister_invoices","sister_invoice_lines",
