@@ -219,7 +219,7 @@ def add_csrf(request, html):
 
 @login_required
 def invoice_proxy(request, invoice_id, action=""):
-    if action and action not in ("dispatch", "receipt", "edit", "cancel"):
+    if action and action not in ("dispatch", "receipt", "edit", "cancel", "origin"):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     return digikala_proxy(request, "invoices/" + str(invoice_id) + ("/" + action if action else ""))
 
