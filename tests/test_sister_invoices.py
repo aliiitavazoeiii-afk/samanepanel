@@ -606,11 +606,12 @@ class SisterInvoiceTests(unittest.TestCase):
         updated=detail(invoice_id=iid,conn=self.db).body.decode("utf-8")
         self.assertIn("ویرایش این دریافتی",updated)
         listing=page_invoices(self.db)
-        self.assertIn("ویرایش",listing.body.decode("utf-8"))
         listed=listing.body.decode("utf-8")
-        self.assertIn("/invoices/"+str(iid)+"/edit/",listed)
         self.assertIn('m2-invoice-actions',listed)
-        self.assertIn("/invoices/"+str(iid)+"/#invoice-cancel",listed)
+        self.assertIn("مشاهده فاکتور #"+str(iid),listed)
+        self.assertNotIn("/invoices/"+str(iid)+"/edit/",listed)
+        self.assertNotIn("/invoices/"+str(iid)+"/#invoice-cancel",listed)
+        self.assertIn("/invoices/"+str(iid)+"/edit/",item)
 
 
     def test_factory_origin_correction_restores_stock_once_and_posts_mehr_once(self):
@@ -666,6 +667,48 @@ class SisterInvoiceTests(unittest.TestCase):
         self.assertIn('name="invoice_ids"',html)
         self.assertIn(str(iid),html)
         self.assertIn('اصلاح مبدأ فاکتور',html)
+
+
+    def test_invoice_edit_actions_only_in_detail_and_origin_preview_by_invoice(self):
+        from daily_sales_service.sister_invoice_api import page_invoices,detail,invoice_origin_confirm
+        home_id=self._invoice("home")
+        idx=page_invoices(self.db).body.decode("utf-8")
+        self.assertNotIn("/invoices/"+str(home_id)+"/edit/",idx)
+        self.assertIn("مشاهده فاکتور #"+str(home_id),idx)
+        d=detail(invoice_id=home_id,conn=self.db).body.decode("utf-8")
+        self.assertIn("/invoices/"+str(home_id)+"/edit/",d)
+        self.assertIn("/invoices/"+str(home_id)+"/origin/",d)
+        confirm=invoice_origin_confirm(invoice_id=home_id,conn=self.db).body.decode("utf-8")
+        self.assertIn('name="invoice_ids" value="'+str(home_id)+'"',confirm)
+        self.assertIn("ثبت اصلاح مبدأ همین فاکتور",confirm)
+
+    def test_mehr_page_warns_ledger_receipt_and_home_origin_mismatches(self):
+        from daily_sales_service.sister_invoice_api import supplier
+        iid=self._invoice("home")
+        rid=record_receipt(self.db,iid,10000,"mehr",self.day,"warning-receipt")
+        html=supplier(conn=self.db).body.decode("utf-8")
+        self.assertIn("مغایرت‌هایی که قبل از اعتماد به مانده مهر",html)
+        self.assertIn("مبدأ فاکتور خانه است",html)
+        self.db.execute("UPDATE sister_mehr_ledger SET credit_delta=9999 WHERE reference=?",
+                        ("invoice-receipt:"+str(rid),))
+        html=supplier(conn=self.db).body.decode("utf-8")
+        self.assertIn("مبلغ دفتر مهر با رسیدهای فاکتور یکسان نیست",html)
+
+    def test_correct_invoice_receipt_destination_updates_single_mehr_ledger_entry(self):
+        from daily_sales_service.sister_invoices import edit_invoice_receipt,invoice_detail
+        iid=self._invoice("factory")
+        dispatch_invoice(self.db,iid)
+        rid=record_receipt(self.db,iid,10000,"mine",self.day,"wrong-dest")
+        edit_invoice_receipt(self.db,iid,rid,10000,self.day,"رسید اصلاح‌شده","",
+                             "correct-recipient",destination="mehr")
+        self.assertEqual(mehr_balance(self.db)["credit"],10000)
+        inv,lines,receipts=invoice_detail(self.db,iid)
+        self.assertEqual(receipts[0]["destination"],"mehr")
+        self.assertEqual(len(receipts),1)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM sister_mehr_ledger WHERE kind='customer_to_mehr'").fetchone()[0],1)
+        with self.assertRaises(ImportErrorDetail):
+            edit_invoice_receipt(self.db,iid,rid,10000,self.day,"","",
+                                 "correct-recipient",destination="mehr")
 
 if __name__=="__main__":
     unittest.main()
