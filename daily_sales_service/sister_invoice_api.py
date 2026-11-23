@@ -301,8 +301,8 @@ def cancel_post(invoice_id:int,request_key:str=Form(...),version:int=Form(...),c
 @router.post(ROOT+"/invoices/{invoice_id}/receipts/{receipt_id}/edit")
 def receipt_edit_post(invoice_id:int,receipt_id:int,amount:str=Form(...),paid_on:str=Form(...),
                       notes:str=Form(""),check_date:str=Form(""),request_key:str=Form(...),
-                      conn=Depends(conn_dep)):
-    try:edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,request_key)
+                      destination:str=Form(""),conn=Depends(conn_dep)):
+    try:edit_invoice_receipt(conn,invoice_id,receipt_id,amount,paid_on,notes,check_date,request_key,destination=destination)
     except (ImportErrorDetail,ValueError,TypeError) as exc:
         return form_error(exc,"invoices/"+str(invoice_id))
     return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
@@ -421,8 +421,13 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
             body+='<details><summary>ویرایش این دریافتی</summary><form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipts/'+str(r["id"])+'/edit">'
             body+='<input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
             body+='<div><label>مبلغ صحیح (تومان)</label><input type="number" name="amount" min="1" value="'+str(r["amount"])+'" required></div>'
+            body+='<div><label>دریافت‌کننده واقعی وجه</label><select name="destination">'
+            for code,desc in (("mine","حساب من"),("mehr","حساب مهر"),("check_mehr","چک تحویل مهر")):
+                body+='<option value="'+code+'"'+(" selected" if r["destination"]==code else "")+'>'+desc+'</option>'
+            body+='</select></div>'
             body+='<div><label>تاریخ دریافت</label><input type="date" name="paid_on" value="'+e(r["paid_on"])+'" required></div>'
             body+='<div><label>توضیح</label><input name="notes" maxlength="350" value="'+e(r["notes"])+'"></div>'
+            body+='<p class="m2-hint">مبلغ و دریافت‌کننده را با رسید واقعی تطبیق بده؛ اصلاح، دریافت جدید ایجاد نمی‌کند. اگر مبلغ اشتباه زیاد است، قبل از ذخیره رقم صحیح را از سند بانکی بررسی کن.</p>'
             if r["destination"]=="check_mehr":
                 body+='<div><label>تاریخ چک</label><input type="date" name="check_date" value="'+e(r["check_date"])+'" required></div>'
             body+='</div><button class="m2-btn" onclick="return confirm(\'اصلاح مبلغ دریافت ثبت شود؟\')">ذخیره اصلاح دریافتی</button></form></details>'
