@@ -42,9 +42,6 @@ def page_invoices(conn,query=""):
     body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
     for r in rows:
         body+='<tr><td><div class="m2-invoice-actions"><a href="/invoices/'+str(r["id"])+'/">مشاهده فاکتور #'+str(r["id"])+'</a>'
-        if not r["is_void"]:
-
-
         body+='</div></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
