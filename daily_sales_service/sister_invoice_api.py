@@ -313,6 +313,34 @@ def supplier(conn=Depends(conn_dep)):
     b=mehr_balance(conn)
     body='<h1>حساب مه هر</h1><p class="m2-hint">واریزی مشتری به حساب مهر، پولی برای تسویه بدهی خرید از مهر است؛ تا وقتی بدهی بیشتر باشد، تو از مهر طلب خالص نداری. ثبت تهاتر عملیاتی جداگانه است.</p>'
     body+='<div class="m2-msg">مانده قدیمی مه هر هنوز با دفتر جدید تطبیق داده نشده است؛ عدد فعلی، مانده قطعی همه سال‌ها نیست.</div>'
+    checks=list(conn.execute("""SELECT i.id AS invoice_id,c.name,i.origin,
+        COALESCE((SELECT SUM(qty*sale_unit) FROM sister_invoice_lines
+            WHERE invoice_id=i.id),0) AS sale_total,
+        COALESCE((SELECT SUM(amount) FROM sister_invoice_receipts
+            WHERE invoice_id=i.id),0) AS received_total,
+        COALESCE((SELECT SUM(amount) FROM sister_invoice_receipts
+            WHERE invoice_id=i.id AND destination IN ('mehr','check_mehr')),0) AS receipt_mehr,
+        COALESCE((SELECT SUM(credit_delta) FROM sister_mehr_ledger l
+            JOIN sister_invoice_receipts r ON l.reference='invoice-receipt:'||r.id
+            WHERE r.invoice_id=i.id AND l.kind='customer_to_mehr'),0) AS ledger_mehr
+        FROM sister_invoices i JOIN sister_invoice_customers c ON c.id=i.customer_id
+        WHERE i.is_void=0 ORDER BY i.id DESC"""))
+    problems=[]
+    for item in checks:
+        reasons=[]
+        if item["received_total"]>item["sale_total"]:
+            reasons.append("دریافتی ثبت‌شده از کل فاکتور بیشتر است")
+        if item["ledger_mehr"]!=item["receipt_mehr"]:
+            reasons.append("مبلغ دفتر مهر با رسیدهای فاکتور یکسان نیست")
+        if item["origin"]=="home" and item["receipt_mehr"]>0:
+            reasons.append("وجه نزد مهر ثبت شده، اما مبدأ فاکتور خانه است؛ ارسال واقعی را بررسی کن")
+        if reasons:problems.append((item,reasons))
+    if problems:
+        body+='<section class="m2-card"><h3>مغایرت‌هایی که قبل از اعتماد به مانده مهر باید بررسی شوند</h3>'
+        body+='<p class="m2-hint">عدد خالص مهر تا زمان اصلاح مبالغ رسیدها و مبدأ ارسال فاکتورهای اشتباه قابل اتکا نیست. تغییرات به‌صورت خودکار روی سندها انجام نمی‌شود.</p>'
+        for item,reasons in problems:
+            body+='<p><a href="/invoices/'+str(item["invoice_id"])+'/">فاکتور #'+str(item["invoice_id"])+' / '+e(item["name"])+'</a>: '+e("؛ ".join(reasons))+' — کل فروش '+fmt(item["sale_total"])+'، دریافت '+fmt(item["received_total"])+'، سند مهر '+fmt(item["ledger_mehr"])+' تومان</p>'
+        body+='</section>'
     body+='<div class="m2-finance-cards"><div class="m2-card"><small>بدهی خالص من به مه هر</small><strong>'+fmt(max(0,-b["net"]))+'</strong><span class="m2-unit">تومان</span></div>'
     body+='<div class="m2-card"><small>طلب خالص من از مه هر</small><strong>'+fmt(max(0,b["net"]))+'</strong><span class="m2-unit">تومان</span></div>'
     body+='</div>'
