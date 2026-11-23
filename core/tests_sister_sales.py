@@ -130,6 +130,8 @@ class SalesChannelRoutesTest(SimpleTestCase):
     def test_invoice_edit_void_and_receipt_correction_routes_are_authenticated(self):
         self.assertEqual(reverse("sister_invoice_action",kwargs={"invoice_id":15,"action":"edit"}),"/invoices/15/edit/")
         self.assertEqual(resolve("/invoices/15/edit/").func,sister_sales.invoice_proxy)
+        self.assertEqual(resolve("/invoices/15/origin/").func,sister_sales.invoice_proxy)
+        self.assertEqual(sister_sales.invoice_proxy.__name__,"invoice_proxy")
         self.assertEqual(resolve("/invoices/15/cancel/").func,sister_sales.invoice_proxy)
         self.assertEqual(resolve("/invoices/15/receipts/3/edit/").func,sister_sales.invoice_receipt_edit_proxy)
         for url in ("/invoices/15/edit/","/invoices/15/cancel/","/invoices/15/receipts/3/edit/"):
