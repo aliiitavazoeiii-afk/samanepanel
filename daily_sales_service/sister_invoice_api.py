@@ -38,13 +38,13 @@ def page_invoices(conn,query=""):
     body='<h1>فاکتور مشتریان</h1><p class="m2-hint">فاکتور ابتدا پیش‌نویس است؛ فقط هنگام تأیید ارسال، موجودی و حساب مه هر تغییر می‌کند.</p>'
     body+='<div class="m2-tabs"><a href="'+ROOT+'/invoices/new">+ فاکتور جدید</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a><a href="'+ROOT+'/purchases">خرید کالا</a></div>'
     body+='<form method="get" action="'+ROOT+'/invoices" class="m2-filters"><label>جست‌وجوی مشتری با نام</label><input name="q" value="'+e(query)+'" placeholder="نام مشتری"><button class="m2-btn">جست‌وجو</button></form>'
-    body+='<p><a class="m2-btn" href="/invoices/origins/">اصلاح فاکتورهای اشتباه «خانه» به «کارخانه»</a></p>'
+
     body+='<section class="m2-card"><h3>فاکتورهای ثبت‌شده</h3><div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبدأ</th><th>وضعیت فاکتور</th><th>جمع فاکتور</th><th>دریافتی</th><th>مانده</th><th>وضعیت تسویه</th></tr></thead><tbody>'
     for r in rows:
-        body+='<tr><td><div class="m2-invoice-actions"><a href="/invoices/'+str(r["id"])+'/">#'+str(r["id"])+'</a>'
+        body+='<tr><td><div class="m2-invoice-actions"><a href="/invoices/'+str(r["id"])+'/">مشاهده فاکتور #'+str(r["id"])+'</a>'
         if not r["is_void"]:
-            body+='<a class="m2-invoice-edit" href="/invoices/'+str(r["id"])+'/edit/">✎ ویرایش</a>'
-            body+='<a class="m2-invoice-void" href="/invoices/'+str(r["id"])+'/#invoice-cancel">حذف</a>'
+
+
         body+='</div></td><td>'+e(r["name"])+'</td><td>'+jal_label(r["invoice_date"])+'</td><td>'+("خانه" if r["origin"]=="home" else "کارخانه")+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("ارسال‌شده" if r["status"]=="dispatched" else "پیش‌نویس"))+'</td><td>'+fmt(r["gross"])+'</td><td>'+fmt(r["paid"])+'</td><td>'+fmt(r["gross"]-r["paid"])+'</td><td>'+("ابطال‌شده" if r["is_void"] else ("تسویه‌شده" if r["paid"]>=r["gross"] else "باز / تسویه‌نشده"))+'</td></tr>'
     body+='</tbody></table></div></section>'
     return page_with_style("فاکتور مشتریان",body)
@@ -89,6 +89,29 @@ def origin_correction_form(conn=Depends(conn_dep)):
     return page_with_style("اصلاح مبدأ فاکتورها",body)
 
 
+@router.get(ROOT+"/invoices/{invoice_id}/origin")
+def invoice_origin_confirm(invoice_id:int,conn=Depends(conn_dep)):
+    try:inv,lines,receipts=invoice_detail(conn,invoice_id)
+    except ImportErrorDetail as exc:return form_error(exc)
+    if inv["is_void"]:return form_error(ImportErrorDetail("این فاکتور ابطال شده است."))
+    if inv["origin"]!="home":
+        return page_with_style("مبدأ فاکتور",'<h2>مبدأ این فاکتور از قبل کارخانه است.</h2><p><a href="/invoices/'+str(invoice_id)+'/">بازگشت</a></p>')
+    cost=sum(x["qty"]*x["purchase_unit"] for x in lines)
+    body='<h1>اصلاح مبدأ فاکتور #'+str(invoice_id)+'</h1>'
+    body+='<div class="m2-msg">فقط اگر این سفارش واقعاً مستقیماً از کارخانه ارسال شده تأیید کن. این عملیات مبلغ فروش و دریافت‌های مشتری را تغییر نمی‌دهد.</div>'
+    body+='<section class="m2-card"><h3>'+e(inv["name"])+'</h3>'
+    body+='<p>مبدأ ثبت‌شده: خانه ← مبدأ صحیح: کارخانه</p>'
+    body+='<p>بهای خرید قابل انتقال به بدهی مهر: <strong>'+fmt(cost if inv["status"]=="dispatched" else 0)+'</strong> تومان</p>'
+    body+='<p class="m2-hint">اگر ارسال‌شده باشد، کسر موجودی خانه فقط پس از تطبیق رویدادهای قبلی برگردانده می‌شود. هیچ دریافت جدیدی ایجاد نمی‌شود. مانده مهر پس از این اصلاح ممکن است تغییر کند.</p>'
+    body+='<form method="post" action="'+ROOT+'/invoices/origins/convert">'
+    body+='<input type="hidden" name="invoice_ids" value="'+str(invoice_id)+'">'
+    body+='<input type="hidden" name="version_'+str(invoice_id)+'" value="'+str(inv["version"])+'">'
+    body+='<input type="hidden" name="request_key" value="'+token()+'">'
+    body+='<button class="m2-btn" onclick="return confirm(\'تأیید می‌کنی فاکتور #'+str(invoice_id)+' از کارخانه ارسال شده؟\')">ثبت اصلاح مبدأ همین فاکتور</button></form>'
+    body+='<p><a href="/invoices/'+str(invoice_id)+'/">انصراف</a></p></section>'
+    return page_with_style("اصلاح مبدأ فاکتور",body)
+
+
 @router.post(ROOT+"/invoices/origins/convert")
 async def origin_correction_post(request:Request,conn=Depends(conn_dep)):
     form=await request.form()
@@ -98,6 +121,8 @@ async def origin_correction_post(request:Request,conn=Depends(conn_dep)):
         correct_invoice_origins_to_factory(conn,versions,form.get("request_key"))
     except (ImportErrorDetail,ValueError,TypeError) as exc:
         return form_error(exc,"invoices/origins")
+    if len(ids)==1:
+        return RedirectResponse(ROOT+"/invoices/"+str(ids[0]),status_code=303)
     return RedirectResponse(ROOT+"/invoices/origins",status_code=303)
 
 
@@ -358,6 +383,8 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     body='<h1>فاکتور شماره '+str(invoice_id)+'</h1><div class="m2-tabs"><a href="'+ROOT+'/invoices">فاکتورها</a><a href="'+ROOT+'/invoices/mehr">حساب مه هر</a>'
     if not inv["is_void"]:
         body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/edit/">✎ ویرایش فاکتور</a>'
+        if inv["origin"]=="home":
+            body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/origin/">اصلاح مبدأ به کارخانه</a>'
     body+='</div>'
     if inv["is_void"]:
         body+='<div class="m2-msg">این فاکتور ابطال شده و در فروش، سود و حساب‌های باز منظور نمی‌شود. سابقه همچنان قابل مشاهده است.</div>'
