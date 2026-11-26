@@ -27,7 +27,6 @@ def sister_summary(request, start, end, channel=""):
     from .sister_sales import digikala_proxy
     from urllib.parse import urlencode
     tail = "api/sales-overview.json"
-    from django.test import RequestFactory
     # Do not mutate request.GET or lose Django session authentication.
     params = urlencode({"start": start, "end": end, "channel": channel})
     previous = request.META.get("QUERY_STRING", "")
@@ -123,6 +122,7 @@ def sales_report(request):
     return render(request,"core/sister_sales_report_v1.html",{
         "jy":jy,"jm":jm,"month_name":cal["month_name"],
         "channels":CHANNELS,"selected_channel":channel,
+        "months": [(index, name) for index,name in enumerate(PERSIAN_MONTHS,1)],
         "data":data,"error":error
     })
 
