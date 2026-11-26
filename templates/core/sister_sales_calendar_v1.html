@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% load jalali %}
+{% block title %}تقویم فروش روزانه{% endblock %}
+{% block content %}
+{% include "core/_mobile_shell.html" %}
+<div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-4">
+  <div><div class="page-kicker">مدیریت فروش</div><h1 class="page-title">تقویم فروش روزانه</h1>
+  <p class="text-secondary mb-0">یک روز را انتخاب کن و سپس وارد پلتفرم همان روز شو.</p></div>
+  <a class="btn btn-outline-light" href="{% url 'sister_sales_report' %}?jy={{ jy }}&jm={{ jm }}">گزارش جامع فروش</a>
+</div>
+{% if error %}<div class="alert alert-warning" role="alert">{{ error }} — آمار این ماه در دسترس نیست؛ عدد صفر به‌جای اطلاعات واقعی نمایش داده نمی‌شود.</div>{% endif %}
+<div class="card glass-strong mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a class="btn btn-outline-light btn-sm" href="?jy={{ calendar.prev_y }}&jm={{ calendar.prev_m }}">ماه قبل</a>
+    <h2 class="h3 mb-0">{{ calendar.month_name }} {{ jy }}</h2>
+    <a class="btn btn-outline-light btn-sm" href="?jy={{ calendar.next_y }}&jm={{ calendar.next_m }}">ماه بعد</a>
+  </div>
+  <div class="card-body p-2 p-md-4">
+    <div class="sister-cal-grid sister-cal-heading">
+      {% for weekday in calendar.weekdays %}<strong>{{ weekday }}</strong>{% endfor %}
+    </div>
+    {% for week in calendar.weeks %}
+      <div class="sister-cal-grid">
+      {% for cell in week %}
+      {% if cell %}
+        <a class="sister-cal-day {% if cell.is_today %}is-today{% endif %} {% if cell.has_sales %}has-sales{% endif %} {% if cell.selected %}is-selected{% endif %} {% if cell.is_holiday %}is-holiday{% endif %}" href="{{ cell.url }}">
+          <strong class="sister-cal-num">{{ cell.day }}</strong>
+          {% if cell.has_sales %}<span class="sister-cal-dot">فروش ثبت‌شده</span>
+          <small class="sister-cal-amount">{{ cell.gross|groupnum }} تومان</small>{% endif %}
+          {% if cell.holiday_name %}<small class="sister-cal-holiday">{{ cell.holiday_name }}</small>{% endif %}
+        </a>
+      {% else %}<span class="sister-cal-empty"></span>{% endif %}
+      {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% if selected_date %}
+<div id="selected-day" class="card glass-strong mb-4">
+  <div class="card-header"><h3 class="card-title mb-0">فروش {{ selected_jalali }} — انتخاب پلتفرم</h3></div>
+  <div class="card-body">
+    {% if selected_stats %}<p class="text-secondary">جمع فروش ثبت‌شده این روز: <strong>{{ selected_stats.gross|groupnum }}</strong> تومان · سود: <strong>{% if selected_stats.profit == None %}نامشخص{% else %}{{ selected_stats.profit|groupnum }} تومان{% endif %}</strong></p>
+    {% else %}<p class="text-secondary">برای این روز هنوز فروش ثبت نشده است.</p>{% endif %}
+    <div class="row g-3">
+      {% for link in links %}
+      <div class="col-6 col-lg-3">
+        <a class="card quick-card text-decoration-none h-100" href="{{ link.url }}"><div class="card-body text-center"><strong>{{ link.name }}</strong><div class="small text-secondary mt-2">مشاهده / ثبت فروش</div></div></a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% if summary %}
+<div class="card glass-card"><div class="card-body d-flex flex-wrap gap-4">
+  <div><div class="text-secondary small">جمع فروش ماه انتخابی</div><strong>{{ summary.gross|groupnum }} تومان</strong></div>
+  <div><div class="text-secondary small">سود ماه انتخابی</div><strong>{% if summary.profit == None %}نامشخص{% else %}{{ summary.profit|groupnum }} تومان{% endif %}</strong></div>
+  <div><div class="text-secondary small">تعداد بسته</div><strong>{{ summary.packs|groupnum }}</strong></div>
+  <div><div class="text-secondary small">تعداد کالای فیزیکی</div><strong>{{ summary.units|groupnum }}</strong></div>
+</div></div>
+{% endif %}
+<style>
+.sister-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin-bottom:7px}
+.sister-cal-heading strong{text-align:center;font-size:.8rem;color:#cbd5e1;padding:8px 2px}
+.sister-cal-day{min-height:106px;padding:10px 7px;border:1px solid rgba(255,255,255,.13);border-radius:12px;color:#f1f5f9;text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(255,255,255,.035)}
+.sister-cal-day:hover{color:#fff;border-color:#f79009;background:rgba(251,101,20,.10)}
+.sister-cal-day.is-today,.sister-cal-day.is-selected{outline:2px solid #f79009}
+.sister-cal-day.has-sales{background:rgba(18,183,106,.08);border-color:rgba(18,183,106,.36)}
+.sister-cal-day.is-holiday .sister-cal-num,.sister-cal-holiday{color:#ff8a83}
+.sister-cal-num{font-size:1.2rem}.sister-cal-dot{color:#70e8a9;font-size:.72rem}
+.sister-cal-amount{font-size:.71rem;direction:ltr}.sister-cal-holiday{font-size:.66rem}.sister-cal-empty{min-height:106px}
+@media(max-width:650px){.sister-cal-grid{gap:3px}.sister-cal-day{min-height:68px;padding:5px 1px;gap:2px}.sister-cal-num{font-size:.98rem}.sister-cal-dot{font-size:.53rem}.sister-cal-amount,.sister-cal-holiday{display:none}.sister-cal-empty{min-height:68px}}
+</style>
+{% endblock %}
