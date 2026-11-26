@@ -113,11 +113,27 @@ def dashboard(request):
     try:
         from .sister_sales_pages_v1 import dashboard_periods
         sister_today, sister_month = dashboard_periods(request)
+        # Chart and averages must use the same new ledger as the four KPIs.
+        days = sister_month["days"]
+        known_profit = all(row["profit"] is not None for row in days)
         context.update({
             "sister_sales_ready": True,
             "sister_sales_error": "",
             "sister_today": sister_today,
             "sister_month": sister_month,
+            "chart_labels": [row["jalali"][5:] for row in days],
+            "chart_sales": [row["gross"] for row in days],
+            "chart_profit": [row["profit"] for row in days],
+            "chart_shorts": [row["units"] for row in days],
+            "chart_day_count": len(days),
+            "chart_avg_sales": (round(sum(row["gross"] for row in days) / len(days)) if days else 0),
+            "chart_avg_profit": (
+                round(sum(row["profit"] for row in days) / len(days))
+                if days and known_profit else (0 if not days else None)
+            ),
+            "chart_avg_shorts": (
+                round(sum(row["units"] for row in days) / len(days), 1) if days else 0
+            ),
         })
     except RuntimeError as exc:
         context.update({
