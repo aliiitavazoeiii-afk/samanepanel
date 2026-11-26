@@ -21,7 +21,8 @@ from django.views.decorators.http import require_GET
 @login_required
 @require_GET
 def channels(request):
-    return render(request, "core/sister_sales_channels.html", {"selected": None})
+    from .sister_sales_pages_v1 import sales_calendar
+    return sales_calendar(request)
 
 
 def _placeholder(request, title):
