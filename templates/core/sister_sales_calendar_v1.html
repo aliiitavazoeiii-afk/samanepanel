@@ -4,7 +4,7 @@
 {% include "core/_mobile_shell.html" %}
 <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-4">
   <div><div class="page-kicker">مدیریت فروش</div><h1 class="page-title">تقویم فروش روزانه</h1>
-  <p class="text-secondary mb-0">یک روز را انتخاب کن و سپس وارد پلتفرم همان روز شو.</p></div>
+  <p class="text-secondary mb-0">یک روز را انتخاب کن و سپس وارد پلتفرم همان روز شو. فروش دیجی‌کالا، فروش سایت، فروش باسلام و فروش قالب در همین تقویم در دسترس‌اند.</p></div>
   <a class="btn btn-outline-light" href="{% url 'sister_sales_report' %}?jy={{ jy }}&jm={{ jm }}">گزارش جامع فروش</a>
 </div>
 {% if error %}<div class="alert alert-warning" role="alert">{{ error }} — آمار این ماه در دسترس نیست؛ عدد صفر به‌جای اطلاعات واقعی نمایش داده نمی‌شود.</div>{% endif %}
@@ -39,7 +39,7 @@
   <div class="card-header"><h3 class="card-title mb-0">فروش {{ selected_jalali }} — انتخاب پلتفرم</h3></div>
   <div class="card-body">
     {% if selected_stats %}<p class="text-secondary">جمع فروش ثبت‌شده این روز: <strong>{{ selected_stats.gross|groupnum }}</strong> تومان · سود: <strong>{% if selected_stats.profit == None %}نامشخص{% else %}{{ selected_stats.profit|groupnum }} تومان{% endif %}</strong></p>
-    {% else %}<p class="text-secondary">برای این روز هنوز فروش ثبت نشده است.</p>{% endif %}
+    {% elif not error %}<p class="text-secondary">برای این روز هنوز فروش ثبت نشده است.</p>{% else %}<p class="text-secondary">آمار این روز قابل دریافت نیست.</p>{% endif %}
     <div class="row g-3">
       {% for link in links %}
       <div class="col-6 col-lg-3">
