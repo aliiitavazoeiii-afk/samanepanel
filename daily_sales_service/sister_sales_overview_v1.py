@@ -5,6 +5,12 @@ mold invoices. Unknown cost makes profit unknown, never an invented zero.
 Amounts are Toman. No inventory, sale, or finance record is mutated here.
 """
 from collections import defaultdict
+from datetime import date
+import jdatetime
+
+
+def _jalali(iso_day):
+    return jdatetime.date.fromgregorian(date=date.fromisoformat(iso_day)).strftime('%Y/%m/%d')
 
 from .effective_costs import valid_date
 from .sister_finance_logic import PLATFORM_KEYS, sale_lines
@@ -72,11 +78,11 @@ def sales_overview(conn, start, end, channel=""):
             for key, value in sorted(channels.items())
         ],
         "days": [
-            {"date": key, **_finish(value)}
+            {"date": key, "jalali": _jalali(key), **_finish(value)}
             for key, value in sorted(days.items())
         ],
         "day_channels": [
-            {"date": day, "source": source, "label": LABELS[source], **_finish(value)}
+            {"date": day, "jalali": _jalali(day), "source": source, "label": LABELS[source], **_finish(value)}
             for (day, source), value in sorted(day_channels.items(), reverse=True)
         ],
     }
