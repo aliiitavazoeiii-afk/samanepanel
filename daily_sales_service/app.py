@@ -212,5 +212,14 @@ def report_csv(conn=Depends(conn_dep)):
  return StreamingResponse(iter(['\ufeff'+output.getvalue()]),media_type='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename="daily-sales.csv"'})
 
 # Defined after page/auth helpers to allow master UI reuse without circular imports.
+@app.get(ROOT+'/api/sales-overview.json')
+def api_sales_overview(start:str,end:str,channel:str="",conn=Depends(conn_dep)):
+ from .sister_sales_overview_v1 import sales_overview
+ try:
+  return JSONResponse(sales_overview(conn,start,end,channel))
+ except (ValueError,ImportErrorDetail) as exc:
+  raise HTTPException(status_code=400,detail=str(exc))
+
+# Defined after page/auth helpers to allow master UI reuse without circular imports.
 from .master_v2_api import router as master_router
 app.include_router(master_router)
