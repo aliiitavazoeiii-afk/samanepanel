@@ -65,7 +65,7 @@
     <a href="{% url 'finance_accounts' %}">حساب‌ها</a>
     <a href="{% url 'payments' %}?section=receipt">دریافتی‌ها</a>
     <a href="{% url 'payments' %}?section=payment">پرداختی‌ها</a>
-    <a href="{% url 'sister_finance_sales' %}">گزارش فروش</a>
+    <a href="{% url 'sister_sales_report' %}">گزارش جامع فروش</a>
     <a href="{% url 'sale_start' %}">فروش روزانه</a>
     {% else %}
     <a href="{% url 'settings_products' %}">محصولات و کدها</a>
@@ -73,7 +73,8 @@
     <a href="{% url 'sister_product_platforms' %}" {% if section == 'catalog' %}class="active"{% endif %}>پلتفرم‌ها</a>
     <a href="{% url 'sister_product_pricing' %}" {% if section == 'pricing' %}class="active"{% endif %}>قیمت‌گذاری</a>
     <a href="{% url 'inventory_stock' %}" {% if section == 'stock' %}class="active"{% endif %}>موجودی کالا</a>
-    <a href="{% url 'sale_start' %}">فروش روزانه</a>
+    <a href="{% url 'sale_start' %}">تقویم فروش</a>
+    <a href="{% url 'sister_sales_report' %}">گزارش جامع فروش</a>
     <a href="{% url 'finance_accounts' %}">حساب‌ها</a>
     {% endif %}
   </nav>
