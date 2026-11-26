@@ -43,6 +43,10 @@ def sister_summary(request, start, end, channel=""):
         raise RuntimeError("پاسخ سرویس فروش معتبر نیست.")
     if not isinstance(data,dict) or "total" not in data:
         raise RuntimeError("ساختار گزارش فروش معتبر نیست.")
+    for key in ("days", "day_channels"):
+        for row in data.get(key, []):
+            day = date.fromisoformat(row["date"])
+            row["jalali"] = format_jalali(day)
     return data
 
 
