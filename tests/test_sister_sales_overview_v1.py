@@ -7,7 +7,8 @@ from daily_sales_service.sister_sales_overview_v1 import sales_overview
 
 def line(day, source, gross, fee, cost, packs=1, units=1, identifier="1"):
     return {"sale_date": day, "source": source, "gross": gross, "fees": fee,
-            "cogs": cost, "packs": packs, "units": units, "sale_id": identifier}
+            "net": gross - fee, "cogs": cost, "packs": packs, "units": units,
+            "sale_id": identifier}
 
 
 class UnifiedSalesSummaryTests(unittest.TestCase):
