@@ -107,4 +107,21 @@ def dashboard(request):
         "chart_avg_shorts": chart_avg_shorts,
         "purchase_month_total": purchase_month_total,
     }
+    # Sister sales are the authoritative ledger for the new Dia business.
+    # Never add them to legacy Darma totals: that would double-count
+    # migrated/duplicated records and create fictional profit.
+    try:
+        from .sister_sales_pages_v1 import dashboard_periods
+        sister_today, sister_month = dashboard_periods(request)
+        context.update({
+            "sister_sales_ready": True,
+            "sister_sales_error": "",
+            "sister_today": sister_today,
+            "sister_month": sister_month,
+        })
+    except RuntimeError as exc:
+        context.update({
+            "sister_sales_ready": False,
+            "sister_sales_error": str(exc),
+        })
     return render(request, "core/dashboard_excel_v89.html", context)
