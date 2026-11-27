@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load jalali %}
+{% block title %}فروش {{ selected_jalali }}{% endblock %}
+{% block content %}
+{% include "core/_mobile_shell.html" %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+  <div><div class="page-kicker">فروش روزانه</div><h1 class="page-title">فروش {{ selected_jalali }}</h1><p class="text-secondary mb-0">پلتفرم موردنظرت را برای مشاهده یا ثبت فروش همین روز انتخاب کن.</p></div>
+  <a href="{% url 'sale_start' %}?jy={{ jy }}&jm={{ jm }}" class="btn btn-outline-light">بازگشت به تقویم</a>
+</div>
+{% if error %}<div class="alert alert-warning">دریافت اطلاعات فروش ممکن نشد: {{ error }}</div>{% endif %}
+{% if selected_stats %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">جمع فروش این روز</div><div class="kpi money mt-2">{{ selected_stats.gross|groupnum }}</div><div class="text-secondary">تومان</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">سود فروش این روز</div><div class="kpi money mt-2">{% if selected_stats.profit == None %}نامشخص{% else %}{{ selected_stats.profit|groupnum }}{% endif %}</div><div class="text-secondary">تومان</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">تعداد بسته</div><div class="kpi money mt-2">{{ selected_stats.packs|groupnum }}</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card glass-card h-100"><div class="card-body"><div class="subheader">تعداد کالای فیزیکی</div><div class="kpi money mt-2">{{ selected_stats.units|groupnum }}</div></div></div></div>
+</div>
+{% endif %}
+<div class="row g-3">
+  {% for link in links %}
+  <div class="col-12 col-sm-6 col-xl-3">
+    <a class="card quick-card glass-card h-100 text-decoration-none text-reset" href="{{ link.url }}">
+      <div class="card-body">
+        <div class="page-kicker">پلتفرم فروش</div>
+        <h2 class="h3 mb-2">{{ link.name }}</h2>
+        {% if link.has_sales %}<div class="text-success small">فروش ثبت شده</div><strong class="d-block money mt-2">{{ link.gross|groupnum }} تومان</strong>
+        {% elif not error %}<div class="text-secondary small">هنوز فروشی ثبت نشده</div>{% else %}<div class="text-secondary small">آمار در دسترس نیست</div>{% endif %}
+        <div class="mt-3" style="color:#fdb022">ورود به فروش این روز ←</div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
