@@ -2,7 +2,8 @@
 """Read-only reconciliation: factory invoices, home-stock event traces, finance reports.
 NO DDL/DML, no stock corrections, no real receipt changes.
 """
-import os,sqlite3
+import os,sqlite3,sys
+sys.path.insert(0,"/app")
 from collections import defaultdict
 from datetime import date
 
@@ -67,6 +68,11 @@ try:
         audit(home_by_sku==expected,
               f"invoice #{iid}: net home movements {home_by_sku} match required {expected}")
         if should_factory:
+            if any(str(e["reference"]).startswith("sister-invoice-origin-factory:") for e in raw_events):
+                original=[e for e in raw_events if str(e["reference"])=="sister-invoice:"+str(iid)]
+                reversed_events=[e for e in raw_events if str(e["reference"]).startswith("sister-invoice-origin-factory:")]
+                audit(bool(original) and bool(reversed_events),
+                      f"invoice #{iid}: corrected factory origin has BOTH original home deduction and reversal events")
             audit(all(x["master_id"] is None for x in lines),
                   f"invoice #{iid}: factory lines do not retain home stock SKU IDs")
             audit(len(refs)==1 and refs[0]["kind"]=="factory_invoice" and
