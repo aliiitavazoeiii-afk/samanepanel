@@ -69,6 +69,16 @@ class BanklessMarketplaceReceiptTests(unittest.TestCase):
         self.assertEqual(by_business[0]["business"],"نامشخص / نیازمند اتصال")
         self.assertEqual(by_business[0]["gross"],500000)
 
+    def test_linked_digikala_variant_is_attributed_to_product_business(self):
+        from daily_sales_service.master_engine import add_master
+        sku=add_master(self.conn,"شورت زنانه دیا","DIA-TEST-1","تست دیا","L","مشکی")
+        self.conn.execute("UPDATE products SET master_id=? WHERE variant_id=?",
+                          (sku,self.variant))
+        by_business=business_sales_report(self.conn)
+        self.assertEqual(by_business[0]["business"],"دیا")
+        self.assertEqual(by_business[0]["gross"],500000)
+        self.assertEqual(by_business[0]["profit"],254000)
+
     def test_schema_is_idempotent_and_only_platform_party_can_settle(self):
         ensure_schema(self.conn)
         ensure_schema(self.conn)
