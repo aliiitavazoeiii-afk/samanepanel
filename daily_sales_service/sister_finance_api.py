@@ -86,6 +86,12 @@ def finance_home(conn=Depends(conn_dep)):
     body+='<p class="m2-hint">سود قالب‌ها شامل فاکتورهای ارسال‌شده و فروش‌های کانال قالب است؛ هر فروش باید فقط یک بار در سیستم ثبت شود. پرداخت خرید کالا دوباره هزینه حساب نمی‌شود. هزینه‌های جاری بدون تعیین بانک فقط در دفتر هزینه ثبت می‌شوند و تا زمان انتساب حساب، از مانده بانک کسر نمی‌شوند.</p>'
     body+='<p><a class="m2-btn" href="'+ROOT+'/invoices/mehr">جزئیات حساب مه هر و تهاتر</a></p>'
     body+='<h3 class="m2-bundle-label">طلب هر پلتفرم</h3>'+platform_tiles(conn)
+    body+='<h3 class="m2-bundle-label">فروش هر کسب‌وکار (از سفارش‌ها، نه واریزی‌ها)</h3>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>کسب‌وکار</th><th>جمع فروش</th><th>تعداد کالا</th><th>سود</th></tr></thead><tbody>'
+    for x in business_sales_report(conn):
+        body+='<tr><th>'+e(x["business"])+'</th><td>'+fmt(x["gross"])+'</td><td>'+fmt(x["units"])+'</td><td>'+fmt(x["profit"])+'</td></tr>'
+    body+='</tbody></table></div>'
+    body+='<p class="m2-hint">کالاهای بدون اتصال قطعی به کسب‌وکار با عنوان نامشخص نمایش داده می‌شوند؛ مبلغ به صورت حدسی بین کسب‌وکارها تقسیم نمی‌شود.</p>'
     body+=f'<div class="m2-finance-actions"><a class="m2-btn" href="{ROOT}/finance/accounts">حساب‌ها و طلب‌ها</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=receipt">ثبت دریافتی</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=payment">ثبت پرداختی</a>'
