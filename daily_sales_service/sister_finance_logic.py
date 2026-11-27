@@ -56,6 +56,8 @@ def ensure_finance_schema(conn):
     conn.executescript(SCHEMA)
     from .sister_outgoings import ensure_schema as ensure_outgoing_schema
     ensure_outgoing_schema(conn)
+    from .sister_finance_bankless_v1 import ensure_schema as ensure_bankless_schema
+    ensure_bankless_schema(conn)
     for code,title in PARTIES:
         conn.execute("""INSERT OR IGNORE INTO sister_finance_parties
            (code,title,is_platform,created_at) VALUES(?,?,?,?)""",
@@ -83,6 +85,37 @@ def _day_bounds(from_date=None,to_date=None):
     if start and end and start>end:raise ImportErrorDetail("تاریخ شروع از پایان بزرگ‌تر است.")
     return start,end
 
+BUSINESS_LABELS = {
+    "شورت زنانه دیا": "دیا",
+    "شورت زنانه دارما": "دارما",
+    "زیرپوش دارما": "دارما",
+    "بادیگارد": "بادیگارد",
+    "قالب": "قالب",
+}
+
+
+def _business_for_category(category):
+    return BUSINESS_LABELS.get(str(category or "").strip(), "نامشخص / نیازمند اتصال")
+
+
+def _digikala_business(conn,variant_id,master_id):
+    # Use physical component mappings, never guess from marketplace wording.
+    categories={r[0] for r in conn.execute("""
+      SELECT DISTINCT m.category FROM dk_variant_parts part
+      JOIN master_products m ON m.id=part.master_id
+      WHERE part.variant_id=?""",(variant_id,))}
+    if not categories and master_id is not None:
+        row=conn.execute("SELECT category FROM master_products WHERE id=?",(master_id,)).fetchone()
+        if row is not None:
+            categories.add(row[0])
+    businesses={_business_for_category(value) for value in categories}
+    if not businesses:
+        return "نامشخص / نیازمند اتصال"
+    if len(businesses)>1:
+        return "پک ترکیبی / نیازمند تفکیک"
+    return next(iter(businesses))
+
+
 def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_invoices=True):
     """All three sale sources, COGS snapshots intact, no mutable postings."""
     start,end=_day_bounds(from_date,to_date)
@@ -90,7 +123,7 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_
     lines=[]
     if channel in (None,"digikala"):
         sql="""SELECT s.sale_date,s.source,s.variant_id,s.qty,s.price_toman,
-                     s.fee_toman,s.cost_toman,p.title,p.category
+                     s.fee_toman,s.cost_toman,p.title,p.category,p.master_id
                FROM sales s JOIN products p ON p.variant_id=s.variant_id WHERE 1=1"""
         args=[]
         if start:sql+=" AND s.sale_date>=?";args.append(start)
@@ -108,7 +141,8 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_
                  "units":packs*max(1,int(pack_parts)),
                  "gross":gross,"fees":fee,"cogs":cost,
                  "net":gross-fee,"profit":gross-fee-cost if cost is not None else None,
-                 "kind":"digikala","category":r["category"]})
+                 "kind":"digikala","category":r["category"],
+                 "business":_digikala_business(conn,r["variant_id"],r["master_id"])})
     for source,table,query in (
        ("v3","platform_sales","""SELECT s.id,s.channel,s.sale_date,s.packs,s.units,
                               s.gross_toman,s.cogs_toman,s.commission_toman,l.title,m.category
@@ -133,7 +167,8 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_
                  "sale_date":r["sale_date"],"title":r["title"],"packs":int(r["packs"]),
                  "units":int(r["units"]),"gross":gross,"fees":fees,"cogs":cost,
                  "net":gross-fees,"profit":gross-fees-cost if cost is not None else None,
-                 "kind":source,"category":r["category"]})
+                 "kind":source,"category":r["category"],
+                 "business":_business_for_category(r["category"])})
     if include_invoices and channel in (None,"mold"):
         # One recognized sale per dispatched invoice; drafts are not revenue.
         sql="""SELECT i.id,i.invoice_date,c.name,
@@ -154,7 +189,7 @@ def sale_lines(conn,channel=None,from_date=None,to_date=None,limit=None,include_
                  "sale_date":r["invoice_date"],"title":"فاکتور #"+str(r["id"])+" · "+r["name"],
                  "packs":1,"units":int(r["units"]),"gross":gross,"fees":0,
                  "cogs":cost,"net":gross,"profit":gross-cost,
-                 "kind":"invoice","category":"قالب"})
+                 "kind":"invoice","category":"قالب","business":"قالب"})
     lines.sort(key=lambda x:(x["sale_date"],x["sale_id"]),reverse=True)
     return lines[:int(limit)] if limit is not None else lines
 
@@ -179,6 +214,32 @@ def sales_report(conn,channel=None,from_date=None,to_date=None,limit=100,include
                           if total["mold_unknown_cost_lines"]==0 else None)
     total["mold_invoice_count"]=sum(r["kind"]=="invoice" for r in mold)
     return total
+
+def business_sales_report(conn,channel=None,from_date=None,to_date=None):
+    """Actual sales only, grouped by catalog business; receipts are excluded."""
+    result={}
+    for line in sale_lines(conn,channel,from_date,to_date,include_invoices=True):
+        business=line.get("business") or _business_for_category(line["category"])
+        item=result.setdefault(business,{
+            "business":business,"orders":0,"packs":0,"units":0,
+            "gross":0,"fees":0,"net":0,"cogs_known":0,
+            "unknown_cost_lines":0,"profit":None
+        })
+        item["orders"]+=1
+        item["packs"]+=int(line["packs"])
+        item["units"]+=int(line["units"])
+        item["gross"]+=int(line["gross"])
+        item["fees"]+=int(line["fees"])
+        item["net"]+=int(line["net"])
+        if line["cogs"] is None:
+            item["unknown_cost_lines"]+=1
+        else:
+            item["cogs_known"]+=int(line["cogs"])
+    for item in result.values():
+        if not item["unknown_cost_lines"]:
+            item["profit"]=item["net"]-item["cogs_known"]
+    return sorted(result.values(),key=lambda item:(-item["gross"],item["business"]))
+
 
 def parties(conn):
     return [dict(x) for x in conn.execute(
@@ -295,6 +356,9 @@ def platform_balances(conn):
                JOIN sister_finance_parties p ON p.id=m.party_id
                WHERE m.cancelled_at IS NULL AND m.kind='receipt'
                GROUP BY p.code""")}
+    from .sister_finance_bankless_v1 import received_by_platform
+    for code,amount in received_by_platform(conn).items():
+        receipts[code]=receipts.get(code,0)+amount
     balances={}
     for code,title in PARTIES:
         if code not in PLATFORM_KEYS:continue
@@ -349,7 +413,9 @@ def overview(conn):
             "cash_balance":sum(x["balance"] for x in cash),
             "sales":{k:v for k,v in all_sales.items() if k!="lines"},
             "receipts":sum(r["amount_toman"] for r in movements(conn,"receipt",100000)
-                           if not r["cancelled_at"]),
+                           if not r["cancelled_at"]) +
+                           __import__("daily_sales_service.sister_finance_bankless_v1",
+                                      fromlist=["received_total"]).received_total(conn),
             "payments":sum(r["amount_toman"] for r in movements(conn,"payment",100000)
                            if not r["cancelled_at"])}
 
