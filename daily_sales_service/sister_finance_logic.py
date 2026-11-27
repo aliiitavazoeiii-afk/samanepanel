@@ -386,6 +386,7 @@ def invoice_claims(conn):
 
 
 def overview(conn):
+    from .sister_finance_bankless_v1 import received_total
     by_platform=platform_balances(conn)
     cash=accounts(conn)
     total_due=sum(r["outstanding"] for r in by_platform.values())
@@ -414,8 +415,7 @@ def overview(conn):
             "sales":{k:v for k,v in all_sales.items() if k!="lines"},
             "receipts":sum(r["amount_toman"] for r in movements(conn,"receipt",100000)
                            if not r["cancelled_at"]) +
-                           __import__("daily_sales_service.sister_finance_bankless_v1",
-                                      fromlist=["received_total"]).received_total(conn),
+                           received_total(conn),
             "payments":sum(r["amount_toman"] for r in movements(conn,"payment",100000)
                            if not r["cancelled_at"])}
 
