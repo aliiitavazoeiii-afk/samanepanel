@@ -2,6 +2,7 @@
 bank accounts and unified sale/cost/commission/profit reporting.
 """
 import uuid
+from .sister_finance_bankless_v1 import receipt_history,record_receipt,cancel_receipt
 from urllib.parse import quote
 from fastapi import APIRouter,Depends,Form
 from fastapi.responses import RedirectResponse,JSONResponse
@@ -13,7 +14,7 @@ from .platform_catalog import PLATFORMS
 from .engine import ImportErrorDetail
 from .sister_finance_logic import (
     overview,platform_balances,sales_report,accounts,parties,movements,
-    add_party,add_account,register_movement,cancel_movement
+    add_party,add_account,register_movement,cancel_movement,business_sales_report
 )
 
 from .sister_outgoings import (EXPENSES,SUPPLIER_SHORTCUTS,record_outgoing,
@@ -255,55 +256,76 @@ def finance_movements(section:str="receipt",conn=Depends(conn_dep)):
     kind=section if section in ("receipt","payment") else "receipt"
     if kind=="payment":
         return outgoing_payment_page(conn)
-    banks=[a for a in accounts(conn) if a["active"]]
-    people=parties(conn)
-    heading="دریافتی‌ها" if kind=="receipt" else "پرداختی‌ها"
-    prompt="دریافت از" if kind=="receipt" else "پرداخت به"
-    source_label="واریز به حساب" if kind=="receipt" else "پرداخت از حساب"
-    body=f'<h1>{heading}</h1><p class="m2-hint">هر انتقال وجه فقط یک بار در دفتر ثبت می‌شود. شماره پیگیری برای جلوگیری از تکرار قابل استفاده است.</p>'
-    body+='<div class="m2-msg">دریافت مربوط به فاکتور مشتری را فقط داخل همان فاکتور ثبت کن؛ پرداخت یا تهاتر مه هر را فقط از «حساب مه هر» انجام بده. آن گردش‌ها خودکار در بانک ثبت می‌شوند و نباید دوباره اینجا وارد شوند.</div>'
-    body+=nav("finance/movements?section="+kind)
-    body+=f'<section class="m2-card m2-finance-section"><h3>ثبت {e(heading[:-1])}</h3>'
-    if not banks:
-        body+=f'<div class="m2-msg">حساب بانکی یا صندوقی تعریف نشده؛ ابتدا از <a href="{ROOT}/finance/accounts">حساب‌ها</a> یک حساب بساز.</div>'
-    body+=f'<form method="post" action="{ROOT}/finance/movements/add" class="m2-fields m2-finance-form">'
-    body+=f'<input type="hidden" name="kind" value="{kind}">'
-    body+=f'<div><label>{prompt}</label><select name="party_id" required>'
-    body+=''.join(f'<option value="{p["id"]}">{e(p["title"])}</option>' for p in people)
+    people=[p for p in parties(conn) if p["code"] in ("digikala","basalam","site","mold")]
+    balances=platform_balances(conn)
+    rows=receipt_history(conn)
+    body='<h1>دریافتی از پلتفرم‌ها</h1>'
+    body+='<p class="m2-hint">برای ثبت دریافتی دیجی‌کالا، باسلام، سایت یا قالب فقط پلتفرم، تاریخ و مبلغ را وارد کن. حساب بانکی لازم نیست.</p>'
+    body+=nav("finance/movements?section=receipt")
+    body+='<div class="m2-msg">دریافتی فقط مانده طلب پلتفرم را کم می‌کند؛ فروش یا سود تازه نمی‌سازد و چون حساب بانکی مشخص نیست، مانده هیچ حسابی را تغییر نمی‌دهد. دریافت فاکتور مشتری را فقط داخل همان فاکتور ثبت کن.</div>'
+    body+=tiles([(x["title"],x["outstanding"],"مانده طلب · تومان")
+                  for x in balances.values()])
+    body+=f'<section class="m2-card m2-finance-section"><h3>ثبت دریافتی جدید</h3>'
+    body+=f'<form method="post" action="{ROOT}/finance/receipts/add" class="m2-fields m2-finance-form">'
+    body+=f'<input type="hidden" name="request_key" value="{uuid.uuid4().hex}">'
+    body+='<div><label>دریافت از</label><select name="party_id" required>'
+    for p in people:
+        current=balances[p["code"]]
+        body+=f'<option value="{p["id"]}">{e(p["title"])} · طلب {fmt(current["outstanding"])} تومان</option>'
     body+='</select></div>'
-    body+=f'<div><label>{source_label}</label><select name="account_id" required>'
-    body+=''.join(f'<option value="{bank["id"]}">{e(bank["title"])} · مانده {fmt(bank["balance"])}</option>' for bank in banks)
-    body+='</select></div>'
-    body+=f'<div><label>تاریخ</label><input type="date" name="movement_date" value="{today()}" required></div>'
-    body+='<div><label>مبلغ (تومان)</label><input type="number" name="amount" min="1" required></div>'
-    body+='<div><label>شماره پیگیری بانکی (اختیاری)</label><input name="reference" maxlength="100"></div>'
-    body+='<div><label>شرح (اختیاری)</label><input name="note" maxlength="500"></div>'
-    body+=f'<div><button type="submit" class="m2-btn"'+(" disabled" if not banks else "")+f'>ثبت {e(heading[:-1])}</button></div></form>'
-    body+='</section>'
-    body+=f'<section class="m2-card m2-finance-section"><h3>افزودن طرف حساب جدید</h3><p class="m2-hint">دیجی‌کالا، باسلام، سایت، قالب‌ها و اسنپ از قبل در فهرست هستند؛ می‌توانی اشخاص یا تأمین‌کنندگان دیگر را هم ثبت کنی.</p>'
-    body+=f'<form method="post" action="{ROOT}/finance/parties/add" class="m2-fields m2-finance-form">'
-    body+=f'<input type="hidden" name="return_kind" value="{kind}">'
-    body+='<div><label>نام شخص یا طرف حساب</label><input name="title" maxlength="100" required></div>'
-    body+='<div><button type="submit" class="m2-btn">ثبت طرف حساب</button></div></form></section>'
-    rows=movements(conn,kind)
-    body+='<section class="m2-card m2-finance-section"><h3>سوابق '+heading+'</h3>'
+    body+=f'<div><label>مبلغ دریافت‌شده (تومان)</label><input type="number" name="amount" min="1" required></div>'
+    body+=f'<div><label>تاریخ دریافت</label><input name="paid_on" type="date" value="{today()}" required></div>'
+    body+='<div><label>شماره پیگیری (اختیاری)</label><input name="reference" maxlength="100"></div>'
+    body+='<div><label>توضیحات (اختیاری)</label><input name="note" maxlength="500"></div>'
+    body+='<div><button class="m2-btn" type="submit">ثبت دریافت و کاهش طلب</button></div></form></section>'
+    body+='<section class="m2-card m2-finance-section"><h3>دریافتی‌های بدون حساب بانکی</h3>'
     if rows:
-        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>از / به</th><th>حساب</th><th>مبلغ</th><th>شرح / پیگیری</th><th>وضعیت</th></tr></thead><tbody>'
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>پلتفرم</th><th>مبلغ</th><th>پیگیری / شرح</th><th>وضعیت</th></tr></thead><tbody>'
         for r in rows:
-            body+=f'<tr><th>{e(r["movement_date"])}</th><td>{e(r["party_title"])}</td><td>{e(r["account_title"])}</td>'
-            body+=f'<td>{fmt(r["amount_toman"])}</td><td>{e(r["note"] or r["reference"] or "—")}</td><td>'
+            body+='<tr><td>'+e(r["movement_date"])+'</td><td>'+e(r["party_title"])+'</td>'
+            body+='<td>'+fmt(r["amount_toman"])+'</td><td>'+e(r["note"] or r["reference"] or "—")+'</td><td>'
             if r["cancelled_at"]:
                 body+='ابطال‌شده'
             else:
-                body+=(f'<form method="post" action="{ROOT}/finance/movements/cancel">'
-                       f'<input type="hidden" name="movement_id" value="{r["id"]}">'
-                       f'<input type="hidden" name="return_kind" value="{kind}">'
-                       '<button class="m2-finance-cancel" type="submit" onclick="return confirm(\'آیا از ابطال این گردش مالی مطمئن هستید؟\')">ابطال</button></form>')
+                body+=f'<form method="post" action="{ROOT}/finance/receipts/cancel">'
+                body+=f'<input type="hidden" name="receipt_id" value="{r["id"]}">'
+                body+='<button class="m2-finance-cancel" type="submit" onclick="return confirm(\'این دریافتی ابطال و مبلغ به طلب پلتفرم برگردد؟\')">ابطال دریافتی</button></form>'
             body+='</td></tr>'
         body+='</tbody></table></div>'
-    else:body+='<p class="m2-hint">هنوز گردش مالی در این بخش ثبت نشده است.</p>'
+    else:
+        body+='<p class="m2-hint">هنوز دریافتی بدون تعیین بانک ثبت نشده است.</p>'
     body+='</section>'
-    return page_with_style(heading,body)
+    # Old bank-linked receipts remain in the ledger and continue to reduce
+    # claims, but no longer force the owner to choose a bank for new receipts.
+    old=[m for m in movements(conn,"receipt") if not m["cancelled_at"]]
+    if old:
+        body+='<section class="m2-card m2-finance-section"><h3>دریافتی‌های قبلی ثبت‌شده با حساب بانکی</h3>'
+        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>تاریخ</th><th>طرف حساب</th><th>مبلغ</th><th>حساب قبلی</th></tr></thead><tbody>'
+        for r in old:
+            body+='<tr><td>'+e(r["movement_date"])+'</td><td>'+e(r["party_title"])+'</td><td>'+fmt(r["amount_toman"])+'</td><td>'+e(r["account_title"])+'</td></tr>'
+        body+='</tbody></table></div></section>'
+    return page_with_style("دریافتی‌ها",body)
+
+
+@router.post(ROOT+"/finance/receipts/add")
+def post_bankless_receipt(party_id:str=Form(...),amount:str=Form(...),
+                           paid_on:str=Form(...),request_key:str=Form(...),
+                           reference:str=Form(""),note:str=Form(""),
+                           conn=Depends(conn_dep)):
+    try:
+        record_receipt(conn,party_id,amount,paid_on,request_key,reference,note)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return error_page(exc,"finance/movements?section=receipt")
+    return RedirectResponse(ROOT+"/finance/movements?section=receipt",status_code=303)
+
+
+@router.post(ROOT+"/finance/receipts/cancel")
+def post_bankless_receipt_cancel(receipt_id:str=Form(...),conn=Depends(conn_dep)):
+    try:
+        cancel_receipt(conn,receipt_id)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return error_page(exc,"finance/movements?section=receipt")
+    return RedirectResponse(ROOT+"/finance/movements?section=receipt",status_code=303)
 
 @router.post(ROOT+"/finance/parties/add")
 def post_party(title:str=Form(...),return_kind:str=Form("receipt"),conn=Depends(conn_dep)):
@@ -349,6 +371,17 @@ def all_sales(channel:str="",from_date:str="",to_date:str="",conn=Depends(conn_d
                  ("بهای تمام‌شده",report["cogs_known"],"تومان · ثبت‌شده"),
                  ("سود",report["profit"],"تومان · پس از کارمزد و بهای کالا")])
     if report["unknown_cost_lines"]:body+=f'<div class="m2-msg">{report["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل نامشخص است.</div>'
+    business_rows=business_sales_report(conn,channel or None,from_date or None,to_date or None)
+    body+='<section class="m2-card m2-finance-section"><h3>تفکیک فروش کسب‌وکارها</h3>'
+    body+='<p class="m2-hint">فروش هر کسب‌وکار از نوع کالای فروخته‌شده تعیین می‌شود؛ واریزی پلتفرم فروش تازه نیست. کالاهای نامشخص یا ترکیبی حدسی تقسیم نمی‌شوند.</p>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>کسب‌وکار</th><th>تعداد بسته</th><th>تعداد کالا</th><th>فروش</th><th>کارمزد</th><th>بهای کالا</th><th>سود</th></tr></thead><tbody>'
+    for x in business_rows:
+        body+=f'<tr><th>{e(x["business"])}</th><td>{fmt(x["packs"])}</td><td>{fmt(x["units"])}</td><td>{fmt(x["gross"])}</td><td>{fmt(x["fees"])}</td>'
+        body+=f'<td>{fmt(x["cogs_known"]) if not x["unknown_cost_lines"] else "ناقص"}</td><td>{fmt(x["profit"])}</td></tr>'
+    if not business_rows:
+        body+='<tr><td colspan="7">فروشی در این بازه ثبت نشده است.</td></tr>'
+    body+='</tbody></table></div></section>'
+
     body+='<p class="m2-hint">فاکتورهای ارسال‌شده قالب در جمع فروش و سود لحاظ می‌شوند؛ ریز فاکتور و مشتری فقط در صفحه فاکتورهاست. دریافت مشتری فروش تازه نیست.</p>'
     body+='<section class="m2-card m2-finance-section"><h3>ریز فروش‌ها</h3>'
     if report["lines"]:
