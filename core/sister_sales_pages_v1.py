@@ -7,7 +7,8 @@ import json
 from datetime import date, timedelta
 import jdatetime
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.http import Http404
 from django.utils import timezone
 
 from .dateutils import format_jalali
@@ -80,6 +81,15 @@ def sales_calendar(request):
         for x in data["day_channels"]:
             source_map.setdefault(x["date"],[]).append(x["label"])
     selected=request.GET.get("jd","")
+    # Backward-compatible old calendar links: show a distinct day screen.
+    if selected:
+        try:
+            day_number=int(selected)
+            chosen=jdatetime.date(jy,jm,day_number)
+        except (ValueError,TypeError):
+            pass
+        else:
+            return redirect("sister_sales_day",jy=jy,jm=jm,jd=day_number)
     selected_date=None
     try:
         d=int(selected)
@@ -96,7 +106,7 @@ def sales_calendar(request):
             cell["gross"]=info["gross"] if info else 0
             cell["sources"]=source_map.get(g.isoformat(),[])
             cell["selected"]=selected_date==g
-            cell["url"]=f"/sales/?jy={jy}&jm={jm}&jd={cell['day']}"
+            cell["url"]=f"/sales/day/{jy}/{jm}/{cell['day']}/"
     links=[]
     if selected_date:
         iso=selected_date.isoformat()
@@ -106,6 +116,41 @@ def sales_calendar(request):
         "selected_jalali":format_jalali(selected_date) if selected_date else "",
         "selected_stats":day_map.get(selected_date.isoformat()) if selected_date else None,
         "links":links,"error":error,"summary":data["total"] if data else None,
+    })
+
+ 
+@login_required
+def sales_day(request, jy, jm, jd):
+    """Dedicated calendar-day page; clicking a date navigates visibly."""
+    try:
+        if not 1300 <= jy <= 1500:
+            raise ValueError
+        selected = jdatetime.date(jy, jm, jd)
+        iso = selected.togregorian().isoformat()
+    except (ValueError, TypeError):
+        raise Http404("روز انتخابی معتبر نیست.")
+
+    error = ""
+    data = None
+    try:
+        data = sister_summary(request, iso, iso)
+    except RuntimeError as exc:
+        error = str(exc)
+    known_channels = {c["source"]: c for c in data["channels"]} if data else {}
+    links = []
+    for key, label, base in CHANNELS:
+        item = known_channels.get(key)
+        links.append({
+            "key": key, "name": label, "url": base + iso,
+            "has_sales": bool(item and item["orders"]),
+            "gross": item["gross"] if item else 0,
+            "profit": item["profit"] if item else None,
+        })
+    return render(request, "core/sister_sales_day_v1.html", {
+        "jy": jy, "jm": jm, "jd": jd,
+        "selected_jalali": format_jalali(selected.togregorian()),
+        "selected_stats": data["total"] if data else None,
+        "links": links, "error": error,
     })
 
 
