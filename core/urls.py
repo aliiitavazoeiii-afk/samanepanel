@@ -62,6 +62,7 @@ urlpatterns = [
     path("digikala/returns/", digikala_views_v40.digikala_returns, name="digikala_returns"),
     path("calendar/picker/", calendar_views.jalali_picker, name="jalali_picker"),
     path("sales/", sister_sales.channels, name="sale_start"),
+    path("sales/day/<int:jy>/<int:jm>/<int:jd>/", sister_sales_pages_v1.sales_day, name="sister_sales_day"),
     path("purchases/", sister_sales.digikala_proxy, {"tail": "purchases"}, name="sister_purchases"),
     path("invoices/", sister_sales.digikala_proxy, {"tail": "invoices"}, name="sister_invoices"),
     path("invoices/new/", sister_sales.digikala_proxy, {"tail": "invoices/new"}, name="sister_invoice_new"),
