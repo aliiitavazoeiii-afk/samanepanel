@@ -593,6 +593,45 @@ def correct_invoice_origins_to_factory(conn,invoice_versions,request_key):
         raise
 
 
+def edit_invoice_date(conn,invoice_id,invoice_date,expected_version,request_key):
+    """Date-only correction; never changes money, line items, receipt or stock.
+
+    Uses the existing audited 'edit' action for compatibility with prior DBs.
+    All fiscal aggregates still derive from the invoice's corrected date.
+    """
+    try:
+        iid=int(invoice_id)
+        version=int(expected_version)
+    except (TypeError,ValueError):
+        raise ImportErrorDetail("شماره یا نسخه فاکتور نامعتبر است.")
+    key=_text(request_key,100)
+    if not key:
+        raise ImportErrorDetail("شناسه اصلاح تاریخ لازم است.")
+    day=_date(invoice_date)
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        before=_invoice_snapshot(conn,iid)
+        invoice=before["invoice"]
+        if invoice["is_void"]:
+            raise ImportErrorDetail("فاکتور ابطال‌شده قابل اصلاح نیست.")
+        if int(invoice["version"])!=version:
+            raise ImportErrorDetail("فاکتور بعد از باز شدن صفحه تغییر کرده؛ دوباره صفحه را باز کن.")
+        if conn.execute("SELECT 1 FROM sister_invoice_audit WHERE request_key=?",(key,)).fetchone():
+            raise ImportErrorDetail("این درخواست اصلاح قبلاً ثبت شده است.")
+        if day==invoice["invoice_date"]:
+            raise ImportErrorDetail("تاریخ جدید با تاریخ فعلی فاکتور یکسان است.")
+        conn.execute("UPDATE sister_invoices SET invoice_date=?,version=version+1 WHERE id=?",
+                     (day,iid))
+        after=_invoice_snapshot(conn,iid)
+        _audit_invoice(conn,iid,"edit",before,after,key)
+        conn.execute("COMMIT")
+        return iid
+    except Exception:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
+
+
 def edit_invoice(conn,invoice_id,customer_name,phone,invoice_date,lines,notes,
                  expected_version,request_key):
     """Correct an existing invoice atomically; never create a second sale."""
@@ -647,7 +686,10 @@ def edit_invoice(conn,invoice_id,customer_name,phone,invoice_date,lines,notes,
                 JOIN sister_mehr_ledger l ON l.reference=a.reference
                 WHERE a.target_type='invoice' AND a.target_id=? AND l.kind='paid_to_mehr'""",
                 (iid,)).fetchone()[0])
-            if new_cost<customer_to_mehr+linked:
+            # Existing document surpluses at Mehr are legitimate receivables.
+            # Editing the date, name, notes or sale must not revalidate unchanged
+            # purchase cost as if a new settlement were being posted.
+            if new_cost!=old_cost and new_cost<customer_to_mehr+linked:
                 raise ImportErrorDetail("بهای خرید جدید از مجموع واریزی مشتری نزد مهر و تسویه‌های این فاکتور کمتر می‌شود.")
             if mehr_balance(conn)["debt"]+new_cost-old_cost<0:
                 raise ImportErrorDetail("به‌خاطر تهاترهای قبلی، بدهی مهر برای این اصلاح کافی نیست.")
