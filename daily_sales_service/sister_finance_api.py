@@ -81,6 +81,14 @@ def finance_home(conn=Depends(conn_dep)):
                   (sales["profit"]-expense_total(conn) if sales["profit"] is not None else None),
                   "تومان · بدون دوباره‌شماری پرداخت خرید کالا")])
     body+='<p class="m2-hint">ریز حساب مهر: بدهی خرید '+fmt(info["mehr_payable"])+' تومان، وجوه مشتری نزد مهر '+fmt(info["mehr_receivable"])+' تومان؛ کارت طلب فقط مازاد خالص را نشان می‌دهد.</p>'
+    from .mehr_document_positions_v1 import summarize_mehr_documents
+    mehr_docs=summarize_mehr_documents(mehr_open_items(conn),mehr_balance(conn))
+    body+='<section class="m2-card m2-finance-section"><h3>طلب و بدهی من از مهر؛ تفکیک سندها</h3>'
+    body+='<p class="m2-hint">ممکن است از یک فاکتور طلب داشته باشی ولی کل حساب مهر به علت بدهی‌های دیگر، بدهکار باشد. این ارقام سندی هستند و نباید دوباره به جمع طلب خالص افزوده شوند.</p>'
+    body+=tiles([("طلب من از مهر بابت فاکتورها",mehr_docs["invoice_excess"],"تومان · پیش از تهاتر با بدهی‌های دیگر"),
+                 ("بدهی فاکتورها به مهر",mehr_docs["invoice_due"],"تومان · پیش از تهاتر"),
+                 ("بدهی خریدهای مستقل به مهر",mehr_docs["purchases_due"],"تومان · پیش از تهاتر")])
+    body+='<p><a class="m2-btn" href="'+ROOT+'/invoices/mehr">مشاهده ریز طلب هر مشتری در حساب مهر</a></p></section>'
     if sales["unknown_cost_lines"]:
         body+=f'<div class="m2-msg">{sales["unknown_cost_lines"]} ردیف فاقد بهای تمام‌شده است؛ سود کل قطعی نیست.</div>'
     body+='<p class="m2-hint">سود قالب‌ها شامل فاکتورهای ارسال‌شده و فروش‌های کانال قالب است؛ هر فروش باید فقط یک بار در سیستم ثبت شود. پرداخت خرید کالا دوباره هزینه حساب نمی‌شود. هزینه‌های جاری بدون تعیین بانک فقط در دفتر هزینه ثبت می‌شوند و تا زمان انتساب حساب، از مانده بانک کسر نمی‌شوند.</p>'
