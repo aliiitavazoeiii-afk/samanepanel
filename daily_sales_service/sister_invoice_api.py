@@ -343,6 +343,19 @@ def supplier(conn=Depends(conn_dep)):
     body+='</div>'
     body+='<p class="m2-hint">ریز محاسبه: بدهی خرید '+fmt(b["debt"])+' تومان، وجوه مشتری نزد مهر '+fmt(b["credit"])+' تومان. مانده‌های بالا خالص این دو مبلغ‌اند.</p>'
     open_items=mehr_open_items(conn)
+    from .mehr_document_positions_v1 import summarize_mehr_documents
+    doc_positions=summarize_mehr_documents(open_items,b)
+    body+='<section class="m2-card"><h3>طلب من از مهر به تفکیک فاکتور</h3>'
+    body+='<p class="m2-hint">مبالغ زیر مازاد وجه مشتری نزد مهر پس از کسر بهای خرید و پرداخت اختصاصی هر سند است. این طلب‌های سندی در مانده خالص کل مهر قبلاً منظور شده‌اند؛ جمع آن‌ها را دوباره به طلب کل اضافه نکن.</p>'
+    body+='<div class="m2-finance-cards"><div class="m2-card"><small>جمع طلب‌های فاکتوری من از مهر</small><strong>'+fmt(doc_positions["invoice_excess"])+'</strong><span class="m2-unit">تومان · قبل از تهاتر با سایر بدهی‌ها</span></div>'
+    body+='<div class="m2-card"><small>جمع بدهی‌های باز فاکتور به مهر</small><strong>'+fmt(doc_positions["invoice_due"])+'</strong><span class="m2-unit">تومان · قبل از تهاتر</span></div>'
+    body+='<div class="m2-card"><small>بدهی باز خرید مستقل به مهر</small><strong>'+fmt(doc_positions["purchases_due"])+'</strong><span class="m2-unit">تومان · قبل از تهاتر</span></div></div>'
+    body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>فاکتور</th><th>بهای خرید از مهر</th><th>وجه مشتری نزد مهر</th><th>پرداخت من بابت سند</th><th>طلب من از مهر بابت این سند</th><th>بدهی من به مهر بابت این سند</th></tr></thead><tbody>'
+    for p in doc_positions["invoices"]:
+        body+='<tr><td><a href="/invoices/'+str(p["id"])+'/">'+e(p["label"])+'</a></td><td>'+fmt(p["gross"])+'</td><td>'+fmt(p["customer"])+'</td><td>'+fmt(p["assigned"])+'</td><td>'+fmt(p["excess"])+'</td><td>'+fmt(p["due"])+'</td></tr>'
+    body+='</tbody></table></div>'
+    body+='<p class="m2-hint">طلب خالص واقعی کل دفتر پس از کسر بدهی‌ها: '+fmt(doc_positions["net_claim"])+' تومان؛ بدهی خالص واقعی کل دفتر: '+fmt(doc_positions["net_payable"])+' تومان. اختلاف بین جمع مانده سندها و دفتر کل (مانند تسویه‌های تخصیص‌نیافته یا تهاترهای قدیمی): '+fmt(doc_positions["unallocated_difference"])+' تومان. اختلاف غیرصفر نیازمند تطبیق است، نه ثبت مجدد پول.</p>'
+    body+='</section>'
     body+='<section class="m2-card"><h3>بدهی‌های باز مهر به تفکیک فاکتور و خرید</h3>'
     if open_items:
         body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>سند</th><th>تاریخ</th><th>بهای خرید</th><th>واریزی مشتری نزد مهر</th><th>پرداخت اختصاص‌یافته</th><th>مانده سند</th></tr></thead><tbody>'
