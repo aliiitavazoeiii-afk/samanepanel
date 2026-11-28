@@ -275,6 +275,23 @@ def mehr_open_items(conn):
         items.append({"target":"invoice:"+str(r["id"]),"kind":"invoice","id":int(r["id"]),
                       "date":r["invoice_date"],"label":"فاکتور #"+str(r["id"])+" / "+r["name"],
                       "gross":gross,"credit":customer,"paid":linked,"remaining":remaining})
+    # When a customer paid Mehr for an invoice supplied from HOME, the money
+    # remains a genuine claim against Mehr. There is no factory procurement
+    # liability for such an invoice; expose its full credit in document detail.
+    for r in conn.execute("""SELECT i.id,i.invoice_date,c.name,
+           COALESCE(SUM(p.amount),0) credit
+           FROM sister_invoices i
+           JOIN sister_invoice_customers c ON c.id=i.customer_id
+           JOIN sister_invoice_receipts p ON p.invoice_id=i.id
+               AND p.destination IN ('mehr','check_mehr')
+           WHERE i.origin='home' AND i.is_void=0
+           GROUP BY i.id,i.invoice_date,c.name
+           HAVING SUM(p.amount)>0 ORDER BY i.id DESC"""):
+        credit=int(r["credit"])
+        items.append({"target":"invoice:"+str(r["id"]),"kind":"invoice",
+                      "id":int(r["id"]),"date":r["invoice_date"],
+                      "label":"فاکتور خانه #"+str(r["id"])+" / "+r["name"],
+                      "gross":0,"credit":credit,"paid":0,"remaining":0})
     for r in conn.execute("""SELECT p.id,p.purchase_date,p.supplier_invoice,p.total_toman
         FROM sister_purchase_orders p
         JOIN sister_purchase_suppliers s ON s.id=p.supplier_id
@@ -588,6 +605,102 @@ def correct_invoice_origins_to_factory(conn,invoice_versions,request_key):
             results.append(_correct_one_invoice_origin_to_factory(conn,iid,ver,key))
         conn.execute("COMMIT")
         return results
+    except Exception:
+        if conn.in_transaction:conn.execute("ROLLBACK")
+        raise
+
+
+def correct_invoice_origin_to_home(conn,invoice_id,expected_version,request_key,masters):
+    """Convert factory -> home atomically with exact SKU, matched debt reversal.
+
+    No sale/receipt/profit changes. Existing customer receipts paid to Mehr remain
+    real supplier-held money and are not removed or reclassified automatically.
+    Linked supplier settlements must be reconciled separately before conversion.
+    """
+    try:
+        iid=int(invoice_id)
+        version=int(expected_version)
+    except (TypeError,ValueError):
+        raise ImportErrorDetail("شماره یا نسخه فاکتور نامعتبر است.")
+    key=_text(request_key,90)
+    if not key:raise ImportErrorDetail("شناسه اصلاح مبدأ لازم است.")
+    if not isinstance(masters,dict):
+        raise ImportErrorDetail("قالب‌های فیزیکی سایزها مشخص نشده‌اند.")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        before=_invoice_snapshot(conn,iid)
+        inv=before["invoice"]
+        if inv["is_void"] or inv["origin"]!="factory":
+            raise ImportErrorDetail("فقط فاکتور فعال با مبدأ کارخانه قابل تبدیل به خانه است.")
+        if int(inv["version"])!=version:
+            raise ImportErrorDetail("فاکتور تغییر کرده است؛ صفحه را تازه‌سازی کن.")
+        if conn.execute("SELECT 1 FROM sister_invoice_audit WHERE request_key=?",(key,)).fetchone():
+            raise ImportErrorDetail("این اصلاح قبلاً ثبت شده است.")
+        if conn.execute("SELECT 1 FROM sister_mehr_ledger WHERE reference=?",
+                        ("factory-home-reverse:"+str(iid),)).fetchone():
+            raise ImportErrorDetail("خرید کارخانه این فاکتور قبلاً برگشت داده شده است.")
+        if conn.execute("""SELECT 1 FROM sister_mehr_settlement_links
+              WHERE target_type='invoice' AND target_id=?""",(iid,)).fetchone():
+            raise ImportErrorDetail("این فاکتور پرداخت اختصاصی به مهر دارد؛ قبل از اصلاح مبدأ باید تسویه آن تطبیق داده شود.")
+        if not before["lines"]:
+            raise ImportErrorDetail("فاکتور هیچ کالایی ندارد.")
+        selected=[]
+        for line in before["lines"]:
+            size=line["size"]
+            raw=masters.get(size)
+            try:mid=int(raw)
+            except (ValueError,TypeError):
+                raise ImportErrorDetail("مدل فیزیکی قالب سایز "+size+" را انتخاب کن.")
+            sku=conn.execute("""SELECT id,category,size,active,seller_stock
+                 FROM master_products WHERE id=?""",(mid,)).fetchone()
+            if (sku is None or sku["category"]!="قالب" or
+                sku["size"]!=size or not sku["active"]):
+                raise ImportErrorDetail("مدل انتخابی انبار برای سایز "+size+" معتبر نیست.")
+            selected.append((line,mid))
+        is_posted=inv["status"]=="dispatched"
+        if is_posted:
+            # Factory cost may have been edited; require complete one-to-one
+            # procurement evidence, including its historical corrections.
+            rows=list(conn.execute("""SELECT kind,reference,debt_delta,credit_delta
+                   FROM sister_mehr_ledger
+                   WHERE reference=? OR (kind='factory_invoice_adjustment'
+                         AND reference LIKE ?)""",
+                   ("factory-invoice:"+str(iid),"invoice-edit:"+str(iid)+":%")))
+            original=[r for r in rows if r["reference"]=="factory-invoice:"+str(iid)]
+            if len(original)!=1 or original[0]["kind"]!="factory_invoice":
+                raise ImportErrorDetail("سند اصلی خرید کارخانه وجود ندارد؛ اصلاح متوقف شد.")
+            if any(int(r["credit_delta"])!=0 for r in rows):
+                raise ImportErrorDetail("حرکت دفتر مهر برای این فاکتور غیرمنتظره است.")
+            cost=sum(int(x["qty"])*int(x["purchase_unit"]) for x in before["lines"])
+            posted_cost=sum(int(x["debt_delta"]) for x in rows)
+            if posted_cost!=cost:
+                raise ImportErrorDetail("بهای خرید و سندهای مهر این فاکتور مغایرت دارند؛ اصلاح متوقف شد.")
+            if int(mehr_balance(conn)["debt"])<cost:
+                raise ImportErrorDetail("به‌خاطر تهاترهای قبلی، کاهش بدهی مهر به بررسی دستی نیاز دارد.")
+            # Compensating posting, not deletion: preserve audit history.
+            _ledger(conn,today(),-cost,0,"factory_invoice_reversal",
+                    "factory-home-reverse:"+str(iid),
+                    "برگشت خرید کارخانه فاکتور #"+str(iid)+" بابت اصلاح مبدأ به خانه")
+            for line,mid in selected:
+                sku=conn.execute("SELECT seller_stock FROM master_products WHERE id=?",(mid,)).fetchone()
+                qty=int(line["qty"])
+                after=int(sku["seller_stock"])-qty
+                conn.execute("UPDATE master_products SET seller_stock=?,updated_at=? WHERE id=?",
+                             (after,now(),mid))
+                conn.execute("""INSERT INTO master_stock_events
+                    (occurred_at,master_id,source,delta,balance_after,reference)
+                    VALUES (?,?,?,?,?,?)""",
+                    (now(),mid,"home",-qty,after,
+                     "sister-invoice-origin-home:"+str(iid)+":"+key))
+        for line,mid in selected:
+            conn.execute("""UPDATE sister_invoice_lines SET master_id=?
+                         WHERE invoice_id=? AND size=?""",(mid,iid,line["size"]))
+        conn.execute("UPDATE sister_invoices SET origin='home',version=version+1 WHERE id=?",(iid,))
+        after=_invoice_snapshot(conn,iid)
+        _audit_invoice(conn,iid,"edit",before,after,
+                       "origin-home:"+str(iid)+":"+key)
+        conn.execute("COMMIT")
+        return {"id":iid,"posted":is_posted}
     except Exception:
         if conn.in_transaction:conn.execute("ROLLBACK")
         raise
