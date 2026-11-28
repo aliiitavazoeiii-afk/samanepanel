@@ -2,9 +2,12 @@
 import tempfile
 import unittest
 from pathlib import Path
+# Import the FastAPI app first: it registers the invoice/finance routers, avoiding circular imports.
+from daily_sales_service.app import app
 from daily_sales_service.engine import init_db
 from daily_sales_service.effective_costs import today
 from daily_sales_service.sister_invoices import submit_invoice,invoice_detail,mehr_balance
+from daily_sales_service.sister_finance_logic import ensure_finance_schema
 from daily_sales_service.sister_finance_api import finance_accounts, finance_home, open_invoice_balances
 from daily_sales_service.sister_invoice_api import new_invoice, supplier, detail
 
@@ -14,6 +17,7 @@ class BankFreeCustomerAccountingTests(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.conn=init_db(Path(folder.name)/"no-bank.sqlite3")
         self.addCleanup(self.conn.close)
+        ensure_finance_schema(self.conn)
 
     def test_factory_invoice_receipts_without_bank_and_no_stock_change(self):
         before=self.conn.execute("SELECT COALESCE(SUM(seller_stock),0) FROM master_products").fetchone()[0]
