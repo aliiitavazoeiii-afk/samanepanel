@@ -10,7 +10,7 @@ from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
 from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
     receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail,
-    edit_invoice,edit_invoice_receipt,cancel_invoice,invoice_audit,
+    edit_invoice,edit_invoice_date,edit_invoice_receipt,cancel_invoice,invoice_audit,
     correct_invoice_origins_to_factory)
 
 router=APIRouter()
@@ -225,7 +225,11 @@ def edit_form(invoice_id:int,conn=Depends(conn_dep)):
     if inv["is_void"]:return form_error(ImportErrorDetail("فاکتور ابطال‌شده قابل ویرایش نیست."))
     by_size={r["size"]:r for r in lines}
     body='<h1>ویرایش فاکتور #'+str(invoice_id)+'</h1>'
-    body+='<p class="m2-hint">قیمت، تعداد، جمع و سود را اصلاح کن. اگر مبلغ دریافتی اشتباه است، آن را جدا در جزئیات فاکتور ویرایش کن.</p>'
+    body+='<section class="m2-card"><h3>فقط اصلاح تاریخ فاکتور</h3>'
+    body+='<p class="m2-hint">اگر فقط تاریخ اشتباه است، از این فرم استفاده کن؛ مبلغ فروش، اقلام، رسید مشتری، بدهی و طلب مهر و موجودی انبار تغییر نمی‌کنند. پس از ذخیره، داشبورد فروش را در ماه صحیح نشان می‌دهد.</p>'
+    body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/date"><input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
+    body+='<div class="m2-fields"><div><label>تاریخ واقعی فاکتور</label><input type="date" name="invoice_date" value="'+e(inv["invoice_date"])+'" required></div><div><button class="m2-btn" onclick="return confirm(\'فقط تاریخ فاکتور اصلاح شود؟\')">ذخیره فقط تاریخ</button></div></div></form></section>'
+    body+='<p class="m2-hint">فرم زیر برای اصلاح قیمت و تعداد است. برای تغییر صرفاً تاریخ، از فرم بالا استفاده کن.</p>'
     body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/edit" id="invoice-edit-form">'
     body+='<input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
     body+='<section class="m2-card"><div class="m2-fields">'
@@ -266,6 +270,16 @@ def edit_form(invoice_id:int,conn=Depends(conn_dep)):
     document.getElementById("edit-profit").textContent=new Intl.NumberFormat("fa-IR").format(total-cost);}
     f.addEventListener("input",refresh);refresh();})();</script>'''
     return page_with_style("ویرایش فاکتور",body)
+
+
+@router.post(ROOT+"/invoices/{invoice_id}/date")
+def edit_date_post(invoice_id:int,invoice_date:str=Form(...),version:int=Form(...),
+                   request_key:str=Form(...),conn=Depends(conn_dep)):
+    try:
+        edit_invoice_date(conn,invoice_id,invoice_date,version,request_key)
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/"+str(invoice_id)+"/edit")
+    return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
 
 
 @router.post(ROOT+"/invoices/{invoice_id}/edit")
