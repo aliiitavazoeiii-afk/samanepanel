@@ -220,7 +220,7 @@ def add_csrf(request, html):
 
 @login_required
 def invoice_proxy(request, invoice_id, action=""):
-    if action and action not in ("dispatch", "receipt", "edit", "date", "cancel", "origin"):
+    if action and action not in ("dispatch", "receipt", "edit", "date", "cancel", "origin", "origin-home"):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     return digikala_proxy(request, "invoices/" + str(invoice_id) + ("/" + action if action else ""))
 
@@ -231,11 +231,11 @@ def invoice_receipt_edit_proxy(request, invoice_id, receipt_id):
 
 @login_required
 def digikala_proxy(request, tail=""):
-    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|date|cancel|origin|receipts/\d+/edit))?",tail):
+    if tail not in _ALLOWED and not re.fullmatch(r"invoices/\d+(?:/(?:dispatch|receipt|edit|date|cancel|origin|origin-home|receipts/\d+/edit))?",tail):
         return HttpResponse("مسیر نامعتبر است.", status=404)
     if request.method not in ("GET", "POST"):
         return HttpResponse("متد غیرمجاز است.", status=405)
-    if request.method == "POST" and tail not in _POST and not re.fullmatch(r"invoices/\d+/(?:dispatch|receipt|edit|date|cancel|receipts/\d+/edit)",tail):
+    if request.method == "POST" and tail not in _POST and not re.fullmatch(r"invoices/\d+/(?:dispatch|receipt|edit|date|cancel|origin-home|receipts/\d+/edit)",tail):
         return HttpResponse("متد غیرمجاز است.", status=405)
     password = os.getenv("SALES_ADMIN_PASSWORD", "")
     if len(password) < 16:
