@@ -7,7 +7,6 @@ from daily_sales_service.effective_costs import today
 from daily_sales_service.sister_invoices import submit_invoice,invoice_detail,mehr_balance
 from daily_sales_service.sister_finance_api import finance_accounts, finance_home, open_invoice_balances
 from daily_sales_service.sister_invoice_api import new_invoice, supplier, detail
-from daily_sales_service.master_v2_logic import available_models
 
 class BankFreeCustomerAccountingTests(unittest.TestCase):
     def setUp(self):
