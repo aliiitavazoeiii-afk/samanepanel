@@ -12,7 +12,6 @@ from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoi
     receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail,
     edit_invoice,edit_invoice_receipt,cancel_invoice,invoice_audit,
     correct_invoice_origins_to_factory)
-from .sister_finance_logic import accounts
 
 router=APIRouter()
 
@@ -22,9 +21,6 @@ def form_error(exc,back="invoices"):
 
 def token():
     return uuid.uuid4().hex
-
-def receipt_bank_options(conn):
-    return ''.join('<option value="'+str(a["id"])+'">'+e(a["title"])+'</option>' for a in accounts(conn) if a["active"])
 
 def sku_options(conn,size):
     rows=conn.execute("""SELECT id,title,color,seller_stock FROM master_products
@@ -162,11 +158,11 @@ def new_invoice(conn=Depends(conn_dep)):
     body+='<div class="m2-card"><small>دریافت اولیه</small><strong id="invoice-paid-total">۰</strong><span class="m2-unit">تومان</span></div>'
     body+='<div class="m2-card"><small>مانده مشتری</small><strong id="invoice-remaining">۰</strong><span class="m2-unit">تومان</span></div></div>'
     body+='<div class="m2-fields"><div><label>مبلغ دریافتی هنگام ثبت (تومان؛ اختیاری)</label><input type="number" min="0" value="0" name="initial_amount" id="invoice-initial-amount"></div>'
-    body+='<div><label>دریافت‌شده توسط</label><select name="destination" id="invoice-destination"><option value="mine">من (بدون انتخاب بانک)</option><option value="mehr">مه هر</option><option value="check_mehr">چک تحویل مه هر</option></select></div>'
+    body+='<div><label>دریافت‌شده توسط</label><select name="destination" id="invoice-destination"><option value="mine">به من</option><option value="mehr">به مهر</option><option value="check_mehr">چک به مهر</option></select></div>'
     body+='<div><label>تاریخ پرداخت</label><input type="date" name="paid_on" value="'+today()+'"></div>'
     body+='<div id="invoice-check-date-wrap" style="display:none"><label>تاریخ چک</label><input type="date" name="check_date"></div>'
     body+='<div><label>شرح دریافت / شماره پیگیری (اختیاری)</label><input name="receipt_notes" maxlength="350"></div></div>'
-    body+='<p class="m2-hint">اگر دریافت به من ثبت شود، ولی بانک مشخص نباشد، دریافت در تاریخچه فاکتور ثبت می‌شود؛ به مانده هیچ حساب بانکی اضافه نمی‌شود تا حساب واقعی تعیین شود.</p>'
+    body+='<p class="m2-hint">فقط مشخص کن وجه به تو رسیده یا به مهر؛ شماره حساب و نام بانک لازم نیست. واریزی به مهر در حساب مهر منظور می‌شود و دریافت به تو در ریز فاکتور ثبت می‌شود.</p>'
     body+='<button class="m2-btn" type="submit" id="invoice-save-button">ثبت نهایی فاکتور و دریافتی</button>'
     body+='</section></form>'
     body+=r'''<script>
@@ -376,7 +372,7 @@ def supplier(conn=Depends(conn_dep)):
     body+='</select></div>'
     body+='<div><label>مبلغ (تومان)</label><input type="text" inputmode="numeric" dir="ltr" name="amount" placeholder="مثلاً 18000000" required></div>'
     body+='<div><label>تاریخ ثبت</label><input type="date" name="day" value="'+today()+'" required></div>'
-    body+='<p class="m2-hint">پرداخت واقعی بدهی خالص را کم می‌کند و به فاکتور انتخاب‌شده وصل می‌شود. تهاترِ ۵۸ میلیون واریزی مشتری از قبل در مانده خالص حساب شده؛ تهاترِ جداگانه مانده خالص را دوباره کم نمی‌کند و برای تطبیق دوطرفه دفتر است. هیچ بانکی انتخاب نمی‌شود.</p>'
+    body+='<p class="m2-hint">تسویه با مهر فقط با مبلغ، تاریخ و سند ثبت می‌شود؛ نام بانک لازم نیست. واریزی مشتری به مهر قبلاً در طلب/بدهی لحاظ شده و با تسویه دوم دوباره به‌عنوان دریافت ثبت نمی‌شود.</p>'
     body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
     body+='</div><button class="m2-btn">ثبت تسویه</button></form>'
     body+='<script>(function(){var a=document.getElementById("mehr-action"),w=document.getElementById("mehr-target-wrap"),t=document.getElementById("mehr-target");if(!a)return;function update(){var pay=a.value==="paid_to_mehr";w.style.display=pay?"":"none";t.required=pay;}a.addEventListener("change",update);update();})();</script>'
@@ -390,11 +386,11 @@ def supplier(conn=Depends(conn_dep)):
 
 @router.post(ROOT+"/invoices/mehr/settle")
 def settle(kind:str=Form(...),amount:str=Form(...),day:str=Form(...),request_key:str=Form(...),
-           account_id:str=Form(""),notes:str=Form(""),target:str=Form(""),conn=Depends(conn_dep)):
+           notes:str=Form(""),target:str=Form(""),conn=Depends(conn_dep)):
     try:
         if kind=="paid_to_mehr" and not target:
             raise ImportErrorDetail("فاکتور یا خرید مورد تسویه را انتخاب کن.")
-        settlement(conn,kind,amount,day,request_key,account_id,notes,target=target)
+        settlement(conn,kind,amount,day,request_key,account_id=None,notes=notes,target=target)
     except (ImportErrorDetail,ValueError) as ex:return form_error(ex,"invoices/mehr")
     return RedirectResponse(ROOT+"/invoices/mehr",status_code=303)
 
@@ -454,26 +450,26 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
     body+='<section class="m2-card"><h3>پرداخت‌های مشتری</h3>'
     for r in receipts:
         label={"mine":"به حساب من","mehr":"به حساب مه هر","check_mehr":"چک تحویل مه هر"}[r["destination"]]
-        body+='<p>'+jal_label(r["paid_on"])+' — '+e(label)+(' (بانک نامشخص)' if r["destination"]=="mine" and r["account_id"] is None else '')+' — '+fmt(r["amount"])+' تومان'+(' — تاریخ چک '+jal_label(r["check_date"]) if r["check_date"] else '')+' — '+e(r["notes"])+'</p>'
+        body+='<p>'+jal_label(r["paid_on"])+' — '+e(label)+' — '+fmt(r["amount"])+' تومان'+(' — تاریخ چک '+jal_label(r["check_date"]) if r["check_date"] else '')+' — '+e(r["notes"])+'</p>'
         if not inv["is_void"]:
             body+='<details><summary>ویرایش این دریافتی</summary><form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipts/'+str(r["id"])+'/edit">'
             body+='<input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
             body+='<div><label>مبلغ صحیح (تومان)</label><input type="number" name="amount" min="1" value="'+str(r["amount"])+'" required></div>'
             body+='<div><label>دریافت‌کننده واقعی وجه</label><select name="destination">'
-            for code,desc in (("mine","حساب من"),("mehr","حساب مهر"),("check_mehr","چک تحویل مهر")):
+            for code,desc in (("mine","به من"),("mehr","به مهر"),("check_mehr","چک به مهر")):
                 body+='<option value="'+code+'"'+(" selected" if r["destination"]==code else "")+'>'+desc+'</option>'
             body+='</select></div>'
             body+='<div><label>تاریخ دریافت</label><input type="date" name="paid_on" value="'+e(r["paid_on"])+'" required></div>'
             body+='<div><label>توضیح</label><input name="notes" maxlength="350" value="'+e(r["notes"])+'"></div>'
-            body+='<p class="m2-hint">مبلغ و دریافت‌کننده را با رسید واقعی تطبیق بده؛ اصلاح، دریافت جدید ایجاد نمی‌کند. اگر مبلغ اشتباه زیاد است، قبل از ذخیره رقم صحیح را از سند بانکی بررسی کن.</p>'
+            body+='<p class="m2-hint">مبلغ و دریافت‌کننده را با رسید واقعی تطبیق بده؛ اصلاح، دریافت جدید ایجاد نمی‌کند. قبل از ذخیره با رسید واقعی مطابقت بده.</p>'
             if r["destination"]=="check_mehr":
                 body+='<div><label>تاریخ چک</label><input type="date" name="check_date" value="'+e(r["check_date"])+'" required></div>'
             body+='</div><button class="m2-btn" onclick="return confirm(\'اصلاح مبلغ دریافت ثبت شود؟\')">ذخیره اصلاح دریافتی</button></form></details>'
     if total>paid and not inv["is_void"]:
         body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/receipt"><input type="hidden" name="request_key" value="'+token()+'"><div class="m2-fields">'
         body+='<div><label>مبلغ (تومان)</label><input type="number" min="1" max="'+str(total-paid)+'" name="amount" required></div>'
-        body+='<div><label>دریافت‌کننده</label><select name="destination"><option value="mine">حساب من</option><option value="mehr">حساب مه هر</option><option value="check_mehr">چک تحویل مه هر</option></select></div>'
-        body+='<input type="hidden" name="account_id" value=""><p class="m2-hint">دریافت به من بدون انتخاب بانک ثبت می‌شود؛ تا زمان تعیین حساب واقعی به موجودی بانک اضافه نمی‌شود.</p>'
+        body+='<div><label>وجه به چه کسی رسیده؟</label><select name="destination"><option value="mine">به من</option><option value="mehr">به مهر</option><option value="check_mehr">چک به مهر</option></select></div>'
+        body+='<p class="m2-hint">فقط دریافت‌کننده واقعی وجه مهم است؛ شماره حساب و نام بانک ثبت نمی‌شود.</p>'
         body+='<div><label>تاریخ پرداخت</label><input type="date" name="paid_on" value="'+today()+'" required></div>'
         body+='<div><label>تاریخ چک (در صورت چک)</label><input type="date" name="check_date"></div>'
         body+='<div><label>توضیحات</label><input name="notes" maxlength="350"></div>'
@@ -501,8 +497,8 @@ def dispatch(invoice_id:int,conn=Depends(conn_dep)):
 
 @router.post(ROOT+"/invoices/{invoice_id}/receipt")
 def receipt(invoice_id:int,amount:str=Form(...),destination:str=Form(...),paid_on:str=Form(...),
-            request_key:str=Form(...),account_id:str=Form(""),check_date:str=Form(""),
+            request_key:str=Form(...),check_date:str=Form(""),
             notes:str=Form(""),conn=Depends(conn_dep)):
-    try:record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,account_id,check_date,notes)
+    try:record_receipt(conn,invoice_id,amount,destination,paid_on,request_key,None,check_date,notes)
     except (ImportErrorDetail,ValueError) as ex:return form_error(ex,"invoices/"+str(invoice_id))
     return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
