@@ -10,7 +10,7 @@ from .master_v2_ui import page_with_style
 from .calendar_jalali import label as jal_label
 from .sister_invoices import (SIZES,create_invoice,submit_invoice,dispatch_invoice,record_receipt,
     receive_purchase,settlement,mehr_balance,mehr_open_items,invoices,invoice_detail,
-    edit_invoice,edit_invoice_date,edit_invoice_receipt,cancel_invoice,invoice_audit,
+    edit_invoice,edit_invoice_date,correct_invoice_origin_to_home,edit_invoice_receipt,cancel_invoice,invoice_audit,
     correct_invoice_origins_to_factory)
 
 router=APIRouter()
@@ -103,6 +103,52 @@ def invoice_origin_confirm(invoice_id:int,conn=Depends(conn_dep)):
     body+='<button class="m2-btn" onclick="return confirm(\'تأیید می‌کنی فاکتور #'+str(invoice_id)+' از کارخانه ارسال شده؟\')">ثبت اصلاح مبدأ همین فاکتور</button></form>'
     body+='<p><a href="/invoices/'+str(invoice_id)+'/">انصراف</a></p></section>'
     return page_with_style("اصلاح مبدأ فاکتور",body)
+
+
+@router.get(ROOT+"/invoices/{invoice_id}/origin-home")
+def origin_home_form(invoice_id:int,conn=Depends(conn_dep)):
+    try:inv,lines,receipts=invoice_detail(conn,invoice_id)
+    except ImportErrorDetail as exc:return form_error(exc)
+    if inv["is_void"] or inv["origin"]!="factory":
+        return form_error(ImportErrorDetail("فقط فاکتور فعال با مبدأ کارخانه قابل اصلاح به خانه است."),"invoices/"+str(invoice_id))
+    if conn.execute("""SELECT 1 FROM sister_mehr_settlement_links
+                      WHERE target_type='invoice' AND target_id=?""",(invoice_id,)).fetchone():
+        return form_error(ImportErrorDetail("فاکتور تسویه اختصاصی مهر دارد؛ اول باید تسویه آن تطبیق شود."),"invoices/"+str(invoice_id))
+    cost=sum(int(x["qty"])*int(x["purchase_unit"]) for x in lines)
+    mehr_paid=sum(int(x["amount"]) for x in receipts if x["destination"] in ("mehr","check_mehr"))
+    body='<h1>اصلاح مبدأ فاکتور #'+str(invoice_id)+' از کارخانه به خانه</h1>'
+    body+='<div class="m2-msg">پیش‌نمایش: فروش و دریافتی مشتری ثابت می‌ماند؛ بهای خرید کارخانه '+fmt(cost)+' تومان از بدهی مهر برگشت داده می‌شود و اگر فاکتور ارسال‌شده باشد، کالا دقیقاً از موجودی خانه کسر می‌شود.</div>'
+    if mehr_paid:
+        body+='<p class="m2-hint">وجه واقعی مشتری نزد مهر: '+fmt(mehr_paid)+' تومان. این وجه با تغییر مبدأ پاک نمی‌شود و طلب تو از مهر باقی می‌ماند.</p>'
+    body+='<form method="post" action="'+ROOT+'/invoices/'+str(invoice_id)+'/origin-home">'
+    body+='<input type="hidden" name="request_key" value="'+token()+'"><input type="hidden" name="version" value="'+str(inv["version"])+'">'
+    body+='<section class="m2-card"><h3>انتخاب کالای واقعی انبار خانه</h3><div class="m2-fields">'
+    for line in lines:
+        size=line["size"]
+        body+='<div><label>قالب '+e(size)+' · '+fmt(line["qty"])+' عدد</label><select required name="master_'+size+'"><option value="">انتخاب کالای دقیق</option>'
+        choices=conn.execute("""SELECT id,title,color,seller_stock FROM master_products
+            WHERE category='قالب' AND size=? AND active=1 ORDER BY title,color,id""",(size,))
+        for sku in choices:
+            body+='<option value="'+str(sku["id"])+'">'+e(sku["title"])+' / '+e(sku["color"])+' · موجودی '+fmt(sku["seller_stock"])+'</option>'
+        body+='</select></div>'
+    body+='</div><p class="m2-hint">موجودی منفی در این سیستم مجاز است. فقط کالایی را انتخاب کن که واقعاً از خانه تحویل شده است.</p>'
+    body+='<button class="m2-btn" onclick="return confirm(\'فاکتور از کارخانه به خانه تبدیل شود و موجودی خانه دقیقاً کسر شود؟\')">تأیید اصلاح مبدأ به خانه</button>'
+    body+='</section></form>'
+    return page_with_style("اصلاح مبدأ به خانه",body)
+
+
+@router.post(ROOT+"/invoices/{invoice_id}/origin-home")
+def origin_home_post(invoice_id:int,version:int=Form(...),request_key:str=Form(...),
+                     master_small:str=Form("",alias="master_کوچک"),
+                     master_medium:str=Form("",alias="master_متوسط"),
+                     master_large:str=Form("",alias="master_بزرگ"),
+                     conn=Depends(conn_dep)):
+    try:
+        correct_invoice_origin_to_home(conn,invoice_id,version,request_key,{
+            "کوچک":master_small,"متوسط":master_medium,"بزرگ":master_large})
+    except (ImportErrorDetail,ValueError,TypeError) as exc:
+        return form_error(exc,"invoices/"+str(invoice_id)+"/origin-home")
+    return RedirectResponse(ROOT+"/invoices/"+str(invoice_id),status_code=303)
 
 
 @router.post(ROOT+"/invoices/origins/convert")
@@ -433,6 +479,8 @@ def detail(invoice_id:int,conn=Depends(conn_dep)):
         body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/edit/">✎ ویرایش فاکتور</a>'
         if inv["origin"]=="home":
             body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/origin/">اصلاح مبدأ به کارخانه</a>'
+        else:
+            body+='<a class="m2-invoice-edit" href="/invoices/'+str(invoice_id)+'/origin-home/">اصلاح مبدأ به خانه</a>'
     body+='</div>'
     if inv["is_void"]:
         body+='<div class="m2-msg">این فاکتور ابطال شده و در فروش، سود و حساب‌های باز منظور نمی‌شود. سابقه همچنان قابل مشاهده است.</div>'
