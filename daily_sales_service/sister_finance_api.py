@@ -70,7 +70,6 @@ def finance_home(conn=Depends(conn_dep)):
                  ("طلب خالص من از مه هر",max(0,info["mehr_receivable"]-info["mehr_payable"]),"تومان · اگر وجوه نزد مهر بیشتر از بدهی باشد"),
                  ("بدهی سایر تأمین‌کنندگان",info["supplier_payable"],"تومان"),
                  ("پیش‌دریافت فاکتورهای ارسال‌نشده",info["customer_advances"],"تومان"),
-                 ("جمع موجودی حساب‌های ثبت‌شده",info["cash_balance"],"تومان"),
                  ("فروش ثبت‌شده",sales["gross"],"تومان"),
                  ("کارمزدها",sales["fees"],"تومان"),
                  ("بهای تمام‌شده ثبت‌شده",sales["cogs_known"],"تومان · به‌جز موارد نامشخص"),
@@ -105,7 +104,7 @@ def finance_home(conn=Depends(conn_dep)):
     body+=f'<a class="m2-btn" href="{ROOT}/finance/movements?section=payment">ثبت پرداختی</a>'
     body+=f'<a class="m2-btn" href="{ROOT}/finance/sales">گزارش تفصیلی فروش</a>'
     body+='<a class="m2-btn" href="/calculator/">محاسبه‌گر</a></div>'
-    body+='<p class="m2-hint">موجودی حساب بانکی بر اساس مانده اولیه و گردش‌های این دفتر محاسبه می‌شود. موجودی یا مطالبات دفتر قدیمی با این مبالغ جمع نشده‌اند.</p>'
+    body+='<p class="m2-hint">دریافت‌ها فقط با مقصد «به من» یا «به مهر» ثبت می‌شوند. سوابق بانکی قدیمی برای حفظ تاریخچه باقی مانده‌اند، ولی در ثبت‌های جدید نیازی به نام بانک نیست.</p>'
     return page_with_style("مرکز مالی",body)
 
 
@@ -119,11 +118,11 @@ def open_invoice_balances(conn=Depends(conn_dep)):
     mehr=mehr_balance(conn)
     unallocated=conn.execute("""SELECT COALESCE(SUM(amount),0),COUNT(*)
         FROM sister_invoice_receipts WHERE destination='mine' AND account_id IS NULL""").fetchone()
-    body='<h1>فاکتورهای باز و مانده حساب‌ها</h1>'
-    body+='<p class="m2-hint">مانده مشتریان، بدهی تأمین‌کنندگان و دریافت‌های بانک‌نامشخص از یکدیگر جدا هستند. پرداخت‌های فاکتور را دوباره در مالی ثبت نکن.</p>'
+    body='<h1>فاکتورهای باز و مانده طرف‌حساب‌ها</h1>'
+    body+='<p class="m2-hint">دریافت‌های «به من» از وجه نزد مهر جدا هستند. برای هیچ‌کدام شماره حساب لازم نیست. پرداخت‌های فاکتور را دوباره در مالی ثبت نکن.</p>'
     body+=nav("finance")
     body+=tiles([("مانده مشتریان",sum(int(x["gross"])-int(x["paid"]) for x in rows),"تومان · فاکتورهای ارسال‌شده"),
-                 ("دریافت ثبت‌شده با بانک نامشخص",int(unallocated[0]),"تومان · "+str(int(unallocated[1]))+" دریافت؛ خارج از مانده بانک"),
+                 ("دریافت‌های ثبت‌شده به من",int(unallocated[0]),"تومان · "+str(int(unallocated[1]))+" دریافت بدون تعیین حساب بانکی"),
                  ("بدهی خالص من به مه هر",max(0,-mehr["net"]),"تومان · پس از کسر وجوه مشتری"),
                  ("طلب خالص من از مه هر",max(0,mehr["net"]),"تومان · در صورت مازاد نزد مهر"),
                  ("بدهی سایر تأمین‌کنندگان",sum(int(x["due"]) for x in supplier_rows),"تومان")])
@@ -158,19 +157,8 @@ def finance_accounts(conn=Depends(conn_dep)):
     for x in positions.values():
         body+=f'<tr><th>{e(x["title"])}</th><td>{fmt(x["sales_net"])}</td><td>{fmt(x["received"])}</td><td>{fmt(x["outstanding"])}</td></tr>'
     body+='</tbody></table></div></section>'
-    body+='<section class="m2-card m2-finance-section"><h3>حساب‌های بانکی و صندوق</h3>'
-    if banks:
-        body+='<div class="m2-table-scroll"><table class="m2-table"><thead><tr><th>حساب</th><th>مانده افتتاحیه</th><th>خالص گردش</th><th>مانده فعلی</th></tr></thead><tbody>'
-        for x in banks:
-            body+=f'<tr><th>{e(x["title"])}</th><td>{fmt(x["opening_toman"])}</td><td>{fmt(x["movement_toman"])}</td><td>{fmt(x["balance"])}</td></tr>'
-        body+='</tbody></table></div>'
-    else:
-        body+='<p class="m2-hint">هنوز حسابی تعریف نشده است. قبل از اولین دریافت یا پرداخت، حساب مقصد یا مبدأ را ایجاد کن.</p>'
-    body+=f'<form class="m2-fields m2-finance-form" method="post" action="{ROOT}/finance/accounts/add">'
-    body+='<div><label>نام حساب جدید (مثلاً ملت، تجارت، صندوق)</label><input name="title" maxlength="100" required></div>'
-    body+='<div><label>مانده ابتدای کار (تومان)</label><input name="opening" type="number" min="0" value="0" required></div>'
-    body+='<div><button type="submit" class="m2-btn">ثبت حساب جدید</button></div></form>'
-    body+='</section>'
+    body+='<section class="m2-card m2-finance-section"><h3>دریافت به من یا مهر</h3>'
+    body+='<p class="m2-hint">از این پس مقصد دریافتی را فقط در فرم همان فاکتور مشخص کن: «به من»، «به مهر»، یا «چک به مهر». در این صفحه نیازی به تعریف حساب بانکی نیست. ثبت‌های قدیمی بانکی حذف نشده‌اند.</p></section>'
     body+='<p class="m2-hint">بهای کالای فروخته‌شده از سود کم می‌شود، نه از طلب پلتفرم. دریافت وجه هم فروش تازه ایجاد نمی‌کند.</p>'
     return page_with_style("حساب‌ها",body)
 
@@ -212,7 +200,7 @@ def outgoing_payment_page(conn):
     body+='<div><label>توضیحات (اختیاری)</label><input name="notes" maxlength="350"></div>'
     body+='<div><button class="m2-btn" type="submit">ثبت پرداخت</button></div></form>'
     body+='<p class="m2-hint">مانده خالص بدهی فعلی به مهر: '+fmt(max(0,-mehr_net["net"]))+' تومان. مبلغ انتخابی نباید از مانده سند یا بدهی خالص بیشتر باشد. وجوهی که مشتری مستقیم به مهر داده قبلاً از مانده فاکتور کسر شده‌اند.</p>'
-    body+='<p class="m2-hint">پرداخت مهر در دفتر اختصاصی خودش ثبت می‌شود. پرداخت به سایر تأمین‌کنندگان فقط وقتی خودکار از بدهی کم می‌شود که نام دقیقاً با یک تأمین‌کننده خرید مطابقت داشته باشد و مانده کافی باشد؛ در غیر این صورت به‌عنوان پرداختِ نیازمند تطبیق می‌ماند. از موجودی بانک مبلغی کم نمی‌شود تا حساب واقعی مشخص شود.</p>'
+    body+='<p class="m2-hint">پرداخت مهر در دفتر اختصاصی خودش ثبت می‌شود. پرداخت به سایر تأمین‌کنندگان فقط وقتی خودکار از بدهی کم می‌شود که نام با تأمین‌کننده خرید مطابقت داشته باشد و مانده کافی باشد؛ در غیر این صورت نیازمند تطبیق باقی می‌ماند.</p>'
     body+='</section>'
     body+='<section class="m2-card m2-finance-section"><h3>سوابق پرداخت‌های بدون تعیین بانک</h3>'
     if rows:
@@ -239,7 +227,7 @@ def outgoing_payment_page(conn):
         body+='</tbody></table></div>'
     else:body+='<p class="m2-hint">هنوز پرداخت به مهر ثبت نشده است.</p>'
     body+='</section>'
-    body+='<p class="m2-hint">سوابق قدیمی پرداخت‌های بانکی حذف نشده‌اند. برای دیدن پرداخت‌های قبل از این تغییر، به <a href="'+ROOT+'/finance/accounts">حساب‌ها</a> مراجعه کن.</p>'
+    body+='<p class="m2-hint">پرداخت‌های قدیمی همچنان در دفتر ثبت و محفوظ‌اند؛ هیچ سند بانکی پیشین حذف نشده است.</p>'
     body+='<script>(function(){var f=document.getElementById("outgoing-purpose"),a=document.getElementById("outgoing-other-supplier"),m=document.getElementById("outgoing-mehr-target"),t=document.getElementById("outgoing-mehr-target-select"),x=document.getElementById("outgoing-amount");if(!f)return;function show(){a.style.display=f.value==="supplier:other"?"":"none";m.style.display=(f.value==="supplier:mehr"||f.value==="supplier:holder")?"":"none";t.required=(f.value==="supplier:mehr"||f.value==="supplier:holder");}f.addEventListener("change",show);show();var form=f.closest("form");form.addEventListener("submit",function(ev){var v=x.value.replace(/[۰-۹]/g,function(n){return String(n.charCodeAt(0)-1776);}).replace(/[٠-٩]/g,function(n){return String(n.charCodeAt(0)-1632);}).replace(/[٬,\\s]/g,"");if(!/^\\d+$/.test(v)||Number(v)<=0){ev.preventDefault();alert("مبلغ پرداختی معتبر نیست.");return;}x.value=v;});})();</script>'
     return page_with_style("پرداختی‌ها",body)
 
